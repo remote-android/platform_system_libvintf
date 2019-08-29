@@ -15,6 +15,7 @@
  */
 
 #include <getopt.h>
+#include <sysexits.h>
 #include <unistd.h>
 
 #include <iostream>
@@ -327,7 +328,7 @@ int usage(const char* me) {
         << "            --property ro.boot.product.hardware.sku=`adb shell getprop "
            "ro.boot.product.hardware.sku`"
         << std::endl;
-    return 1;
+    return EX_USAGE;
 }
 
 int checkAllFiles(const Dirmap& dirmap, const Properties& props,
@@ -406,11 +407,16 @@ int main(int argc, char** argv) {
     }
 
     int compat = checkAllFiles(dirmap, properties, runtimeInfo, &error);
-    std::cerr << "Debug: "
-              << (compat == COMPATIBLE
-                      ? "files are compatible"
-                      : compat == INCOMPATIBLE ? "files are incompatible"
-                                               : ("Encountered an error: " + error))
-              << std::endl;
-    return compat;
+
+    if (compat == COMPATIBLE) {
+        std::cout << "COMPATIBLE" << std::endl;
+        return EX_OK;
+    }
+    if (compat == INCOMPATIBLE) {
+        std::cerr << "Error: files are incompatible: " << error << std::endl;
+        std::cout << "INCOMPATIBLE" << std::endl;
+        return EX_DATAERR;
+    }
+    std::cerr << "Error: " << strerror(-compat) << ": " << error << std::endl;
+    return EX_SOFTWARE;
 }
