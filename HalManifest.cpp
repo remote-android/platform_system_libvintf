@@ -187,12 +187,12 @@ std::vector<std::string> HalManifest::checkIncompatibleHals(const CompatibilityM
         }
 
         std::set<FqInstance> manifestInstances;
-        std::set<FqInstance> manifestInstancesNoPackage;
+        std::set<std::string> simpleManifestInstances;
         std::set<Version> versions;
         for (const ManifestHal* manifestHal : getHals(matrixHal.name)) {
             manifestHal->forEachInstance([&](const auto& manifestInstance) {
                 manifestInstances.insert(manifestInstance.getFqInstance());
-                manifestInstancesNoPackage.insert(manifestInstance.getFqInstanceNoPackage());
+                simpleManifestInstances.insert(manifestInstance.getSimpleFqInstance());
                 return true;
             });
             manifestHal->appendAllVersions(&versions);
@@ -206,7 +206,7 @@ std::vector<std::string> HalManifest::checkIncompatibleHals(const CompatibilityM
             if (manifestInstances.empty()) {
                 multilineIndent(oss, 8, versions);
             } else {
-                multilineIndent(oss, 8, manifestInstancesNoPackage);
+                multilineIndent(oss, 8, simpleManifestInstances);
             }
 
             ret.insert(ret.end(), oss.str());
