@@ -26,10 +26,11 @@
 
 #include <android-base/strings.h>
 
+#include "CompatibilityMatrix.h"
+#include "constants.h"
 #include "parse_string.h"
 #include "parse_xml.h"
 #include "utils.h"
-#include "CompatibilityMatrix.h"
 
 namespace android {
 namespace vintf {
@@ -384,7 +385,7 @@ Level HalManifest::level() const {
 }
 
 Version HalManifest::getMetaVersion() const {
-    return mMetaVersion;
+    return kMetaVersion;
 }
 
 const Version &HalManifest::sepolicyVersion() const {
@@ -482,15 +483,6 @@ const std::optional<KernelInfo>& HalManifest::kernel() const {
 }
 
 bool HalManifest::addAll(HalManifest* other, std::string* error) {
-    if (other->mMetaVersion.majorVer != mMetaVersion.majorVer) {
-        if (error) {
-            *error = "Cannot merge manifest version " + to_string(mMetaVersion) + " and " +
-                     to_string(other->mMetaVersion);
-        }
-        return false;
-    }
-    mMetaVersion.minorVer = std::max(mMetaVersion.minorVer, other->mMetaVersion.minorVer);
-
     if (type() != other->type()) {
         if (error) {
             *error = "Cannot add a " + to_string(other->type()) + " manifest to a " +

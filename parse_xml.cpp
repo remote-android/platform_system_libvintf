@@ -967,15 +967,17 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
         }
     }
     bool buildObject(HalManifest* object, NodeType* root, std::string* error) const override {
-        std::vector<ManifestHal> hals;
-        if (!parseAttr(root, "version", &object->mMetaVersion, error) ||
-            !parseAttr(root, "type", &object->mType, error) ||
-            !parseChildren(root, manifestHalConverter, &hals, error)) {
+        Version metaVersion;
+        if (!parseAttr(root, "version", &metaVersion, error)) return false;
+        if (metaVersion > kMetaVersion) {
+            *error = "Unrecognized manifest.version " + to_string(metaVersion) + " (libvintf@" +
+                     to_string(kMetaVersion) + ")";
             return false;
         }
-        if (!kMetaVersion.minorAtLeast(object->mMetaVersion)) {
-            *error = "Unrecognized manifest.version " + to_string(object->mMetaVersion) +
-                     " (libvintf@" + to_string(kMetaVersion) + ")";
+
+        std::vector<ManifestHal> hals;
+        if (!parseAttr(root, "type", &object->mType, error) ||
+            !parseChildren(root, manifestHalConverter, &hals, error)) {
             return false;
         }
         if (object->mType == SchemaType::DEVICE) {
@@ -1099,7 +1101,7 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
     void mutateNode(const CompatibilityMatrix& m, NodeType* root, DocType* d,
                     SerializeFlags::Type flags) const override {
         if (flags.isMetaVersionEnabled()) {
-            appendAttr(root, "version", m.getMinimumMetaVersion());
+            appendAttr(root, "version", kMetaVersion);
         }
         if (flags.isSchemaTypeEnabled()) {
             appendAttr(root, "type", m.mType);
@@ -1152,10 +1154,16 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
     }
     bool buildObject(CompatibilityMatrix* object, NodeType* root,
                      std::string* error) const override {
-        Version version;
+        Version metaVersion;
+        if (!parseAttr(root, "version", &metaVersion, error)) return false;
+        if (metaVersion > kMetaVersion) {
+            *error = "Unrecognized compatibility-matrix.version " + to_string(metaVersion) +
+                     " (libvintf@" + to_string(kMetaVersion) + ")";
+            return false;
+        }
+
         std::vector<MatrixHal> hals;
-        if (!parseAttr(root, "version", &version, error) ||
-            !parseAttr(root, "type", &object->mType, error) ||
+        if (!parseAttr(root, "type", &object->mType, error) ||
             !parseChildren(root, matrixHalConverter, &hals, error)) {
             return false;
         }
@@ -1210,11 +1218,6 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
             }
         }
 
-        if (!kMetaVersion.minorAtLeast(version)) {
-            *error = "Unrecognized compatibility-matrix.version " + to_string(version) +
-                     " (libvintf@" + to_string(kMetaVersion) + ")";
-            return false;
-        }
         for (auto &&hal : hals) {
             if (!object->add(std::move(hal))) {
                 *error = "Duplicated compatibility-matrix.hal entry";
