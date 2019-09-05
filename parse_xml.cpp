@@ -26,6 +26,7 @@
 #include <tinyxml2.h>
 
 #include "Regex.h"
+#include "constants-private.h"
 #include "constants.h"
 #include "parse_string.h"
 
@@ -550,7 +551,10 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
         appendAttr(root, "format", hal.format);
         appendAttr(root, "optional", hal.optional);
         appendTextElement(root, "name", hal.name, d);
-        appendChildren(root, versionRangeConverter, hal.versionRanges, d);
+        // Don't write <version> for format="aidl"
+        if (hal.format != HalFormat::AIDL) {
+            appendChildren(root, versionRangeConverter, hal.versionRanges, d);
+        }
         appendChildren(root, halInterfaceConverter, iterateValues(hal.interfaces), d);
     }
     bool buildObject(MatrixHal* object, NodeType* root, std::string* error) const override {
@@ -562,6 +566,16 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
             !parseChildren(root, versionRangeConverter, &object->versionRanges, error) ||
             !parseChildren(root, halInterfaceConverter, &interfaces, error)) {
             return false;
+        }
+        if (object->format == HalFormat::AIDL) {
+            if (!object->versionRanges.empty()) {
+                LOG(WARNING) << "Ignoring <version> on matrix <hal format=\"aidl\"> "
+                             << object->name;
+                object->versionRanges.clear();
+            }
+            // Insert fake version for AIDL HALs so that compatibility check for AIDL and other
+            // HAL formats can be unified.
+            object->versionRanges.push_back(details::kFakeAidlVersionRange);
         }
         for (auto&& interface : interfaces) {
             std::string name{interface.name()};
@@ -673,20 +687,25 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                     SerializeFlags::Type flags) const override {
         appendAttr(root, "format", hal.format);
         appendTextElement(root, "name", hal.name, d);
-        appendChild(root, transportArchConverter(hal.transportArch, d));
-        appendChildren(root, versionConverter, hal.versions, d);
+        if (!hal.transportArch.empty()) {
+            appendChild(root, transportArchConverter(hal.transportArch, d));
+        }
+        // Don't output <version> for format="aidl"
+        if (hal.format != HalFormat::AIDL) {
+            appendChildren(root, versionConverter, hal.versions, d);
+        }
         appendChildren(root, halInterfaceConverter, iterateValues(hal.interfaces), d);
         if (hal.isOverride()) {
             appendAttr(root, "override", hal.isOverride());
         }
 
         if (flags.isFqnameEnabled()) {
-            std::set<FqInstance> fqInstances;
-            hal.forEachInstance([&fqInstances](const auto& manifestInstance) {
-                fqInstances.emplace(manifestInstance.getFqInstanceNoPackage());
+            std::set<std::string> simpleFqInstances;
+            hal.forEachInstance([&simpleFqInstances](const auto& manifestInstance) {
+                simpleFqInstances.emplace(manifestInstance.getSimpleFqInstance());
                 return true;
             });
-            appendChildren(root, fqInstanceConverter, fqInstances, d);
+            appendTextElements(root, fqInstanceConverter.elementName(), simpleFqInstances, d);
         }
     }
     bool buildObject(ManifestHal* object, NodeType* root, std::string* error) const override {
@@ -713,6 +732,20 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                         "Native HAL '" + object->name + "' should not have <transport> defined.";
                     return false;
                 }
+            } break;
+            case HalFormat::AIDL: {
+                if (!object->transportArch.empty()) {
+                    LOG(WARNING) << "Ignoring <transport> on manifest <hal format=\"aidl\"> "
+                                 << object->name;
+                    object->transportArch = {};
+                }
+                if (!object->versions.empty()) {
+                    LOG(WARNING) << "Ignoring <version> on manifest <hal format=\"aidl\"> "
+                                 << object->name;
+                    object->versions.clear();
+                }
+                // Insert fake version for AIDL HALs so that forEachInstance works.
+                object->versions.push_back(details::kFakeAidlVersion);
             } break;
             default: {
                 LOG(FATAL) << "Unhandled HalFormat "
@@ -747,13 +780,27 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         if (!parseChildren(root, fqInstanceConverter, &fqInstances, error)) {
             return false;
         }
-        for (const auto& e : fqInstances) {
+        std::set<FqInstance> fqInstancesToInsert;
+        for (auto& e : fqInstances) {
             if (e.hasPackage()) {
                 *error = "Should not specify package: \"" + e.string() + "\"";
                 return false;
             }
+            if (object->format == HalFormat::AIDL) {
+                // <fqname> in AIDL HALs should not contain version. Put in the fake
+                // kFakeAidlVersion so that compatibility check works.
+                FqInstance withFakeVersion;
+                if (!withFakeVersion.setTo(details::kFakeAidlVersion.majorVer,
+                                           details::kFakeAidlVersion.minorVer, e.getInterface(),
+                                           e.getInstance())) {
+                    return false;
+                }
+                fqInstancesToInsert.emplace(std::move(withFakeVersion));
+            } else {
+                fqInstancesToInsert.emplace(std::move(e));
+            }
         }
-        if (!object->insertInstances(fqInstances, error)) {
+        if (!object->insertInstances(fqInstancesToInsert, error)) {
             return false;
         }
 
