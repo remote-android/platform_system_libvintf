@@ -3650,6 +3650,104 @@ TEST_F(LibVintfTest, MatrixMetaVersionWriteLatest) {
     EXPECT_IN(kMetaVersionStr, gCompatibilityMatrixConverter(matrix, SerializeFlags::NO_TAGS));
 }
 
+TEST_F(LibVintfTest, Aidl) {
+    std::string xml =
+        "<compatibility-matrix " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"aidl\" optional=\"false\">\n"
+        "        <name>android.system.foo</name>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "            <regex-instance>test.*</regex-instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</compatibility-matrix>\n";
+    std::string error;
+    CompatibilityMatrix matrix;
+    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << error;
+    EXPECT_EQ(xml, gCompatibilityMatrixConverter(matrix, SerializeFlags::HALS_NO_FQNAME));
+
+    {
+        HalManifest manifest;
+        std::string manifestXml =
+            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"aidl\">\n"
+            "        <name>android.system.foo</name>\n"
+            "        <interface>\n"
+            "            <name>IFoo</name>\n"
+            "            <instance>default</instance>\n"
+            "            <instance>test0</instance>\n"
+            "        </interface>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
+    }
+
+    {
+        HalManifest manifest;
+        std::string manifestXml =
+            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"aidl\">\n"
+            "        <name>android.system.foo</name>\n"
+            "        <fqname>IFoo/default</fqname>\n"
+            "        <fqname>IFoo/test0</fqname>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_ONLY));
+        EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
+    }
+
+    {
+        HalManifest manifest;
+        std::string manifestXml =
+            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"aidl\">\n"
+            "        <name>android.system.foo</name>\n"
+            "        <interface>\n"
+            "            <name>IFoo</name>\n"
+            "            <instance>incompat_instance</instance>\n"
+            "            <instance>test0</instance>\n"
+            "        </interface>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
+            << "Should not be compatible because default instance is missing";
+        EXPECT_IN("required: (IFoo/default AND IFoo/test.*)", error);
+        EXPECT_IN("provided: \n"
+                  "        IFoo/incompat_instance\n"
+                  "        IFoo/test0",
+                  error);
+    }
+    {
+        HalManifest manifest;
+        std::string manifestXml =
+            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"aidl\">\n"
+            "        <name>android.system.foo</name>\n"
+            "        <interface>\n"
+            "            <name>IFoo</name>\n"
+            "            <instance>default</instance>\n"
+            "            <instance>incompat_instance</instance>\n"
+            "        </interface>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
+            << "Should not be compatible because test.* instance is missing";
+        EXPECT_IN("required: (IFoo/default AND IFoo/test.*)", error);
+        EXPECT_IN("provided: \n"
+                  "        IFoo/default\n"
+                  "        IFoo/incompat_instance\n",
+                  error);
+    }
+}
+
 struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
     virtual void SetUp() override {
         matrices = {
