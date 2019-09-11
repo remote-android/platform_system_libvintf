@@ -100,7 +100,7 @@ struct HalGroup {
         return true;
     }
 
-   public:
+   protected:
     // Apply func to all instances of package@expectVersion::*/*.
     // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
     // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
@@ -121,6 +121,57 @@ struct HalGroup {
                                             }
                                             return true;
                                         });
+    }
+
+    // Apply func to all instances of package@expectVersion::*/*.
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
+    // If format is AIDL, expectVersion should be the fake AIDL version.
+    bool forEachInstanceOfVersion(HalFormat format, const std::string& package,
+                                  const Version& expectVersion,
+                                  const std::function<bool(const InstanceType&)>& func) const {
+        return forEachInstanceOfVersion(package, expectVersion,
+                                        [&func, format](const InstanceType& e) {
+                                            if (e.format() == format) {
+                                                return func(e);
+                                            }
+                                            return true;
+                                        });
+    }
+
+    // Apply func to instances of package@expectVersion::interface/*.
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // is called with a.h.foo@1.0::IFoo, then a.h.foo@1.1::IFoo/default is returned.
+    // If format is AIDL, expectVersion should be the fake AIDL version.
+    bool forEachInstanceOfInterface(HalFormat format, const std::string& package,
+                                    const Version& expectVersion, const std::string& interface,
+                                    const std::function<bool(const InstanceType&)>& func) const {
+        return forEachInstanceOfVersion(format, package, expectVersion,
+                                        [&func, &interface](const InstanceType& e) {
+                                            if (e.interface() == interface) {
+                                                return func(e);
+                                            }
+                                            return true;
+                                        });
+    }
+
+   public:
+    // Apply func to all instances of package@expectVersion::*/*.
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
+    virtual bool forEachHidlInstanceOfVersion(
+        const std::string& package, const Version& expectVersion,
+        const std::function<bool(const InstanceType&)>& func) const {
+        return forEachInstanceOfVersion(HalFormat::HIDL, package, expectVersion, func);
+    }
+
+    // Apply func to instances of package@expectVersion::interface/*.
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // is called with a.h.foo@1.0::IFoo, then a.h.foo@1.1::IFoo/default is returned.
+    bool forEachHidlInstanceOfInterface(
+        const std::string& package, const Version& expectVersion, const std::string& interface,
+        const std::function<bool(const InstanceType&)>& func) const {
+        return forEachInstanceOfInterface(HalFormat::HIDL, package, expectVersion, interface, func);
     }
 
     // Alternative to forEachInstanceOfInterface if you need a vector instead.

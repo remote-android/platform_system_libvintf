@@ -799,7 +799,8 @@ int32_t VintfObject::checkDeprecation(std::string* error) {
                           const std::vector<std::string>& /* hintInstances */) {
             std::vector<std::pair<std::string, Version>> ret;
             deviceManifest->forEachInstanceOfInterface(
-                package, version, interface, [&ret](const ManifestInstance& manifestInstance) {
+                HalFormat::HIDL, package, version, interface,
+                [&ret](const ManifestInstance& manifestInstance) {
                     ret.push_back(
                         std::make_pair(manifestInstance.instance(), manifestInstance.version()));
                     return true;
