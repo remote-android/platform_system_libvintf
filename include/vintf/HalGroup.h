@@ -122,21 +122,6 @@ struct HalGroup {
         const std::string& package, const Version& expectVersion,
         const std::function<bool(const InstanceType&)>& func) const = 0;
 
-    // Apply func to instances of package@expectVersion::interface/*.
-    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
-    // is called with a.h.foo@1.0::IFoo, then a.h.foo@1.1::IFoo/default is returned.
-    bool forEachInstanceOfInterface(const std::string& package, const Version& expectVersion,
-                                    const std::string& interface,
-                                    const std::function<bool(const InstanceType&)>& func) const {
-        return forEachInstanceOfVersion(package, expectVersion,
-                                        [&func, &interface](const InstanceType& e) {
-                                            if (e.interface() == interface) {
-                                                return func(e);
-                                            }
-                                            return true;
-                                        });
-    }
-
     // Apply func to all instances of package@expectVersion::*/*.
     // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
     // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
