@@ -86,7 +86,21 @@ struct HalGroup {
         return true;
     }
 
+    bool forEachHidlInstance(const std::function<bool(const InstanceType&)>& func) const {
+        return forEachInstance(HalFormat::HIDL, func);
+    }
+
    private:
+    bool forEachInstance(HalFormat format,
+                         const std::function<bool(const InstanceType&)>& func) const {
+        return forEachInstance([&](const InstanceType& e) {
+            if (e.format() == format) {
+                return func(e);
+            }
+            return true;  // continue
+        });
+    }
+
     bool forEachHidlInstanceOfPackage(const std::string& package,
                                       const std::function<bool(const InstanceType&)>& func) const {
         for (const auto* hal : getHals(package)) {
