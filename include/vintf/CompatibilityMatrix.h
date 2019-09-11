@@ -64,7 +64,7 @@ struct CompatibilityMatrix : public HalGroup<MatrixHal>, public XmlFileGroup<Mat
 
    protected:
     bool forEachInstanceOfVersion(
-        const std::string& package, const Version& expectVersion,
+        HalFormat format, const std::string& package, const Version& expectVersion,
         const std::function<bool(const MatrixInstance&)>& func) const override;
 
    private:

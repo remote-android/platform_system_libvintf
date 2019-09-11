@@ -118,25 +118,10 @@ struct HalGroup {
     // Apply func to all instances of package@expectVersion::*/*.
     // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
     // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
-    virtual bool forEachInstanceOfVersion(
-        const std::string& package, const Version& expectVersion,
-        const std::function<bool(const InstanceType&)>& func) const = 0;
-
-    // Apply func to all instances of package@expectVersion::*/*.
-    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
-    // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
     // If format is AIDL, expectVersion should be the fake AIDL version.
-    bool forEachInstanceOfVersion(HalFormat format, const std::string& package,
-                                  const Version& expectVersion,
-                                  const std::function<bool(const InstanceType&)>& func) const {
-        return forEachInstanceOfVersion(package, expectVersion,
-                                        [&func, format](const InstanceType& e) {
-                                            if (e.format() == format) {
-                                                return func(e);
-                                            }
-                                            return true;
-                                        });
-    }
+    virtual bool forEachInstanceOfVersion(
+        HalFormat format, const std::string& package, const Version& expectVersion,
+        const std::function<bool(const InstanceType&)>& func) const = 0;
 
     // Apply func to instances of package@expectVersion::interface/*.
     // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
