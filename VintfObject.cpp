@@ -697,7 +697,7 @@ bool VintfObject::IsInstanceDeprecated(const MatrixInstance& oldMatrixInstance,
         // Find any package@x.? in target matrix, and check if instance is in target matrix.
         bool foundInstance = false;
         Version targetMatrixMinVer;
-        targetMatrix.forEachInstanceOfPackage(package, [&](const auto& targetMatrixInstance) {
+        targetMatrix.forEachHidlInstanceOfPackage(package, [&](const auto& targetMatrixInstance) {
             if (targetMatrixInstance.versionRange().majorVer == version.majorVer &&
                 targetMatrixInstance.interface() == interface &&
                 targetMatrixInstance.matchInstance(servedInstance)) {
