@@ -116,14 +116,14 @@ struct HalGroup {
 
    protected:
     // Apply func to all instances of package@expectVersion::*/*.
-    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
     // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
     virtual bool forEachInstanceOfVersion(
         const std::string& package, const Version& expectVersion,
         const std::function<bool(const InstanceType&)>& func) const = 0;
 
     // Apply func to instances of package@expectVersion::interface/*.
-    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
     // is called with a.h.foo@1.0::IFoo, then a.h.foo@1.1::IFoo/default is returned.
     bool forEachInstanceOfInterface(const std::string& package, const Version& expectVersion,
                                     const std::string& interface,
@@ -138,7 +138,7 @@ struct HalGroup {
     }
 
     // Apply func to all instances of package@expectVersion::*/*.
-    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
     // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
     // If format is AIDL, expectVersion should be the fake AIDL version.
     bool forEachInstanceOfVersion(HalFormat format, const std::string& package,
@@ -154,7 +154,7 @@ struct HalGroup {
     }
 
     // Apply func to instances of package@expectVersion::interface/*.
-    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
     // is called with a.h.foo@1.0::IFoo, then a.h.foo@1.1::IFoo/default is returned.
     // If format is AIDL, expectVersion should be the fake AIDL version.
     bool forEachInstanceOfInterface(HalFormat format, const std::string& package,
@@ -171,7 +171,7 @@ struct HalGroup {
 
    public:
     // Apply func to all instances of package@expectVersion::*/*.
-    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
     // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
     virtual bool forEachHidlInstanceOfVersion(
         const std::string& package, const Version& expectVersion,
@@ -180,7 +180,7 @@ struct HalGroup {
     }
 
     // Apply func to instances of package@expectVersion::interface/*.
-    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
+    // For example, if a.h.foo@1.1::IFoo/default is in "this" and getHidlFqInstances
     // is called with a.h.foo@1.0::IFoo, then a.h.foo@1.1::IFoo/default is returned.
     bool forEachHidlInstanceOfInterface(
         const std::string& package, const Version& expectVersion, const std::string& interface,
@@ -188,21 +188,21 @@ struct HalGroup {
         return forEachInstanceOfInterface(HalFormat::HIDL, package, expectVersion, interface, func);
     }
 
-    // Alternative to forEachInstanceOfInterface if you need a vector instead.
+    // Alternative to forEachHidlInstanceOfInterface if you need a vector instead.
     // If interface is empty, returns all instances of package@version;
     // else return all instances of package@version::interface.
-    std::vector<InstanceType> getFqInstances(const std::string& package,
-                                             const Version& expectVersion,
-                                             const std::string& interface = "") const {
+    std::vector<InstanceType> getHidlFqInstances(const std::string& package,
+                                                 const Version& expectVersion,
+                                                 const std::string& interface = "") const {
         std::vector<InstanceType> v;
         auto mapToVector = [&v](const auto& e) {
             v.push_back(e);
             return true;
         };
         if (interface.empty()) {
-            (void)forEachInstanceOfVersion(package, expectVersion, mapToVector);
+            (void)forEachHidlInstanceOfVersion(package, expectVersion, mapToVector);
         } else {
-            (void)forEachInstanceOfInterface(package, expectVersion, interface, mapToVector);
+            (void)forEachHidlInstanceOfInterface(package, expectVersion, interface, mapToVector);
         }
         return v;
     }
