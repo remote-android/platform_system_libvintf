@@ -449,11 +449,12 @@ bool CompatibilityMatrix::addAllAsOptional(Named<CompatibilityMatrix>* inputMatr
 }
 
 bool CompatibilityMatrix::forEachInstanceOfVersion(
-    const std::string& package, const Version& expectVersion,
+    HalFormat format, const std::string& package, const Version& expectVersion,
     const std::function<bool(const MatrixInstance&)>& func) const {
     for (const MatrixHal* hal : getHals(package)) {
         bool cont = hal->forEachInstance([&](const MatrixInstance& matrixInstance) {
-            if (matrixInstance.versionRange().contains(expectVersion)) {
+            if (matrixInstance.format() == format &&
+                matrixInstance.versionRange().contains(expectVersion)) {
                 return func(matrixInstance);
             }
             return true;

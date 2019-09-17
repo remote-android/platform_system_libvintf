@@ -150,11 +150,12 @@ Transport HalManifest::getHidlTransport(const std::string& package, const Versio
 }
 
 bool HalManifest::forEachInstanceOfVersion(
-    const std::string& package, const Version& expectVersion,
+    HalFormat format, const std::string& package, const Version& expectVersion,
     const std::function<bool(const ManifestInstance&)>& func) const {
     for (const ManifestHal* hal : getHals(package)) {
         bool cont = hal->forEachInstance([&](const ManifestInstance& manifestInstance) {
-            if (manifestInstance.version().minorAtLeast(expectVersion)) {
+            if (manifestInstance.format() == format &&
+                manifestInstance.version().minorAtLeast(expectVersion)) {
                 return func(manifestInstance);
             }
             return true;
