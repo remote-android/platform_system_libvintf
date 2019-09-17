@@ -790,7 +790,7 @@ TEST_F(VintfObjectTest, ProductCompatibilityMatrix) {
     FqInstance expectInstance;
     EXPECT_TRUE(expectInstance.setTo("android.hardware.foo@1.0::IFoo/default"));
     bool found = false;
-    fcm->forEachInstance([&found, &expectInstance](const auto& matrixInstance) {
+    fcm->forEachHidlInstance([&found, &expectInstance](const auto& matrixInstance) {
         found |= matrixInstance.isSatisfiedBy(expectInstance);
         return !found;  // continue if not found
     });

@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "Regex.h"
+#include "parse_string.h"
 
 namespace android {
 namespace vintf {
@@ -98,6 +99,33 @@ const std::string& MatrixInstance::exactInstance() const {
 
 bool MatrixInstance::isRegex() const {
     return mIsRegex;
+}
+
+std::string MatrixInstance::interfaceDescription(Version replaceVersion) const {
+    switch (format()) {
+        case HalFormat::HIDL:
+            [[fallthrough]];
+        case HalFormat::NATIVE: {
+            return toFQNameString(package(), replaceVersion, interface());
+        } break;
+        case HalFormat::AIDL: {
+            return toAidlFqnameString(package(), interface());
+        } break;
+    }
+}
+
+std::string MatrixInstance::description(Version replaceVersion) const {
+    std::string instanceDescription = isRegex() ? regexPattern() : exactInstance();
+    switch (format()) {
+        case HalFormat::HIDL:
+            [[fallthrough]];
+        case HalFormat::NATIVE: {
+            return toFQNameString(package(), replaceVersion, interface(), instanceDescription);
+        } break;
+        case HalFormat::AIDL: {
+            return toAidlFqnameString(package(), interface(), instanceDescription);
+        } break;
+    }
 }
 
 }  // namespace vintf
