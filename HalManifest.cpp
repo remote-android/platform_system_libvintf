@@ -27,6 +27,7 @@
 #include <android-base/strings.h>
 
 #include "CompatibilityMatrix.h"
+#include "constants-private.h"
 #include "constants.h"
 #include "parse_string.h"
 #include "parse_xml.h"
@@ -477,6 +478,11 @@ bool HalManifest::hasHidlInstance(const std::string& package, const Version& ver
                                   const std::string& interfaceName,
                                   const std::string& instance) const {
     return hasInstance(HalFormat::HIDL, package, version, interfaceName, instance);
+}
+
+bool HalManifest::hasAidlInstance(const std::string& package, const std::string& interface,
+                                  const std::string& instance) const {
+    return hasInstance(HalFormat::AIDL, package, details::kFakeAidlVersion, interface, instance);
 }
 
 bool HalManifest::insertInstance(const FqInstance& fqInstance, Transport transport, Arch arch,

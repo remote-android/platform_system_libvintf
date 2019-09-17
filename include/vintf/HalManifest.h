@@ -120,6 +120,10 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
     bool hasHidlInstance(const std::string& package, const Version& version,
                          const std::string& interfaceName, const std::string& instance) const;
 
+    // Return whether a given AIDL instance is in this manifest.
+    bool hasAidlInstance(const std::string& package, const std::string& interfaceName,
+                         const std::string& instance) const;
+
     // Insert the given instance. After inserting it, the instance will be available via
     // forEachInstance* functions. This modifies the manifest.
     // Return whether this operation is successful.
