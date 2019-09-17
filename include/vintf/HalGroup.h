@@ -216,6 +216,7 @@ struct HalGroup {
     }
 
    private:
+    friend class AnalyzeMatrix;
     friend class VintfObject;
 };
 
