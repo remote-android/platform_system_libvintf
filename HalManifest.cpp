@@ -220,8 +220,9 @@ std::set<std::string> HalManifest::checkUnusedHals(const CompatibilityMatrix& ma
     std::set<std::string> ret;
 
     forEachInstance([&ret, &mat](const auto& manifestInstance) {
-        if (!mat.matchInstance(manifestInstance.package(), manifestInstance.version(),
-                               manifestInstance.interface(), manifestInstance.instance())) {
+        if (!mat.matchInstance(manifestInstance.format(), manifestInstance.package(),
+                               manifestInstance.version(), manifestInstance.interface(),
+                               manifestInstance.instance())) {
             ret.insert(manifestInstance.description());
         }
         return true;
