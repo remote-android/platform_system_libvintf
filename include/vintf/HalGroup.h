@@ -20,6 +20,7 @@
 #include <map>
 #include <set>
 
+#include "HalFormat.h"
 #include "MapValueIterator.h"
 #include "Version.h"
 
@@ -85,9 +86,13 @@ struct HalGroup {
         return true;
     }
 
-    bool forEachInstanceOfPackage(const std::string& package,
-                                  const std::function<bool(const InstanceType&)>& func) const {
+   private:
+    bool forEachHidlInstanceOfPackage(const std::string& package,
+                                      const std::function<bool(const InstanceType&)>& func) const {
         for (const auto* hal : getHals(package)) {
+            if (hal->format != HalFormat::HIDL) {
+                continue;
+            }
             if (!hal->forEachInstance(func)) {
                 return false;
             }
@@ -95,6 +100,7 @@ struct HalGroup {
         return true;
     }
 
+   public:
     // Apply func to all instances of package@expectVersion::*/*.
     // For example, if a.h.foo@1.1::IFoo/default is in "this" and getFqInstances
     // is called with a.h.foo@1.0, then a.h.foo@1.1::IFoo/default is returned.
@@ -173,6 +179,9 @@ struct HalGroup {
         auto it = mHals.emplace(std::move(name), std::move(hal));  // always succeeds
         return &it->second;
     }
+
+   private:
+    friend class VintfObject;
 };
 
 }  // namespace vintf
