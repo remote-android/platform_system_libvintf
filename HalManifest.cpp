@@ -126,7 +126,16 @@ std::set<std::string> HalManifest::getHalNames() const {
 std::set<std::string> HalManifest::getHalNamesAndVersions() const {
     std::set<std::string> names{};
     forEachInstance([&names](const ManifestInstance& e) {
-        names.insert(toFQNameString(e.package(), e.version()));
+        switch (e.format()) {
+            case HalFormat::HIDL:
+                [[fallthrough]];
+            case HalFormat::NATIVE:
+                names.insert(toFQNameString(e.package(), e.version()));
+                break;
+            case HalFormat::AIDL:
+                names.insert(e.package());
+                break;
+        }
         return true;
     });
     return names;
