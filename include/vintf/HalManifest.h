@@ -85,6 +85,7 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
     // Returns all component names and versions, e.g.
     // "android.hardware.camera.device@1.0", "android.hardware.camera.device@3.2",
     // "android.hardware.nfc@1.0"]
+    // For AIDL HALs, versions are stripped away.
     std::set<std::string> getHalNamesAndVersions() const;
 
     // Type of the manifest. FRAMEWORK or DEVICE.
