@@ -21,6 +21,7 @@
 
 #include <hidl-util/FqInstance.h>
 
+#include "HalFormat.h"
 #include "VersionRange.h"
 
 namespace android {
@@ -36,13 +37,15 @@ class MatrixInstance {
 
     using VersionType = VersionRange;
     // fqInstance.version is ignored. Version range is provided separately.
-    MatrixInstance(FqInstance&& fqInstance, VersionRange&& range, bool optional, bool isRegex);
-    MatrixInstance(const FqInstance fqInstance, const VersionRange& range, bool optional,
+    MatrixInstance(HalFormat format, FqInstance&& fqInstance, VersionRange&& range, bool optional,
                    bool isRegex);
+    MatrixInstance(HalFormat format, const FqInstance fqInstance, const VersionRange& range,
+                   bool optional, bool isRegex);
     const std::string& package() const;
     const VersionRange& versionRange() const;
     const std::string& interface() const;
     bool optional() const;
+    HalFormat format() const;
 
     bool isSatisfiedBy(const FqInstance& provided) const;
 
@@ -60,6 +63,7 @@ class MatrixInstance {
     bool isRegex() const;
 
    private:
+    HalFormat mFormat = HalFormat::HIDL;
     FqInstance mFqInstance;
     VersionRange mRange;
     bool mOptional = false;
