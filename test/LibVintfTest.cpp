@@ -3870,6 +3870,22 @@ TEST_F(LibVintfTest, GetTransportAidlHalWithDummyTransport) {
                                         "default"));
 }
 
+TEST_F(LibVintfTest, AidlGetHalNamesAndVersions) {
+    HalManifest manifest;
+    std::string xml =
+        "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+        "    <hal format=\"aidl\">\n"
+        "        <name>android.system.foo</name>\n"
+        "        <fqname>IFoo/default</fqname>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    std::string error;
+    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    auto names = manifest.getHalNamesAndVersions();
+    ASSERT_EQ(1u, names.size());
+    EXPECT_EQ("android.system.foo", *names.begin());
+}
+
 struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
     virtual void SetUp() override {
         matrices = {
