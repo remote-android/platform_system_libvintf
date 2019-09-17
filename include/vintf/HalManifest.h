@@ -112,12 +112,12 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
     Version getMetaVersion() const;
 
     // Alternative to forEachInstance if you just need a set of instance names instead.
-    std::set<std::string> getInstances(const std::string& halName, const Version& version,
-                                       const std::string& interfaceName) const;
+    std::set<std::string> getHidlInstances(const std::string& package, const Version& version,
+                                           const std::string& interfaceName) const;
 
-    // Return whether instance is in getInstances(...).
-    bool hasInstance(const std::string& halName, const Version& version,
-                     const std::string& interfaceName, const std::string& instance) const;
+    // Return whether instance is in getHidlInstances(...).
+    bool hasHidlInstance(const std::string& package, const Version& version,
+                         const std::string& interfaceName, const std::string& instance) const;
 
     // Insert the given instance. After inserting it, the instance will be available via
     // forEachInstance* functions. This modifies the manifest.
@@ -173,6 +173,15 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
 
     // Check that manifest has no entries.
     bool empty() const;
+
+    // Alternative to forEachInstance if you just need a set of instance names instead.
+    std::set<std::string> getInstances(HalFormat format, const std::string& package,
+                                       const Version& version,
+                                       const std::string& interfaceName) const;
+
+    // Return whether instance is in getInstances(...).
+    bool hasInstance(HalFormat format, const std::string& package, const Version& version,
+                     const std::string& interfaceName, const std::string& instance) const;
 
     SchemaType mType;
     Level mLevel = Level::UNSPECIFIED;

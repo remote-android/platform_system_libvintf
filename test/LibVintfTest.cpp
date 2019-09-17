@@ -443,25 +443,25 @@ TEST_F(LibVintfTest, HalManifestGetTransport) {
 
 TEST_F(LibVintfTest, HalManifestInstances) {
     HalManifest vm = testDeviceManifest();
-    EXPECT_EQ(vm.getInstances("android.hardware.camera", {2, 0}, "ICamera"),
+    EXPECT_EQ(vm.getHidlInstances("android.hardware.camera", {2, 0}, "ICamera"),
               std::set<std::string>({"default", "legacy/0"}));
-    EXPECT_EQ(vm.getInstances("android.hardware.camera", {2, 0}, "IBetterCamera"),
+    EXPECT_EQ(vm.getHidlInstances("android.hardware.camera", {2, 0}, "IBetterCamera"),
               std::set<std::string>({"camera"}));
-    EXPECT_EQ(vm.getInstances("android.hardware.camera", {2, 0}, "INotExist"),
+    EXPECT_EQ(vm.getHidlInstances("android.hardware.camera", {2, 0}, "INotExist"),
               std::set<std::string>({}));
-    EXPECT_EQ(vm.getInstances("android.hardware.nfc", {1, 0}, "INfc"),
+    EXPECT_EQ(vm.getHidlInstances("android.hardware.nfc", {1, 0}, "INfc"),
               std::set<std::string>({"default"}));
 
-    EXPECT_TRUE(vm.hasInstance("android.hardware.camera", {2, 0}, "ICamera", "default"));
-    EXPECT_TRUE(vm.hasInstance("android.hardware.camera", {2, 0}, "ICamera", "legacy/0"));
-    EXPECT_TRUE(vm.hasInstance("android.hardware.camera", {2, 0}, "IBetterCamera", "camera"));
-    EXPECT_TRUE(vm.hasInstance("android.hardware.nfc", {1, 0}, "INfc", "default"));
+    EXPECT_TRUE(vm.hasHidlInstance("android.hardware.camera", {2, 0}, "ICamera", "default"));
+    EXPECT_TRUE(vm.hasHidlInstance("android.hardware.camera", {2, 0}, "ICamera", "legacy/0"));
+    EXPECT_TRUE(vm.hasHidlInstance("android.hardware.camera", {2, 0}, "IBetterCamera", "camera"));
+    EXPECT_TRUE(vm.hasHidlInstance("android.hardware.nfc", {1, 0}, "INfc", "default"));
 
-    EXPECT_FALSE(vm.hasInstance("android.hardware.camera", {2, 0}, "INotExist", "default"));
-    EXPECT_FALSE(vm.hasInstance("android.hardware.camera", {2, 0}, "ICamera", "notexist"));
-    EXPECT_FALSE(vm.hasInstance("android.hardware.camera", {2, 0}, "IBetterCamera", "default"));
-    EXPECT_FALSE(vm.hasInstance("android.hardware.camera", {2, 0}, "INotExist", "notexist"));
-    EXPECT_FALSE(vm.hasInstance("android.hardware.nfc", {1, 0}, "INfc", "notexist"));
+    EXPECT_FALSE(vm.hasHidlInstance("android.hardware.camera", {2, 0}, "INotExist", "default"));
+    EXPECT_FALSE(vm.hasHidlInstance("android.hardware.camera", {2, 0}, "ICamera", "notexist"));
+    EXPECT_FALSE(vm.hasHidlInstance("android.hardware.camera", {2, 0}, "IBetterCamera", "default"));
+    EXPECT_FALSE(vm.hasHidlInstance("android.hardware.camera", {2, 0}, "INotExist", "notexist"));
+    EXPECT_FALSE(vm.hasHidlInstance("android.hardware.nfc", {1, 0}, "INfc", "notexist"));
 }
 
 TEST_F(LibVintfTest, VersionConverter) {
