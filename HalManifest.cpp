@@ -132,17 +132,18 @@ std::set<std::string> HalManifest::getHalNamesAndVersions() const {
     return names;
 }
 
-Transport HalManifest::getTransport(const std::string &package, const Version &v,
-            const std::string &interfaceName, const std::string &instanceName) const {
+Transport HalManifest::getHidlTransport(const std::string& package, const Version& v,
+                                        const std::string& interfaceName,
+                                        const std::string& instanceName) const {
     Transport transport{Transport::EMPTY};
-    forEachInstanceOfInterface(package, v, interfaceName, [&](const auto& e) {
+    forEachInstanceOfInterface(HalFormat::HIDL, package, v, interfaceName, [&](const auto& e) {
         if (e.instance() == instanceName) {
             transport = e.transport();
         }
         return transport == Transport::EMPTY;  // if not found, continue
     });
     if (transport == Transport::EMPTY) {
-        LOG(DEBUG) << "HalManifest::getTransport(" << mType << "): Cannot find "
+        LOG(DEBUG) << "HalManifest::getHidlTransport(" << mType << "): Cannot find "
                    << toFQNameString(package, v, interfaceName, instanceName);
     }
     return transport;
