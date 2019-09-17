@@ -29,6 +29,7 @@
 #include <vintf/VintfObject.h>
 #include <vintf/parse_string.h>
 #include <vintf/parse_xml.h>
+#include "constants-private.h"
 #include "test_constants.h"
 
 namespace android {
@@ -236,7 +237,7 @@ TEST_F(LibVintfTest, Stringify) {
 
 TEST_F(LibVintfTest, GetTransport) {
     HalManifest vm = testDeviceManifest();
-    EXPECT_EQ(Transport::HWBINDER, vm.getTransport("android.hardware.camera",
+    EXPECT_EQ(Transport::HWBINDER, vm.getHidlTransport("android.hardware.camera",
             {2, 0}, "ICamera", "default"));
 }
 
@@ -431,13 +432,13 @@ TEST_F(LibVintfTest, HalManifestGetTransport) {
                                       "    </hal>"
                                       "</manifest>"));
     EXPECT_EQ(Transport::PASSTHROUGH,
-              vm.getTransport("android.hidl.manager", {2, 1}, "IServiceManager", "default"));
+              vm.getHidlTransport("android.hidl.manager", {2, 1}, "IServiceManager", "default"));
     EXPECT_EQ(Transport::PASSTHROUGH,
-              vm.getTransport("android.hidl.manager", {2, 0}, "IServiceManager", "default"));
+              vm.getHidlTransport("android.hidl.manager", {2, 0}, "IServiceManager", "default"));
     EXPECT_EQ(Transport::EMPTY,
-              vm.getTransport("android.hidl.manager", {2, 2}, "IServiceManager", "default"));
+              vm.getHidlTransport("android.hidl.manager", {2, 2}, "IServiceManager", "default"));
     EXPECT_EQ(Transport::HWBINDER,
-              vm.getTransport("android.hidl.manager", {1, 0}, "IServiceManager", "default"));
+              vm.getHidlTransport("android.hidl.manager", {1, 0}, "IServiceManager", "default"));
 }
 
 TEST_F(LibVintfTest, HalManifestInstances) {
@@ -3185,7 +3186,7 @@ TEST_F(LibVintfTest, FqNameValid) {
         EXPECT_TRUE(manifest.checkCompatibility(cm, &error)) << error;
 
         EXPECT_EQ(Transport::HWBINDER,
-                  manifest.getTransport("android.hardware.foo", {1, 1}, "IFoo", "custom"));
+                  manifest.getHidlTransport("android.hardware.foo", {1, 1}, "IFoo", "custom"));
     }
 
     {
@@ -3831,6 +3832,42 @@ TEST_F(LibVintfTest, AidlAndHidlCheckUnused) {
     EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml, &error)) << error;
     auto unused = checkUnusedHals(manifest, matrix);
     EXPECT_TRUE(unused.empty()) << android::base::Join(unused, "\n");
+}
+
+TEST_F(LibVintfTest, GetTransportHidlHalWithFakeAidlVersion) {
+    std::string xml =
+        "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+        "    <hal format=\"hidl\">\n"
+        "        <name>android.system.foo</name>\n"
+        "        <transport>hwbinder</transport>\n"
+        "        <fqname>@" + to_string(details::kFakeAidlVersion) + "::IFoo/default</fqname>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    std::string error;
+    HalManifest manifest;
+    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_EQ(Transport::HWBINDER,
+              manifest.getHidlTransport("android.system.foo", details::kFakeAidlVersion, "IFoo",
+                                        "default"));
+}
+
+TEST_F(LibVintfTest, GetTransportAidlHalWithDummyTransport) {
+    // Check that even if <transport> is specified for AIDL, it is ignored and getHidlTransport
+    // will return EMPTY.
+    std::string xml =
+        "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+        "    <hal format=\"aidl\">\n"
+        "        <name>android.system.foo</name>\n"
+        "        <transport>hwbinder</transport>\n"
+        "        <fqname>IFoo/default</fqname>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    std::string error;
+    HalManifest manifest;
+    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_EQ(Transport::EMPTY,
+              manifest.getHidlTransport("android.system.foo", details::kFakeAidlVersion, "IFoo",
+                                        "default"));
 }
 
 struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
