@@ -110,10 +110,6 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
     // Get metaversion of this manifest.
     Version getMetaVersion() const;
 
-    bool forEachInstanceOfVersion(
-        const std::string& package, const Version& expectVersion,
-        const std::function<bool(const ManifestInstance&)>& func) const override;
-
     // Alternative to forEachInstance if you just need a set of instance names instead.
     std::set<std::string> getInstances(const std::string& halName, const Version& version,
                                        const std::string& interfaceName) const;
@@ -139,6 +135,10 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
     // Check before add()
     bool shouldAdd(const ManifestHal& toAdd) const override;
     bool shouldAddXmlFile(const ManifestXmlFile& toAdd) const override;
+
+    bool forEachInstanceOfVersion(
+        const std::string& package, const Version& expectVersion,
+        const std::function<bool(const ManifestInstance&)>& func) const override;
 
    private:
     friend struct HalManifestConverter;

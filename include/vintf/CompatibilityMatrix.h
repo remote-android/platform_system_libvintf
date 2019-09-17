@@ -60,11 +60,12 @@ struct CompatibilityMatrix : public HalGroup<MatrixHal>, public XmlFileGroup<Mat
     // (Normally, version ranges do not overlap, and the only match is returned.)
     std::string getXmlSchemaPath(const std::string& xmlFileName, const Version& version) const;
 
+    std::string getVendorNdkVersion() const;
+
+   protected:
     bool forEachInstanceOfVersion(
         const std::string& package, const Version& expectVersion,
         const std::function<bool(const MatrixInstance&)>& func) const override;
-
-    std::string getVendorNdkVersion() const;
 
    private:
     // Add everything in inputMatrix to "this" as requirements.
