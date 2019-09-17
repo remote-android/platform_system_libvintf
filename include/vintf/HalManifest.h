@@ -138,7 +138,7 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
     bool shouldAddXmlFile(const ManifestXmlFile& toAdd) const override;
 
     bool forEachInstanceOfVersion(
-        const std::string& package, const Version& expectVersion,
+        HalFormat format, const std::string& package, const Version& expectVersion,
         const std::function<bool(const ManifestInstance&)>& func) const override;
 
    private:
