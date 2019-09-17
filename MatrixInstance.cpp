@@ -33,16 +33,21 @@ MatrixInstance& MatrixInstance::operator=(const MatrixInstance&) = default;
 
 MatrixInstance& MatrixInstance::operator=(MatrixInstance&&) noexcept = default;
 
-MatrixInstance::MatrixInstance(FqInstance&& fqInstance, VersionRange&& range, bool optional,
-                               bool isRegex)
-    : mFqInstance(std::move(fqInstance)),
+MatrixInstance::MatrixInstance(HalFormat format, FqInstance&& fqInstance, VersionRange&& range,
+                               bool optional, bool isRegex)
+    : mFormat(format),
+      mFqInstance(std::move(fqInstance)),
       mRange(std::move(range)),
       mOptional(optional),
       mIsRegex(isRegex) {}
 
-MatrixInstance::MatrixInstance(const FqInstance fqInstance, const VersionRange& range,
-                               bool optional, bool isRegex)
-    : mFqInstance(fqInstance), mRange(range), mOptional(optional), mIsRegex(isRegex) {}
+MatrixInstance::MatrixInstance(HalFormat format, const FqInstance fqInstance,
+                               const VersionRange& range, bool optional, bool isRegex)
+    : mFormat(format),
+      mFqInstance(fqInstance),
+      mRange(range),
+      mOptional(optional),
+      mIsRegex(isRegex) {}
 
 const std::string& MatrixInstance::package() const {
     return mFqInstance.getPackage();
@@ -54,6 +59,10 @@ const VersionRange& MatrixInstance::versionRange() const {
 
 const std::string& MatrixInstance::interface() const {
     return mFqInstance.getInterface();
+}
+
+HalFormat MatrixInstance::format() const {
+    return mFormat;
 }
 
 bool MatrixInstance::optional() const {
