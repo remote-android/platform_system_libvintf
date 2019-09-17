@@ -3684,6 +3684,11 @@ TEST_F(LibVintfTest, Aidl) {
         EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
         EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
+        EXPECT_FALSE(manifest.hasAidlInstance("android.system.foo", "IFoo", "does_not_exist"));
+        EXPECT_FALSE(manifest.hasAidlInstance("android.system.foo", "IDoesNotExist", "default"));
+        EXPECT_FALSE(manifest.hasAidlInstance("android.system.does_not_exist", "IFoo", "default"));
     }
 
     {
@@ -3699,6 +3704,11 @@ TEST_F(LibVintfTest, Aidl) {
         EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
         EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_ONLY));
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
+        EXPECT_FALSE(manifest.hasAidlInstance("android.system.foo", "IFoo", "does_not_exist"));
+        EXPECT_FALSE(manifest.hasAidlInstance("android.system.foo", "IDoesNotExist", "default"));
+        EXPECT_FALSE(manifest.hasAidlInstance("android.system.does_not_exist", "IFoo", "default"));
     }
 
     {
