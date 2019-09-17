@@ -132,7 +132,7 @@ struct CompatibilityMatrix : public HalGroup<MatrixHal>, public XmlFileGroup<Mat
 
     // Return whether instance is in "this"; that is, instance is in any <instance> tag or
     // matches any <regex-instance> tag.
-    bool matchInstance(const std::string& halName, const Version& version,
+    bool matchInstance(HalFormat format, const std::string& halName, const Version& version,
                        const std::string& interfaceName, const std::string& instance) const;
 
     // Return the level of the matrixKernel object that it is originally from.
