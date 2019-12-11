@@ -949,12 +949,16 @@ struct KernelInfoConverter : public XmlNodeConverter<KernelInfo> {
         if (o.version() != KernelVersion{}) {
             appendAttr(root, "version", o.version());
         }
+        if (o.level() != Level::UNSPECIFIED) {
+            appendAttr(root, "target-level", o.level());
+        }
         if (flags.isKernelConfigsEnabled()) {
             appendChildren(root, kernelConfigConverter, o.configs(), d);
         }
     }
     bool buildObject(KernelInfo* o, NodeType* root, std::string* error) const override {
         return parseOptionalAttr(root, "version", {}, &o->mVersion, error) &&
+               parseOptionalAttr(root, "target-level", Level::UNSPECIFIED, &o->mLevel, error) &&
                parseChildren(root, kernelConfigConverter, &o->mConfigs, error);
     }
 };
