@@ -189,8 +189,12 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
 
     // Get the <kernel> tag. Assumes type() == DEVICE.
     // - On host, <kernel> tag only exists for the fully assembled HAL manifest.
-    // - On device HAL manifest does not have <kernel> tag. Returns nullopt on device.
+    // - On device, this only contain information about level(). Other information should be
+    //   looked up via RuntimeInfo.
     const std::optional<KernelInfo>& kernel() const;
+
+    // Merge information of other to this.
+    bool mergeKernel(std::optional<KernelInfo>* other, std::string* error = nullptr);
 
     SchemaType mType;
     Level mLevel = Level::UNSPECIFIED;

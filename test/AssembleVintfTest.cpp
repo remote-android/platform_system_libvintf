@@ -577,6 +577,20 @@ TEST_F(AssembleVintfTest, AidlAndHidlNames) {
         "    </hal>\n",
         getOutput());
 }
+
+// Merge kernel FCM from manually written device manifest and <config> from
+// parsing kernel prebuilt.
+TEST_F(AssembleVintfTest, MergeKernelFcmAndConfigs) {
+    addInput("manifest.xml",
+        "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"1\">\n"
+        "    <kernel target-level=\"2\"/>\n"
+        "</manifest>\n");
+    getInstance()->addKernelConfigInputStream({3, 18, 10}, "android-base.config",
+                                              makeStream("CONFIG_FOO=y"));
+    EXPECT_TRUE(getInstance()->assemble());
+    EXPECT_IN("<kernel version=\"3.18.10\" target-level=\"2\">", getOutput());
+}
+
 // clang-format on
 
 }  // namespace vintf
