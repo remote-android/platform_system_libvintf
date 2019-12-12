@@ -1334,8 +1334,8 @@ TEST_F(RegexTest, DeprecateLevel3) {
 // Set of framework matrices of different FCM version with <kernel>.
 //
 
-#define FAKE_KERNEL(__version__, __key__)                   \
-    "    <kernel version=\"" __version__ "\">\n"            \
+#define FAKE_KERNEL(__version__, __key__, __level__)                   \
+    "    <kernel version=\"" __version__ "\" level=\"" #__level__ "\">\n"            \
     "        <config>\n"                                    \
     "            <key>CONFIG_" __key__ "</key>\n"           \
     "            <value type=\"tristate\">y</value>\n"      \
@@ -1345,19 +1345,19 @@ TEST_F(RegexTest, DeprecateLevel3) {
 const static std::vector<std::string> systemMatrixKernelXmls = {
     // 1.xml
     "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
-    FAKE_KERNEL("1.0.0", "A1")
-    FAKE_KERNEL("2.0.0", "B1")
+    FAKE_KERNEL("1.0.0", "A1", 1)
+    FAKE_KERNEL("2.0.0", "B1", 1)
     "</compatibility-matrix>\n",
     // 2.xml
     "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
-    FAKE_KERNEL("2.0.0", "B2")
-    FAKE_KERNEL("3.0.0", "C2")
-    FAKE_KERNEL("4.0.0", "D2")
+    FAKE_KERNEL("2.0.0", "B2", 2)
+    FAKE_KERNEL("3.0.0", "C2", 2)
+    FAKE_KERNEL("4.0.0", "D2", 2)
     "</compatibility-matrix>\n",
     // 3.xml
     "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"3\">\n"
-    FAKE_KERNEL("4.0.0", "D3")
-    FAKE_KERNEL("5.0.0", "E3")
+    FAKE_KERNEL("4.0.0", "D3", 3)
+    FAKE_KERNEL("5.0.0", "E3", 3)
     "</compatibility-matrix>\n",
 };
 
@@ -1373,12 +1373,12 @@ TEST_F(KernelTest, Level1AndLevel2) {
     ASSERT_NE(nullptr, matrix);
     std::string xml = gCompatibilityMatrixConverter(*matrix);
 
-    EXPECT_IN(FAKE_KERNEL("1.0.0", "A1"), xml) << "\nOld requirements must not change.";
-    EXPECT_IN(FAKE_KERNEL("2.0.0", "B1"), xml) << "\nOld requirements must not change.";
-    EXPECT_IN(FAKE_KERNEL("3.0.0", "C2"), xml) << "\nShould see <kernel> from new matrices";
-    EXPECT_IN(FAKE_KERNEL("4.0.0", "D2"), xml) << "\nShould see <kernel> from new matrices";
+    EXPECT_IN(FAKE_KERNEL("1.0.0", "A1", 1), xml) << "\nOld requirements must not change.";
+    EXPECT_IN(FAKE_KERNEL("2.0.0", "B1", 1), xml) << "\nOld requirements must not change.";
+    EXPECT_IN(FAKE_KERNEL("3.0.0", "C2", 2), xml) << "\nShould see <kernel> from new matrices";
+    EXPECT_IN(FAKE_KERNEL("4.0.0", "D2", 2), xml) << "\nShould see <kernel> from new matrices";
 
-    EXPECT_NOT_IN(FAKE_KERNEL("2.0.0", "B2"), xml) << "\nOld requirements must not change";
+    EXPECT_NOT_IN(FAKE_KERNEL("2.0.0", "B2", 2), xml) << "\nOld requirements must not change";
 }
 
 // Assume that we are developing level 3. Test that old <kernel> requirements should
@@ -1391,14 +1391,14 @@ TEST_F(KernelTest, Level1AndMore) {
     ASSERT_NE(nullptr, matrix);
     std::string xml = gCompatibilityMatrixConverter(*matrix);
 
-    EXPECT_IN(FAKE_KERNEL("1.0.0", "A1"), xml) << "\nOld requirements must not change.";
-    EXPECT_IN(FAKE_KERNEL("2.0.0", "B1"), xml) << "\nOld requirements must not change.";
-    EXPECT_IN(FAKE_KERNEL("3.0.0", "C2"), xml) << "\nOld requirements must not change.";
-    EXPECT_IN(FAKE_KERNEL("4.0.0", "D2"), xml) << "\nOld requirements must not change.";
-    EXPECT_IN(FAKE_KERNEL("5.0.0", "E3"), xml) << "\nShould see <kernel> from new matrices";
+    EXPECT_IN(FAKE_KERNEL("1.0.0", "A1", 1), xml) << "\nOld requirements must not change.";
+    EXPECT_IN(FAKE_KERNEL("2.0.0", "B1", 1), xml) << "\nOld requirements must not change.";
+    EXPECT_IN(FAKE_KERNEL("3.0.0", "C2", 2), xml) << "\nOld requirements must not change.";
+    EXPECT_IN(FAKE_KERNEL("4.0.0", "D2", 2), xml) << "\nOld requirements must not change.";
+    EXPECT_IN(FAKE_KERNEL("5.0.0", "E3", 3), xml) << "\nShould see <kernel> from new matrices";
 
-    EXPECT_NOT_IN(FAKE_KERNEL("2.0.0", "B2"), xml) << "\nOld requirements must not change";
-    EXPECT_NOT_IN(FAKE_KERNEL("4.0.0", "D3"), xml) << "\nOld requirements must not change";
+    EXPECT_NOT_IN(FAKE_KERNEL("2.0.0", "B2", 2), xml) << "\nOld requirements must not change";
+    EXPECT_NOT_IN(FAKE_KERNEL("4.0.0", "D3", 3), xml) << "\nOld requirements must not change";
 }
 
 class VintfObjectPartialUpdateTest : public MultiMatrixTest {
