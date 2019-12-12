@@ -123,5 +123,13 @@ bool RuntimeInfo::checkCompatibility(const CompatibilityMatrix& mat, std::string
     return true;
 }
 
+void RuntimeInfo::setKernelLevel(Level level) {
+    mKernel.mLevel = level;
+}
+
+Level RuntimeInfo::kernelLevel() const {
+    return mKernel.mLevel;
+}
+
 } // namespace vintf
 } // namespace android
