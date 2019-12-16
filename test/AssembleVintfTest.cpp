@@ -591,6 +591,42 @@ TEST_F(AssembleVintfTest, MergeKernelFcmAndConfigs) {
     EXPECT_IN("<kernel version=\"3.18.10\" target-level=\"2\">", getOutput());
 }
 
+TEST_F(AssembleVintfTest, NoAutoSetKernelFcm) {
+    addInput("manifest.xml",
+        "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"1\">\n"
+        "    <kernel version=\"3.18.10\"/>\n"
+        "</manifest>\n");
+    EXPECT_TRUE(getInstance()->assemble());
+    EXPECT_IN("<kernel version=\"3.18.10\"/>", getOutput());
+}
+
+TEST_F(AssembleVintfTest, AutoSetKernelFcm) {
+    addInput("manifest.xml",
+        "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"5\">\n"
+        "    <kernel version=\"5.4.10\"/>\n"
+        "</manifest>\n");
+    EXPECT_TRUE(getInstance()->assemble());
+    EXPECT_IN("<kernel version=\"5.4.10\" target-level=\"5\"/>", getOutput());
+}
+
+TEST_F(AssembleVintfTest, NoAutoSetKernelFcmWithConfig) {
+    addInput("manifest.xml",
+        "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"1\" />\n");
+    getInstance()->addKernelConfigInputStream({3, 18, 10}, "android-base.config",
+                                              makeStream("CONFIG_FOO=y"));
+    EXPECT_TRUE(getInstance()->assemble());
+    EXPECT_IN("<kernel version=\"3.18.10\">", getOutput());
+}
+
+TEST_F(AssembleVintfTest, AutoSetKernelFcmWithConfig) {
+    addInput("manifest.xml",
+        "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"5\" />\n");
+    getInstance()->addKernelConfigInputStream({5, 4, 10}, "android-base.config",
+                                              makeStream("CONFIG_FOO=y"));
+    EXPECT_TRUE(getInstance()->assemble());
+    EXPECT_IN("<kernel version=\"5.4.10\" target-level=\"5\">", getOutput());
+}
+
 // clang-format on
 
 }  // namespace vintf
