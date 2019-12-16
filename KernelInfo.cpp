@@ -28,6 +28,10 @@ const std::map<std::string, std::string>& KernelInfo::configs() const {
     return mConfigs;
 }
 
+Level KernelInfo::level() const {
+    return mLevel;
+}
+
 bool KernelInfo::matchKernelConfigs(const std::vector<KernelConfig>& matrixConfigs,
                                     std::string* error) const {
     for (const KernelConfig& matrixConfig : matrixConfigs) {

@@ -38,6 +38,7 @@ class KernelInfo {
 
     const KernelVersion& version() const;
     const std::map<std::string, std::string>& configs() const;
+    Level level() const;
 
     // mVersion = x'.y'.z', minLts = x.y.z,
     // match if x == x' , y == y' , and z <= z'.
@@ -64,6 +65,8 @@ class KernelInfo {
     // /proc/config.gz
     // Key: CONFIG_xxx; Value: the value after = sign.
     std::map<std::string, std::string> mConfigs;
+    // Kernel FCM version
+    Level mLevel = Level::UNSPECIFIED;
 };
 
 }  // namespace vintf
