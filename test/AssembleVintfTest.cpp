@@ -144,7 +144,6 @@ TEST_F(AssembleVintfTest, FrameworkMatrixEmpty) {
 
 TEST_F(AssembleVintfTest, FrameworkMatrix) {
     std::string tail =
-        "    <kernel version=\"3.18.0\">\n"
         "        <config>\n"
         "            <key>CONFIG_FOO</key>\n"
         "            <value type=\"tristate\">y</value>\n"
@@ -160,7 +159,9 @@ TEST_F(AssembleVintfTest, FrameworkMatrix) {
         "</compatibility-matrix>\n";
 
     std::string xmlEmpty =
-        "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\">\n" + tail;
+        "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\">\n"
+        "    <kernel version=\"3.18.0\">\n" +
+        tail;
 
     std::string xml1 =
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
@@ -246,7 +247,8 @@ TEST_F(AssembleVintfTest, FrameworkMatrix) {
         "            <name>IFoo</name>\n"
         "            <instance>default</instance>\n"
         "        </interface>\n"
-        "    </hal>\n" +
+        "    </hal>\n"
+        "    <kernel version=\"3.18.0\" level=\"1\">\n" +
             tail,
         getOutput());
 
@@ -263,7 +265,8 @@ TEST_F(AssembleVintfTest, FrameworkMatrix) {
         "            <name>IFoo</name>\n"
         "            <instance>default</instance>\n"
         "        </interface>\n"
-        "    </hal>\n" +
+        "    </hal>\n"
+        "    <kernel version=\"3.18.0\" level=\"2\">\n" +
             tail,
         getOutput());
 
@@ -279,7 +282,8 @@ TEST_F(AssembleVintfTest, FrameworkMatrix) {
         "            <name>IFoo</name>\n"
         "            <instance>default</instance>\n"
         "        </interface>\n"
-        "    </hal>\n" +
+        "    </hal>\n"
+        "    <kernel version=\"3.18.0\" level=\"3\">\n" +
             tail,
         getOutput());
 }
