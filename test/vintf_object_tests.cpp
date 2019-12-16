@@ -682,22 +682,32 @@ TEST_F(VintfObjectIncompatibleTest, TestInputVsDeviceSuccess) {
     ASSERT_STREQ(error.c_str(), "");
 }
 
+const std::string vendorManifestKernelFcm =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <kernel version=\"3.18.999\" target-level=\"92\"/>\n"
+        "</manifest>\n";
+
 // Test fixture that provides compatible metadata from the mock device.
 class VintfObjectRuntimeInfoTest : public VintfObjectTestBase {
    protected:
     virtual void SetUp() {
         VintfObjectTestBase::SetUp();
-        // clear fetch flags
-        runtimeInfoFactory().getInfo()->failNextFetch();
-        vintfObject->getRuntimeInfo(true /* skipCache */, RuntimeInfo::FetchFlag::ALL);
+        setupMockFetcher(vendorManifestKernelFcm, "", "", "", "");
+        expectVendorManifest();
     }
     virtual void TearDown() {
         Mock::VerifyAndClear(&runtimeInfoFactory());
         Mock::VerifyAndClear(runtimeInfoFactory().getInfo().get());
     }
+    Level getKernelLevel(const RuntimeInfo* rf) {
+        return rf->kernelLevel();
+    }
 };
 
 TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfo) {
+    // RuntimeInfo.fetchAllInformation is never called with KERNEL_FCM set.
+    auto allExceptKernelFcm = RuntimeInfo::FetchFlag::ALL & ~RuntimeInfo::FetchFlag::KERNEL_FCM;
+
     InSequence s;
 
     EXPECT_CALL(*runtimeInfoFactory().getInfo(),
@@ -707,16 +717,29 @@ TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfo) {
                 fetchAllInformation(RuntimeInfo::FetchFlag::CPU_VERSION));
     EXPECT_CALL(
         *runtimeInfoFactory().getInfo(),
-        fetchAllInformation(RuntimeInfo::FetchFlag::ALL & ~RuntimeInfo::FetchFlag::CPU_VERSION));
-    EXPECT_CALL(*runtimeInfoFactory().getInfo(), fetchAllInformation(RuntimeInfo::FetchFlag::ALL));
+        fetchAllInformation(allExceptKernelFcm & ~RuntimeInfo::FetchFlag::CPU_VERSION));
+    EXPECT_CALL(*runtimeInfoFactory().getInfo(), fetchAllInformation(allExceptKernelFcm));
     EXPECT_CALL(*runtimeInfoFactory().getInfo(), fetchAllInformation(RuntimeInfo::FetchFlag::NONE));
 
-    vintfObject->getRuntimeInfo(false /* skipCache */, RuntimeInfo::FetchFlag::CPU_VERSION);
-    vintfObject->getRuntimeInfo(false /* skipCache */, RuntimeInfo::FetchFlag::CPU_VERSION);
-    vintfObject->getRuntimeInfo(true /* skipCache */, RuntimeInfo::FetchFlag::CPU_VERSION);
-    vintfObject->getRuntimeInfo(false /* skipCache */, RuntimeInfo::FetchFlag::ALL);
-    vintfObject->getRuntimeInfo(true /* skipCache */, RuntimeInfo::FetchFlag::ALL);
-    vintfObject->getRuntimeInfo(false /* skipCache */, RuntimeInfo::FetchFlag::ALL);
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(false /* skipCache */,
+                                                   RuntimeInfo::FetchFlag::CPU_VERSION));
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(false /* skipCache */,
+                                                   RuntimeInfo::FetchFlag::CPU_VERSION));
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(true /* skipCache */,
+                                                   RuntimeInfo::FetchFlag::CPU_VERSION));
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(false /* skipCache */,
+                                                   RuntimeInfo::FetchFlag::ALL));
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(true /* skipCache */,
+                                                   RuntimeInfo::FetchFlag::ALL));
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(false /* skipCache */,
+                                                   RuntimeInfo::FetchFlag::ALL));
+}
+
+TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfoKernelFcm) {
+    auto rf = vintfObject->getRuntimeInfo(false /* skipCache */,
+                                          RuntimeInfo::FetchFlag::KERNEL_FCM);
+    ASSERT_NE(nullptr, rf);
+    ASSERT_EQ(Level{92}, getKernelLevel(rf.get()));
 }
 
 // Test fixture that provides incompatible metadata from the mock device.
