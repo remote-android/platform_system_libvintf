@@ -61,6 +61,7 @@ struct MatrixKernel {
     friend struct MatrixKernelConditionsConverter;
     friend struct CompatibilityMatrix;
     friend class AssembleVintfImpl;
+    friend class KernelInfo;
 
     void setSourceMatrixLevel(Level level);
     Level getSourceMatrixLevel() const;

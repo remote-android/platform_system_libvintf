@@ -91,7 +91,8 @@ bool RuntimeInfo::checkCompatibility(const CompatibilityMatrix& mat, std::string
     // HalManifest.device.mSepolicyVersion in HalManifest::checkCompatibility.
 
     if (flags.isKernelEnabled()) {
-        if (mKernel.getMatchedKernelRequirements(mat.framework.mKernels, error).empty()) {
+        if (mKernel.getMatchedKernelRequirements(mat.framework.mKernels, kernelLevel(), error)
+                .empty()) {
             return false;
         }
     }
