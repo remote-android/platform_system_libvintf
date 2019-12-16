@@ -631,6 +631,17 @@ TEST_F(AssembleVintfTest, AutoSetKernelFcmWithConfig) {
     EXPECT_IN("<kernel version=\"5.4.10\" target-level=\"5\">", getOutput());
 }
 
+// Automatically add kernel FCM when parsing framework matrix for a single FCM version.
+TEST_F(AssembleVintfTest, AutoSetMatrixKernelFcm) {
+    addInput("compatibility_matrix.xml",
+        "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\"/>\n"
+    );
+    getInstance()->addKernelConfigInputStream({3, 18, 10}, "android-base.config",
+                                              makeStream(""));
+    EXPECT_TRUE(getInstance()->assemble());
+    EXPECT_IN("<kernel version=\"3.18.10\" level=\"1\"/>", getOutput());
+}
+
 // clang-format on
 
 }  // namespace vintf
