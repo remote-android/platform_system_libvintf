@@ -48,8 +48,7 @@ bool CompatibilityMatrix::addKernel(MatrixKernel&& kernel, std::string* error) {
         if (it->minLts() == kernel.minLts()) {
             break;
         }
-        if (it->minLts().version == kernel.minLts().version &&
-            it->minLts().majorRev == kernel.minLts().majorRev) {
+        if (it->minLts().dropMinor() == kernel.minLts().dropMinor()) {
             if (error) {
                 *error = "Kernel version mismatch; cannot add " + to_string(kernel.minLts()) +
                          " because " + to_string(it->minLts()) + " was added.";

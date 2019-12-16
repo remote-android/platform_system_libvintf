@@ -836,8 +836,8 @@ std::optional<KernelRequirement> VintfObject::getCompatibleKernelRequirement(std
         if (error) *error = "Cannot retrieve runtime information";
         return std::nullopt;
     }
-    auto reqs =
-        runtime_info->mKernel.getMatchedKernelRequirements(matrix->framework.mKernels, error);
+    auto reqs = runtime_info->mKernel.getMatchedKernelRequirements(
+        matrix->framework.mKernels, runtime_info->kernelLevel(), error);
     if (reqs.empty()) {
         if (error) error->insert(0, "Cannot find any matched kernel requirements: ");
         return std::nullopt;

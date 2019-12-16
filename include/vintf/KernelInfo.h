@@ -49,8 +49,8 @@ class KernelInfo {
     // return vector of pointers to elements in "kernels" that this matches
     // kernel requirement specified.
     std::vector<const MatrixKernel*> getMatchedKernelRequirements(
-        const std::vector<MatrixKernel>& kernels, std::string* error = nullptr) const;
-
+        const std::vector<MatrixKernel>& kernels, Level kernelLevel,
+        std::string* error = nullptr) const;
     bool operator==(const KernelInfo& other) const;
 
     // Merge information from "other".
@@ -64,6 +64,10 @@ class KernelInfo {
     friend struct LibVintfTest;
     friend struct RuntimeInfoFetcher;
     friend struct RuntimeInfo;
+
+    std::vector<const MatrixKernel*> getMatchedKernelVersionAndConfigs(
+        const std::vector<const MatrixKernel*>& kernels, std::string* error) const;
+
     // x.y.z
     KernelVersion mVersion;
     // /proc/config.gz
