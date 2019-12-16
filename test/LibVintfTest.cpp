@@ -3904,6 +3904,15 @@ TEST_F(LibVintfTest, AidlGetHalNamesAndVersions) {
     EXPECT_EQ("android.system.foo", *names.begin());
 }
 
+TEST_F(LibVintfTest, KernelInfoLevel) {
+    std::string error;
+    std::string xml = "<kernel version=\"3.18.31\" target-level=\"1\"/>\n";
+    KernelInfo ki;
+    ASSERT_TRUE(gKernelInfoConverter(&ki, xml, &error)) << error;
+    EXPECT_EQ(Level{1}, ki.level());
+    EXPECT_EQ(xml, gKernelInfoConverter(ki));
+}
+
 struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
     virtual void SetUp() override {
         matrices = {
