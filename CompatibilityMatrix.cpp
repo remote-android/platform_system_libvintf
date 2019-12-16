@@ -255,6 +255,9 @@ bool CompatibilityMatrix::addAllXmlFilesAsOptional(CompatibilityMatrix* other, s
 // A1, B1 (from 1.xml, required), C2, D2, E3 (optional, use earliest possible).
 bool CompatibilityMatrix::addAllKernels(CompatibilityMatrix* other, std::string* error) {
     for (MatrixKernel& kernel : other->framework.mKernels) {
+        if (kernel.getSourceMatrixLevel() == Level::UNSPECIFIED) {
+            kernel.setSourceMatrixLevel(other->level());
+        }
         KernelVersion ver = kernel.minLts();
         if (!addKernel(std::move(kernel), error)) {
             if (error) {
@@ -285,7 +288,9 @@ bool CompatibilityMatrix::addAllKernelsAsOptional(CompatibilityMatrix* other, st
             continue;
         }
 
-        (void)kernelToAdd.setSourceMatrixLevel(other->level());
+        if (kernelToAdd.getSourceMatrixLevel() == Level::UNSPECIFIED) {
+            kernelToAdd.setSourceMatrixLevel(other->level());
+        }
 
         KernelVersion minLts = kernelToAdd.minLts();
         if (!addKernel(std::move(kernelToAdd), error)) {

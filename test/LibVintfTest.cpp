@@ -3986,7 +3986,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictMinlts) {
 // <kernel> without <conditions> always comes first
 TEST_F(FrameworkCompatibilityMatrixCombineTest, KernelNoConditions) {
     std::string conditionedKernel =
-        "    <kernel version=\"3.18.5\">\n"
+        "    <kernel version=\"3.18.5\" level=\"1\">\n"
         "        <conditions>\n"
         "            <config>\n"
         "                <key>CONFIG_ARM</key>\n"
@@ -3999,7 +3999,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, KernelNoConditions) {
         "        </config>\n"
         "    </kernel>\n";
     std::string simpleKernel =
-        "    <kernel version=\"3.18.5\">\n"
+        "    <kernel version=\"3.18.5\" level=\"1\">\n"
         "        <config>\n"
         "            <key>CONFIG_BAR</key>\n"
         "            <value type=\"tristate\">y</value>\n"
