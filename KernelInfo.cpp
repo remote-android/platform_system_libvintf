@@ -16,9 +16,12 @@
 #include "KernelInfo.h"
 
 #include "parse_string.h"
+#include "utils.h"
 
 namespace android {
 namespace vintf {
+
+using details::mergeField;
 
 const KernelVersion& KernelInfo::version() const {
     return mVersion;
@@ -109,6 +112,33 @@ std::vector<const MatrixKernel*> KernelInfo::getMatchedKernelRequirements(
 
 bool KernelInfo::operator==(const KernelInfo& other) const {
     return mVersion == other.mVersion && mConfigs == other.mConfigs;
+}
+
+bool KernelInfo::merge(KernelInfo* other, std::string* error) {
+    if (!mergeField(&mVersion, &other->mVersion)) {
+        if (error) {
+            *error = "Conflicting kernel version: " + to_string(version()) + " vs. " +
+                     to_string(other->version());
+        }
+        return false;
+    }
+
+    // Do not allow merging configs. One of them must be empty.
+    if (!mergeField(&mConfigs, &other->mConfigs)) {
+        if (error) {
+            *error = "Found <kernel><config> items in two manifests.";
+        }
+        return false;
+    }
+
+    if (!mergeField(&mLevel, &other->mLevel, Level::UNSPECIFIED)) {
+        if (error) {
+            *error = "Conflicting kernel level: " + to_string(level()) + " vs. " +
+                     to_string(other->level());
+        }
+        return false;
+    }
+    return true;
 }
 
 }  // namespace vintf
