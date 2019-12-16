@@ -51,6 +51,11 @@ void MockRuntimeInfo::setNextFetchKernelInfo(KernelVersion&& v,
     kernel_info_.mVersion = std::move(v);
     kernel_info_.mConfigs = std::move(configs);
 }
+void MockRuntimeInfo::setNextFetchKernelInfo(const KernelVersion& v,
+                                             const std::map<std::string, std::string>& configs) {
+    kernel_info_.mVersion = v;
+    kernel_info_.mConfigs = configs;
+}
 
 }  // namespace details
 }  // namespace vintf
