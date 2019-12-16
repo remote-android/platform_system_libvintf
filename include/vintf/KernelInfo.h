@@ -63,6 +63,7 @@ class KernelInfo {
     friend struct KernelInfoConverter;
     friend struct LibVintfTest;
     friend struct RuntimeInfoFetcher;
+    friend struct RuntimeInfo;
     // x.y.z
     KernelVersion mVersion;
     // /proc/config.gz

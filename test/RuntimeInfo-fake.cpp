@@ -41,7 +41,9 @@ status_t MockRuntimeInfo::doFetch(RuntimeInfo::FetchFlags) {
     mOsVersion = "#4 SMP PREEMPT Wed Feb 1 18:10:52 PST 2017";
     mHardwareId = "aarch64";
     mKernelSepolicyVersion = 30;
-    mKernel = kernel_info_;
+    mKernel.mVersion = kernel_info_.mVersion;
+    mKernel.mConfigs = kernel_info_.mConfigs;
+    // fetchAllInformtion does not fetch kernel FCM version
     return OK;
 }
 void MockRuntimeInfo::setNextFetchKernelInfo(KernelVersion&& v,
