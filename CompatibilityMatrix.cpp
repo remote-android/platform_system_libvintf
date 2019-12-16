@@ -39,6 +39,10 @@ bool CompatibilityMatrix::addKernel(MatrixKernel&& kernel, std::string* error) {
         return false;
     }
 
+    if (kernel.getSourceMatrixLevel() == Level::UNSPECIFIED) {
+        kernel.setSourceMatrixLevel(level());
+    }
+
     auto it = framework.mKernels.begin();
     for (; it != framework.mKernels.end(); ++it) {
         if (it->minLts() == kernel.minLts()) {
