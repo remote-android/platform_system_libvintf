@@ -53,6 +53,9 @@ class KernelInfo {
 
     bool operator==(const KernelInfo& other) const;
 
+    // Merge information from "other".
+    bool merge(KernelInfo* other, std::string* error = nullptr);
+
    private:
     friend class AssembleVintfImpl;
     friend class details::MockRuntimeInfo;
