@@ -602,7 +602,7 @@ int32_t VintfObject::checkCompatibility(std::string* error, CheckFlags::Type fla
     }
 
     CheckFlags::Type runtimeInfoCheckFlags = flags;
-    if (!!getDeviceHalManifest()->kernel()) {
+    if (getDeviceHalManifest()->shouldCheckKernelCompatibility()) {
         // Use kernel from incoming OTA package, but not on the device.
         runtimeInfoCheckFlags = runtimeInfoCheckFlags.disableKernel();
     }
