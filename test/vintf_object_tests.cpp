@@ -1399,7 +1399,18 @@ const static std::vector<std::string> systemMatrixKernelXmls = {
     "</compatibility-matrix>\n",
 };
 
-class KernelTest : public MultiMatrixTest {};
+class KernelTest : public MultiMatrixTest {
+   public:
+    void expectKernelFcmVersion(size_t targetFcm, Level kernelFcm) {
+        std::string xml = "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"" +
+                          to_string(static_cast<Level>(targetFcm)) + "\">\n";
+        if (kernelFcm != Level::UNSPECIFIED) {
+            xml += "    <kernel target-level=\"" + to_string(kernelFcm) + "\"/>\n";
+        }
+        xml += "</manifest>";
+        expectFetch(kVendorManifest, xml);
+    }
+};
 
 // Assume that we are developing level 2. Test that old <kernel> requirements should
 // not change and new <kernel> versions are added.
@@ -1439,19 +1450,44 @@ TEST_F(KernelTest, Level1AndMore) {
     EXPECT_IN(FAKE_KERNEL("4.0.0", "D3", 3), xml) << "\nShould see <kernel> from new matrices";
 }
 
+KernelInfo MakeKernelInfo(const std::string& version, const std::string& key) {
+    KernelInfo info;
+    CHECK(gKernelInfoConverter(&info,
+                               "    <kernel version=\"" + version + "\">\n"
+                               "        <config>\n"
+                               "            <key>CONFIG_" + key + "</key>\n"
+                               "            <value type=\"tristate\">y</value>\n"
+                               "        </config>\n"
+                               "    </kernel>\n"));
+    return info;
+}
+
+TEST_F(KernelTest, Compatible) {
+    setFakeProperties();
+    setupMockFetcher(vendorManifestXml1, systemMatrixXml1, systemManifestXml1, vendorMatrixXml1,
+                     productModel);
+
+    SetUpMockSystemMatrices({
+        "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
+        FAKE_KERNEL("1.0.0", "A1", 1)
+        FAKE_KERNEL("2.0.0", "B1", 1)
+        "    <sepolicy>\n"
+        "        <kernel-sepolicy-version>0</kernel-sepolicy-version>\n"
+        "        <sepolicy-version>0.0</sepolicy-version>\n"
+        "    </sepolicy>\n"
+        "</compatibility-matrix>\n"});
+    expectKernelFcmVersion(Level{1}, Level{1});
+    expectSystemManifest();
+    expectVendorMatrix();
+
+    auto info = MakeKernelInfo("1.0.0", "A1");
+    runtimeInfoFactory().getInfo()->setNextFetchKernelInfo(info.version(), info.configs());
+    std::string error;
+    ASSERT_EQ(COMPATIBLE, vintfObject->checkCompatibility(&error)) << error;
+}
+
 class KernelTestP : public KernelTest, public WithParamInterface<
-    std::tuple<std::vector<std::string>, KernelInfo, Level, Level, bool>> {
-   public:
-    void expectKernelFcmVersion(size_t targetFcm, Level kernelFcm) {
-        std::string xml = "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"" +
-                          to_string(static_cast<Level>(targetFcm)) + "\">\n";
-        if (kernelFcm != Level::UNSPECIFIED) {
-            xml += "    <kernel target-level=\"" + to_string(kernelFcm) + "\"/>\n";
-        }
-        xml += "</manifest>";
-        expectFetch(kVendorManifest, xml);
-    }
-};
+    std::tuple<std::vector<std::string>, KernelInfo, Level, Level, bool>> {};
 // Assume that we are developing level 2. Test that old <kernel> requirements should
 // not change and new <kernel> versions are added.
 TEST_P(KernelTestP, Test) {
@@ -1472,17 +1508,6 @@ TEST_P(KernelTestP, Test) {
             << (pass ? error : fallbackError);
 }
 
-KernelInfo MakeKernelInfo(const std::string& version, const std::string& key) {
-    KernelInfo info;
-    CHECK(gKernelInfoConverter(&info,
-                               "    <kernel version=\"" + version + "\">\n"
-                               "        <config>\n"
-                               "            <key>CONFIG_" + key + "</key>\n"
-                               "            <value type=\"tristate\">y</value>\n"
-                               "        </config>\n"
-                               "    </kernel>\n"));
-    return info;
-}
 
 std::vector<KernelTestP::ParamType> KernelTestParamValues() {
     std::vector<KernelTestP::ParamType> ret;
