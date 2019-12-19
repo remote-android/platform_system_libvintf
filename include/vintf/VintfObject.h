@@ -354,6 +354,7 @@ extern const std::string kSystemVintfDir;
 extern const std::string kVendorVintfDir;
 extern const std::string kOdmVintfDir;
 extern const std::string kProductVintfDir;
+extern const std::string kSystemExtVintfDir;
 extern const std::string kOdmLegacyVintfDir;
 extern const std::string kOdmLegacyManifest;
 extern const std::string kVendorManifest;

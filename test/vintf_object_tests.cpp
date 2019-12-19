@@ -1616,7 +1616,7 @@ std::vector<std::string> GetOemFcmMatrixLevels(const std::string& name) {
 }
 
 class OemFcmLevelTest : public MultiMatrixTest,
-                        public WithParamInterface<std::tuple<size_t, bool>> {
+                        public WithParamInterface<std::tuple<size_t, bool, bool>> {
    protected:
     virtual void SetUp() override {
         MultiMatrixTest::SetUp();
@@ -1634,11 +1634,14 @@ class OemFcmLevelTest : public MultiMatrixTest,
 };
 
 TEST_P(OemFcmLevelTest, Test) {
-    auto&& [level, hasProduct] = GetParam();
+    auto&& [level, hasProduct, hasSystemExt] = GetParam();
 
     expectTargetFcmVersion(level);
     if (hasProduct) {
         SetUpMockMatrices(kProductVintfDir, GetOemFcmMatrixLevels("product"));
+    }
+    if (hasSystemExt) {
+        SetUpMockMatrices(kSystemExtVintfDir, GetOemFcmMatrixLevels("systemext"));
     }
 
     auto fcm = vintfObject->getFrameworkCompatibilityMatrix();
@@ -1654,19 +1657,24 @@ TEST_P(OemFcmLevelTest, Test) {
                                          "android.hardware.major@1.0::IMajor/default"));
     EXPECT_THAT(instances, containsOrNot(level == 1 && hasProduct,
                                          "vendor.foo.product@1.0::IExtra/default"));
+    EXPECT_THAT(instances, containsOrNot(level == 1 && hasSystemExt,
+                                         "vendor.foo.systemext@1.0::IExtra/default"));
     EXPECT_THAT(instances, Contains("android.hardware.major@2.0::IMajor/default"));
     EXPECT_THAT(instances, containsOrNot(hasProduct,
                                          "vendor.foo.product@2.0::IExtra/default"));
+    EXPECT_THAT(instances, containsOrNot(hasSystemExt,
+                                         "vendor.foo.systemext@2.0::IExtra/default"));
 }
 
 static std::string OemFcmLevelTestParamToString(
         const TestParamInfo<OemFcmLevelTest::ParamType>& info) {
-    auto&& [level, hasProduct] = info.param;
+    auto&& [level, hasProduct, hasSystemExt] = info.param;
     auto name = "Level" + std::to_string(level);
     name += "With"s + (hasProduct ? "" : "out") + "Product";
+    name += "With"s + (hasSystemExt ? "" : "out") + "SystemExt";
     return name;
 }
-INSTANTIATE_TEST_SUITE_P(OemFcmLevel, OemFcmLevelTest, Combine(Values(1, 2), Bool()),
+INSTANTIATE_TEST_SUITE_P(OemFcmLevel, OemFcmLevelTest, Combine(Values(1, 2), Bool(), Bool()),
     OemFcmLevelTestParamToString);
 // clang-format on
 
