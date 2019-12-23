@@ -473,7 +473,6 @@ class VintfObjectTestBase : public ::testing::Test {
         return static_cast<MockRuntimeInfoFactory&>(*vintfObject->getRuntimeInfoFactory());
     }
 
-    std::string productModel;
     std::unique_ptr<VintfObject> vintfObject;
 };
 
@@ -795,7 +794,8 @@ TEST_F(DeviceManifestTest, Combine4) {
     EXPECT_TRUE(containsVendorManifest(p));
 }
 
-class OdmManifestTest : public VintfObjectTestBase {
+class OdmManifestTest : public VintfObjectTestBase,
+                         public ::testing::WithParamInterface<const char*> {
    protected:
     virtual void SetUp() override {
         VintfObjectTestBase::SetUp();
@@ -806,13 +806,19 @@ class OdmManifestTest : public VintfObjectTestBase {
         expectNeverFetch(kVendorLegacyManifest);
         // Assume no files exist under /odm/ unless otherwise specified.
         expectFileNotExist(StartsWith("/odm/"));
+
+        // set SKU
+        productModel = GetParam();
+        ON_CALL(propertyFetcher(), getProperty("ro.boot.product.hardware.sku", _))
+            .WillByDefault(Return(productModel));
     }
     std::shared_ptr<const HalManifest> get() {
         return vintfObject->getDeviceHalManifest(true /* skipCache */);
     }
+    std::string productModel;
 };
 
-TEST_F(OdmManifestTest, OdmProductManifest) {
+TEST_P(OdmManifestTest, OdmProductManifest) {
     if (productModel.empty()) return;
     expectFetch(kOdmVintfDir + "manifest_" + productModel + ".xml", odmProductManifest);
     // /odm/etc/vintf/manifest.xml should not be fetched when the product variant exists.
@@ -822,14 +828,14 @@ TEST_F(OdmManifestTest, OdmProductManifest) {
     EXPECT_TRUE(containsOdmProductManifest(p));
 }
 
-TEST_F(OdmManifestTest, OdmManifest) {
+TEST_P(OdmManifestTest, OdmManifest) {
     expectFetch(kOdmManifest, odmManifest);
     auto p = get();
     ASSERT_NE(nullptr, p);
     EXPECT_TRUE(containsOdmManifest(p));
 }
 
-TEST_F(OdmManifestTest, OdmLegacyProductManifest) {
+TEST_P(OdmManifestTest, OdmLegacyProductManifest) {
     if (productModel.empty()) return;
     expectFetch(kOdmLegacyVintfDir + "manifest_" + productModel + ".xml", odmProductManifest);
     // /odm/manifest.xml should not be fetched when the product variant exists.
@@ -839,12 +845,14 @@ TEST_F(OdmManifestTest, OdmLegacyProductManifest) {
     EXPECT_TRUE(containsOdmProductManifest(p));
 }
 
-TEST_F(OdmManifestTest, OdmLegacyManifest) {
+TEST_P(OdmManifestTest, OdmLegacyManifest) {
     expectFetch(kOdmLegacyManifest, odmManifest);
     auto p = get();
     ASSERT_NE(nullptr, p);
     EXPECT_TRUE(containsOdmManifest(p));
 }
+
+INSTANTIATE_TEST_SUITE_P(OdmManifest, OdmManifestTest, ::testing::Values("", "fake_sku"));
 
 struct CheckedFqInstance : FqInstance {
     CheckedFqInstance(const char* s) : CheckedFqInstance(std::string(s)) {}
