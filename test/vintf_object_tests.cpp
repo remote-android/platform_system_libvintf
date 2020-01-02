@@ -586,9 +586,6 @@ class VintfObjectRuntimeInfoTest : public VintfObjectTestBase {
         Mock::VerifyAndClear(&runtimeInfoFactory());
         Mock::VerifyAndClear(runtimeInfoFactory().getInfo().get());
     }
-    Level getKernelLevel(const RuntimeInfo* rf) {
-        return rf->kernelLevel();
-    }
 };
 
 TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfo) {
@@ -623,10 +620,7 @@ TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfo) {
 }
 
 TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfoKernelFcm) {
-    auto rf = vintfObject->getRuntimeInfo(false /* skipCache */,
-                                          RuntimeInfo::FetchFlag::KERNEL_FCM);
-    ASSERT_NE(nullptr, rf);
-    ASSERT_EQ(Level{92}, getKernelLevel(rf.get()));
+    ASSERT_EQ(Level{92}, vintfObject->getKernelLevel());
 }
 
 // Test fixture that provides incompatible metadata from the mock device.
