@@ -404,6 +404,7 @@ status_t VintfObject::getAllFrameworkMatrixLevels(std::vector<Named<Compatibilit
                                                   std::string* error) {
     std::vector<std::string> dirs = {
         kSystemVintfDir,
+        kSystemExtVintfDir,
         kProductVintfDir,
     };
     for (const auto& dir : dirs) {
@@ -555,6 +556,7 @@ const std::string kSystemVintfDir = "/system/etc/vintf/";
 const std::string kVendorVintfDir = "/vendor/etc/vintf/";
 const std::string kOdmVintfDir = "/odm/etc/vintf/";
 const std::string kProductVintfDir = "/product/etc/vintf/";
+const std::string kSystemExtVintfDir = "/system_ext/etc/vintf";
 
 const std::string kVendorManifest = kVendorVintfDir + "manifest.xml";
 const std::string kSystemManifest = kSystemVintfDir + "manifest.xml";
@@ -582,6 +584,7 @@ std::vector<std::string> dumpFileList() {
         kVendorVintfDir,
         kOdmVintfDir,
         kProductVintfDir,
+        kSystemExtVintfDir,
         kOdmLegacyVintfDir,
         kVendorLegacyManifest,
         kVendorLegacyMatrix,
