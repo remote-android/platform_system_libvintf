@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-#include <android-base/logging.h>
-#include <android-base/strings.h>
-
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <stdio.h>
 #include <unistd.h>
 
+#include <android-base/file.h>
+#include <android-base/logging.h>
 #include <android-base/strings.h>
 #include <hidl-util/FQName.h>
 
@@ -32,6 +31,7 @@
 #include "utils-fake.h"
 
 using namespace ::testing;
+using namespace std::literals;
 
 using android::FqInstance;
 
@@ -618,6 +618,11 @@ TEST_F(VintfObjectTest, ProductCompatibilityMatrix) {
             };
             return ::android::OK;
         }));
+    EXPECT_CALL(fetcher(), listFiles(StrEq(kProductVintfDir), _, _))
+        .WillRepeatedly(Invoke([](const auto&, auto* out, auto*) {
+            *out = {android::base::Basename(kProductMatrix)};
+            return ::android::OK;
+        }));
     expectFetch(kSystemVintfDir + "compatibility_matrix.1.xml",
                 "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\"/>");
     expectFetch(kSystemVintfDir + "compatibility_matrix.empty.xml",
@@ -983,7 +988,10 @@ class MultiMatrixTest : public VintfObjectTestBase {
         return "compatibility_matrix." + std::to_string(static_cast<Level>(i)) + ".xml";
     }
     void SetUpMockSystemMatrices(const std::vector<std::string>& xmls) {
-        EXPECT_CALL(fetcher(), listFiles(StrEq(kSystemVintfDir), _, _))
+        SetUpMockMatrices(kSystemVintfDir, xmls);
+    }
+    void SetUpMockMatrices(const std::string& dir, const std::vector<std::string>& xmls) {
+        EXPECT_CALL(fetcher(), listFiles(StrEq(dir), _, _))
             .WillRepeatedly(Invoke([=](const auto&, auto* out, auto*) {
                 size_t i = 1;
                 for (const auto& content : xmls) {
@@ -995,12 +1003,9 @@ class MultiMatrixTest : public VintfObjectTestBase {
             }));
         size_t i = 1;
         for (const auto& content : xmls) {
-            expectFetchRepeatedly(kSystemVintfDir + getFileName(i), content);
+            expectFetchRepeatedly(dir + getFileName(i), content);
             ++i;
         }
-        expectFileNotExist(kProductMatrix);
-        expectNeverFetch(kSystemLegacyMatrix);
-        expectFileNotExist(StartsWith("/odm/"));
     }
     void expectTargetFcmVersion(size_t level) {
         expectFetch(kVendorManifest, "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"" +
@@ -1578,6 +1583,91 @@ TEST_P(FrameworkManifestTest, Existence) {
 INSTANTIATE_TEST_SUITE_P(Vintf, FrameworkManifestTest,
                          ::testing::Combine(Bool(), Bool(), Bool(), Bool()));
 
+
+//
+// Set of OEM FCM matrices at different FCM version.
+//
+
+std::vector<std::string> GetOemFcmMatrixLevels(const std::string& name) {
+    return {
+        // 1.xml
+        "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
+        "    <hal format=\"hidl\" optional=\"true\">\n"
+        "        <name>vendor.foo." + name + "</name>\n"
+        "        <version>1.0</version>\n"
+        "        <interface>\n"
+        "            <name>IExtra</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</compatibility-matrix>\n",
+        // 2.xml
+        "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
+        "    <hal format=\"hidl\" optional=\"true\">\n"
+        "        <name>vendor.foo." + name + "</name>\n"
+        "        <version>2.0</version>\n"
+        "        <interface>\n"
+        "            <name>IExtra</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</compatibility-matrix>\n",
+    };
+}
+
+class OemFcmLevelTest : public MultiMatrixTest,
+                        public WithParamInterface<std::tuple<size_t, bool>> {
+   protected:
+    virtual void SetUp() override {
+        MultiMatrixTest::SetUp();
+        SetUpMockSystemMatrices({systemMatrixLevel1, systemMatrixLevel2});
+    }
+    using Instances = std::set<std::string>;
+    Instances GetInstances(const CompatibilityMatrix* fcm) {
+        Instances instances;
+        fcm->forEachHidlInstance([&instances](const auto& matrixInstance) {
+            instances.insert(matrixInstance.description(matrixInstance.versionRange().minVer()));
+            return true; // continue
+        });
+        return instances;
+    }
+};
+
+TEST_P(OemFcmLevelTest, Test) {
+    auto&& [level, hasProduct] = GetParam();
+
+    expectTargetFcmVersion(level);
+    if (hasProduct) {
+        SetUpMockMatrices(kProductVintfDir, GetOemFcmMatrixLevels("product"));
+    }
+
+    auto fcm = vintfObject->getFrameworkCompatibilityMatrix();
+    ASSERT_NE(nullptr, fcm);
+    auto instances = GetInstances(fcm.get());
+
+    auto containsOrNot = [](bool contains, const std::string& e) {
+        return contains ? SafeMatcherCast<Instances>(Contains(e))
+                        : SafeMatcherCast<Instances>(Not(Contains(e)));
+    };
+
+    EXPECT_THAT(instances, containsOrNot(level == 1,
+                                         "android.hardware.major@1.0::IMajor/default"));
+    EXPECT_THAT(instances, containsOrNot(level == 1 && hasProduct,
+                                         "vendor.foo.product@1.0::IExtra/default"));
+    EXPECT_THAT(instances, Contains("android.hardware.major@2.0::IMajor/default"));
+    EXPECT_THAT(instances, containsOrNot(hasProduct,
+                                         "vendor.foo.product@2.0::IExtra/default"));
+}
+
+static std::string OemFcmLevelTestParamToString(
+        const TestParamInfo<OemFcmLevelTest::ParamType>& info) {
+    auto&& [level, hasProduct] = info.param;
+    auto name = "Level" + std::to_string(level);
+    name += "With"s + (hasProduct ? "" : "out") + "Product";
+    return name;
+}
+INSTANTIATE_TEST_SUITE_P(OemFcmLevel, OemFcmLevelTest, Combine(Values(1, 2), Bool()),
+    OemFcmLevelTestParamToString);
 // clang-format on
 
 }  // namespace testing
