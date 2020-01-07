@@ -23,6 +23,7 @@
 #include <mutex>
 
 #include <android-base/logging.h>
+#include <android-base/strings.h>
 
 #include "CompatibilityMatrix.h"
 #include "parse_string.h"
@@ -401,43 +402,48 @@ status_t VintfObject::getOneMatrix(const std::string& path, Named<CompatibilityM
 
 status_t VintfObject::getAllFrameworkMatrixLevels(std::vector<Named<CompatibilityMatrix>>* results,
                                                   std::string* error) {
-    std::vector<std::string> fileNames;
-
-    status_t listStatus = getFileSystem()->listFiles(kSystemVintfDir, &fileNames, error);
-    if (listStatus != OK) {
-        return listStatus;
-    }
-    for (const std::string& fileName : fileNames) {
-        std::string path = kSystemVintfDir + fileName;
-        Named<CompatibilityMatrix> namedMatrix;
-        std::string matrixError;
-        status_t matrixStatus = getOneMatrix(path, &namedMatrix, &matrixError);
-        if (matrixStatus != OK) {
-            // System manifests and matrices share the same dir. Client may not have enough
-            // permissions to read system manifests, or may not be able to parse it.
-            auto logLevel = matrixStatus == BAD_VALUE ? base::DEBUG : base::ERROR;
-            LOG(logLevel) << "Framework Matrix: Ignore file " << path << ": " << matrixError;
+    std::vector<std::string> dirs = {
+        kSystemVintfDir,
+        kProductVintfDir,
+    };
+    for (const auto& dir : dirs) {
+        std::vector<std::string> fileNames;
+        status_t listStatus = getFileSystem()->listFiles(dir, &fileNames, error);
+        if (listStatus == NAME_NOT_FOUND) {
             continue;
         }
-        results->emplace_back(std::move(namedMatrix));
-    }
+        if (listStatus != OK) {
+            return listStatus;
+        }
+        for (const std::string& fileName : fileNames) {
+            std::string path = dir + fileName;
+            Named<CompatibilityMatrix> namedMatrix;
+            std::string matrixError;
+            status_t matrixStatus = getOneMatrix(path, &namedMatrix, &matrixError);
+            if (matrixStatus != OK) {
+                // Manifests and matrices share the same dir. Client may not have enough
+                // permissions to read system manifests, or may not be able to parse it.
+                auto logLevel = matrixStatus == BAD_VALUE ? base::DEBUG : base::ERROR;
+                LOG(logLevel) << "Framework Matrix: Ignore file " << path << ": " << matrixError;
+                continue;
+            }
+            results->emplace_back(std::move(namedMatrix));
+        }
 
-    Named<CompatibilityMatrix> productMatrix;
-    std::string productError;
-    status_t productStatus = getOneMatrix(kProductMatrix, &productMatrix, &productError);
-    if (productStatus == OK) {
-        results->emplace_back(std::move(productMatrix));
-    } else if (productStatus == NAME_NOT_FOUND) {
-        LOG(DEBUG) << "Framework Matrix: missing " << kProductMatrix;
-    } else {
-        if (error) *error = std::move(productError);
-        return productStatus;
+        if (dir == kSystemVintfDir && results->empty()) {
+            if (error) {
+                *error = "No framework matrices under " + dir + " can be fetched or parsed.\n";
+            }
+            return NAME_NOT_FOUND;
+        }
     }
 
     if (results->empty()) {
         if (error) {
             *error =
-                "No framework matrices under " + kSystemVintfDir + " can be fetched or parsed.\n";
+                "No framework matrices can be fetched or parsed. "
+                "The following directories are searched:\n  " +
+                android::base::Join(dirs, "\n  ");
         }
         return NAME_NOT_FOUND;
     }
