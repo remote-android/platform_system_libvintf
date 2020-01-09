@@ -42,11 +42,15 @@ using Properties = std::map<std::string, std::string>;
 using Dirmap = std::map<std::string, std::string>;
 
 enum Option : int {
-    DUMP_FILE_LIST = 1,
-    ROOTDIR,
+    // Modes
     HELP,
-    PROPERTY,
+    DUMP_FILE_LIST = 1,
     CHECK_COMPAT,
+    CHECK_ONE,
+
+    // Options
+    ROOTDIR,
+    PROPERTY,
     DIR_MAP,
     KERNEL,
 };
@@ -55,12 +59,13 @@ using Args = std::multimap<Option, std::string>;
 
 class HostFileSystem : public details::FileSystemImpl {
    public:
-    HostFileSystem(const Dirmap& dirmap) : mDirMap(dirmap) {}
+    HostFileSystem(const Dirmap& dirmap, status_t missingError)
+        : mDirMap(dirmap), mMissingError(missingError) {}
     status_t fetch(const std::string& path, std::string* fetched,
                    std::string* error) const override {
         auto resolved = resolve(path, error);
         if (resolved.empty()) {
-            return UNKNOWN_ERROR;
+            return mMissingError;
         }
         status_t status = details::FileSystemImpl::fetch(resolved, fetched, error);
         LOG(INFO) << "Fetch '" << resolved << "': " << toString(status);
@@ -70,7 +75,7 @@ class HostFileSystem : public details::FileSystemImpl {
                        std::string* error) const override {
         auto resolved = resolve(path, error);
         if (resolved.empty()) {
-            return UNKNOWN_ERROR;
+            return mMissingError;
         }
         status_t status = details::FileSystemImpl::listFiles(resolved, out, error);
         LOG(INFO) << "List '" << resolved << "': " << toString(status);
@@ -93,12 +98,13 @@ class HostFileSystem : public details::FileSystemImpl {
         if (error) {
             *error = "Cannot resolve path " + path;
         } else {
-            LOG(ERROR) << "Cannot resolve path " << path;
+            LOG(mMissingError == NAME_NOT_FOUND ? INFO : ERROR) << "Cannot resolve path " << path;
         }
         return "";
     }
 
     Dirmap mDirMap;
+    status_t mMissingError;
 };
 
 class PresetPropertyFetcher : public PropertyFetcher {
@@ -221,11 +227,14 @@ Args parseArgs(int argc, char** argv) {
     int optionIndex;
     Args ret;
     std::vector<struct option> longopts{
-        {"dump-file-list", no_argument, &longOptFlag, DUMP_FILE_LIST},
-        {"rootdir", required_argument, &longOptFlag, ROOTDIR},
+        // Modes
         {"help", no_argument, &longOptFlag, HELP},
-        {"property", required_argument, &longOptFlag, PROPERTY},
+        {"dump-file-list", no_argument, &longOptFlag, DUMP_FILE_LIST},
         {"check-compat", no_argument, &longOptFlag, CHECK_COMPAT},
+        {"check-one", no_argument, &longOptFlag, CHECK_ONE},
+        // Options
+        {"rootdir", required_argument, &longOptFlag, ROOTDIR},
+        {"property", required_argument, &longOptFlag, PROPERTY},
         {"dirmap", required_argument, &longOptFlag, DIR_MAP},
         {"kernel", required_argument, &longOptFlag, KERNEL},
         {0, 0, 0, 0}};
@@ -296,11 +305,15 @@ std::shared_ptr<StaticRuntimeInfo> getRuntimeInfo(const T& args) {
 int usage(const char* me) {
     LOG(ERROR)
         << me << ": check VINTF metadata." << std::endl
-        << "    Options:" << std::endl
+        << "    Modes:" << std::endl
         << "        --dump-file-list: Dump a list of directories / files on device" << std::endl
         << "                that is required to be used by --check-compat." << std::endl
         << "        -c, --check-compat: check compatibility for files under the root" << std::endl
         << "                directory specified by --root-dir." << std::endl
+        << "        --check-one: check consistency of VINTF metadata for a single partition."
+        << std::endl
+        << std::endl
+        << "    Options:" << std::endl
         << "        --rootdir=<dir>: specify root directory for all metadata. Same as " << std::endl
         << "                --dirmap /:<dir>" << std::endl
         << "        -D, --property <key>=<value>: specify sysprops." << std::endl
@@ -342,11 +355,59 @@ int checkAllFiles(const Dirmap& dirmap, const Properties& props,
 
     auto vintfObject =
         VintfObject::Builder()
-            .setFileSystem(std::make_unique<HostFileSystem>(dirmap))
+            .setFileSystem(std::make_unique<HostFileSystem>(dirmap, UNKNOWN_ERROR))
             .setPropertyFetcher(std::move(hostPropertyFetcher))
             .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(runtimeInfo))
             .build();
     return vintfObject->checkCompatibility(error, flags);
+}
+
+int checkDirmaps(const Dirmap& dirmap) {
+    auto exitCode = EX_OK;
+    for (auto&& [prefix, mappedPath] : dirmap) {
+        auto vintfObject =
+            VintfObject::Builder()
+                .setFileSystem(std::make_unique<HostFileSystem>(dirmap, NAME_NOT_FOUND))
+                .setPropertyFetcher(std::make_unique<PropertyFetcherNoOp>())
+                .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(nullptr))
+                .build();
+
+        if (android::base::StartsWith(prefix, "/system")) {
+            LOG(INFO) << "Checking system manifest.";
+            auto manifest = vintfObject->getFrameworkHalManifest();
+            if (!manifest) {
+                LOG(ERROR) << "Cannot fetch system manifest.";
+                exitCode = EX_SOFTWARE;
+            }
+            LOG(INFO) << "Checking system matrix.";
+            auto matrix = vintfObject->getFrameworkCompatibilityMatrix();
+            if (!matrix) {
+                LOG(ERROR) << "Cannot fetch system matrix.";
+                exitCode = EX_SOFTWARE;
+            }
+            continue;
+        }
+
+        if (android::base::StartsWith(prefix, "/vendor")) {
+            LOG(INFO) << "Checking vendor manifest.";
+            auto manifest = vintfObject->getDeviceHalManifest();
+            if (!manifest) {
+                LOG(ERROR) << "Cannot fetch vendor manifest.";
+                exitCode = EX_SOFTWARE;
+            }
+            LOG(INFO) << "Checking vendor matrix.";
+            auto matrix = vintfObject->getDeviceCompatibilityMatrix();
+            if (!matrix) {
+                LOG(ERROR) << "Cannot fetch vendor matrix.";
+                exitCode = EX_SOFTWARE;
+            }
+            continue;
+        }
+
+        LOG(ERROR) << "--check-one does not work with --dirmap " << prefix;
+        exitCode = EX_SOFTWARE;
+    }
+    return exitCode;
 }
 
 }  // namespace details
@@ -359,7 +420,7 @@ int main(int argc, char** argv) {
     using namespace android::vintf;
     using namespace android::vintf::details;
     // legacy usage: check_vintf <manifest.xml> <matrix.xml>
-    if (argc == 3) {
+    if (argc == 3 && *argv[1] != '-' && *argv[2] != '-') {
         int ret = checkCompatibilityForFiles(argv[1], argv[2]);
         if (ret >= 0) return ret;
     }
@@ -377,6 +438,12 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    auto dirmap = getDirmap(iterateValues(args, DIR_MAP));
+
+    if (!iterateValues(args, CHECK_ONE).empty()) {
+        return checkDirmaps(dirmap);
+    }
+
     auto checkCompat = iterateValues(args, CHECK_COMPAT);
     if (checkCompat.empty()) {
         return usage(argv[0]);
@@ -392,7 +459,6 @@ int main(int argc, char** argv) {
     }
 
     auto properties = getProperties(iterateValues(args, PROPERTY));
-    auto dirmap = getDirmap(iterateValues(args, DIR_MAP));
 
     std::shared_ptr<StaticRuntimeInfo> runtimeInfo;
     auto kernelArgs = iterateValues(args, KERNEL);
