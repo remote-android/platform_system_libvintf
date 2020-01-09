@@ -22,6 +22,7 @@
 #include <map>
 
 #include <android-base/file.h>
+#include <android-base/logging.h>
 #include <android-base/parseint.h>
 #include <android-base/strings.h>
 #include <utils/Errors.h>
@@ -57,24 +58,22 @@ class HostFileSystem : public details::FileSystemImpl {
     HostFileSystem(const Dirmap& dirmap) : mDirMap(dirmap) {}
     status_t fetch(const std::string& path, std::string* fetched,
                    std::string* error) const override {
-        auto resolved = resolve(path);
+        auto resolved = resolve(path, error);
         if (resolved.empty()) {
-            std::cerr << "Error: Cannot resolve path " << path << std::endl;
             return UNKNOWN_ERROR;
         }
         status_t status = details::FileSystemImpl::fetch(resolved, fetched, error);
-        std::cerr << "Debug: Fetch '" << resolved << "': " << toString(status) << std::endl;
+        LOG(INFO) << "Fetch '" << resolved << "': " << toString(status);
         return status;
     }
     status_t listFiles(const std::string& path, std::vector<std::string>* out,
                        std::string* error) const override {
-        auto resolved = resolve(path);
+        auto resolved = resolve(path, error);
         if (resolved.empty()) {
-            std::cerr << "Error: Cannot resolve path " << path << std::endl;
             return UNKNOWN_ERROR;
         }
         status_t status = details::FileSystemImpl::listFiles(resolved, out, error);
-        std::cerr << "Debug: List '" << resolved << "': " << toString(status) << std::endl;
+        LOG(INFO) << "List '" << resolved << "': " << toString(status);
         return status;
     }
 
@@ -82,7 +81,7 @@ class HostFileSystem : public details::FileSystemImpl {
     static std::string toString(status_t status) {
         return status == OK ? "SUCCESS" : strerror(-status);
     }
-    std::string resolve(const std::string& path) const {
+    std::string resolve(const std::string& path, std::string* error) const {
         for (auto [prefix, mappedPath] : mDirMap) {
             if (path == prefix) {
                 return mappedPath;
@@ -90,6 +89,11 @@ class HostFileSystem : public details::FileSystemImpl {
             if (android::base::StartsWith(path, prefix + "/")) {
                 return mappedPath + "/" + path.substr(prefix.size() + 1);
             }
+        }
+        if (error) {
+            *error = "Cannot resolve path " + path;
+        } else {
+            LOG(ERROR) << "Cannot resolve path " << path;
         }
         return "";
     }
@@ -103,11 +107,10 @@ class PresetPropertyFetcher : public PropertyFetcher {
                             const std::string& defaultValue) const override {
         auto it = mProps.find(key);
         if (it == mProps.end()) {
-            std::cerr << "Debug: Sysprop " << key << " is missing, default to '" << defaultValue
-                      << "'" << std::endl;
+            LOG(INFO) << "Sysprop " << key << " is missing, default to '" << defaultValue << "'";
             return defaultValue;
         }
-        std::cerr << "Debug: Sysprop " << key << "=" << it->second << std::endl;
+        LOG(INFO) << "Sysprop " << key << "=" << it->second;
         return it->second;
     }
     uint64_t getUintProperty(const std::string& key, uint64_t defaultValue,
@@ -139,12 +142,12 @@ struct StaticRuntimeInfo : public RuntimeInfo {
     status_t fetchAllInformation(FetchFlags flags) override {
         if (flags & RuntimeInfo::FetchFlag::CPU_VERSION) {
             mKernel.mVersion = kernelVersion;
-            std::cerr << "Debug: fetched kernel version " << kernelVersion << std::endl;
+            LOG(INFO) << "fetched kernel version " << kernelVersion;
         }
         if (flags & RuntimeInfo::FetchFlag::CONFIG_GZ) {
             std::string content;
             if (!android::base::ReadFileToString(kernelConfigFile, &content)) {
-                std::cerr << "Error: Cannot read " << kernelConfigFile << std::endl;
+                LOG(ERROR) << "Cannot read " << kernelConfigFile;
                 return UNKNOWN_ERROR;
             }
             KernelConfigParser parser;
@@ -153,7 +156,7 @@ struct StaticRuntimeInfo : public RuntimeInfo {
                 return status;
             }
             mKernel.mConfigs = std::move(parser.configs());
-            std::cerr << "Debug: read kernel configs from " << kernelConfigFile << std::endl;
+            LOG(INFO) << "read kernel configs from " << kernelConfigFile;
         }
         if (flags & RuntimeInfo::FetchFlag::POLICYVERS) {
             mKernelSepolicyVersion = SIZE_MAX;
@@ -183,13 +186,12 @@ std::unique_ptr<T> readObject(FileSystem* fileSystem, const std::string& path,
     std::string error;
     status_t err = fileSystem->fetch(path, &xml, &error);
     if (err != OK) {
-        std::cerr << "Error: Cannot read '" << path << "' (" << strerror(-err) << "): " << error
-                  << std::endl;
+        LOG(ERROR) << "Cannot read '" << path << "' (" << strerror(-err) << "): " << error;
         return nullptr;
     }
     auto ret = std::make_unique<T>();
     if (!converter(ret.get(), xml, &error)) {
-        std::cerr << "Error: Cannot parse '" << path << "': " << error << std::endl;
+        LOG(ERROR) << "Cannot parse '" << path << "': " << error;
         return nullptr;
     }
     return ret;
@@ -205,7 +207,7 @@ int checkCompatibilityForFiles(const std::string& manifestPath, const std::strin
 
     std::string error;
     if (!manifest->checkCompatibility(*matrix, &error)) {
-        std::cerr << "Error: Incompatible: " << error << std::endl;
+        LOG(ERROR) << "Incompatible: " << error;
         std::cout << "false" << std::endl;
         return 1;
     }
@@ -244,7 +246,7 @@ Args parseArgs(int argc, char** argv) {
     }
     if (optind < argc) {
         // see non option
-        std::cerr << "unrecognized option `" << argv[optind] << "'" << std::endl;
+        LOG(ERROR) << "unrecognized option `" << argv[optind] << "'";
         return {{HELP, ""}};
     }
     return ret;
@@ -275,16 +277,16 @@ template <typename T>
 std::shared_ptr<StaticRuntimeInfo> getRuntimeInfo(const T& args) {
     auto ret = std::make_shared<StaticRuntimeInfo>();
     if (std::distance(args.begin(), args.end()) > 1) {
-        std::cerr << "Error: Can't have multiple --kernel options" << std::endl;
+        LOG(ERROR) << "Can't have multiple --kernel options";
         return nullptr;
     }
     auto pair = android::base::Split(*args.begin(), ":");
     if (pair.size() != 2) {
-        std::cerr << "Error: Invalid --kernel" << std::endl;
+        LOG(ERROR) << "Invalid --kernel";
         return nullptr;
     }
     if (!parse(pair[0], &ret->kernelVersion)) {
-        std::cerr << "Error: Cannot parse " << pair[0] << " as kernel version" << std::endl;
+        LOG(ERROR) << "Cannot parse " << pair[0] << " as kernel version";
         return nullptr;
     }
     ret->kernelConfigFile = std::move(pair[1]);
@@ -292,7 +294,7 @@ std::shared_ptr<StaticRuntimeInfo> getRuntimeInfo(const T& args) {
 }
 
 int usage(const char* me) {
-    std::cerr
+    LOG(ERROR)
         << me << ": check VINTF metadata." << std::endl
         << "    Options:" << std::endl
         << "        --dump-file-list: Dump a list of directories / files on device" << std::endl
@@ -326,8 +328,7 @@ int usage(const char* me) {
            "ro.product.first_api_level` \\"
         << std::endl
         << "            --property ro.boot.product.hardware.sku=`adb shell getprop "
-           "ro.boot.product.hardware.sku`"
-        << std::endl;
+           "ro.boot.product.hardware.sku`";
     return EX_USAGE;
 }
 
@@ -353,6 +354,8 @@ int checkAllFiles(const Dirmap& dirmap, const Properties& props,
 }  // namespace android
 
 int main(int argc, char** argv) {
+    android::base::SetLogger(android::base::StderrLogger);
+
     using namespace android::vintf;
     using namespace android::vintf::details;
     // legacy usage: check_vintf <manifest.xml> <matrix.xml>
@@ -382,7 +385,7 @@ int main(int argc, char** argv) {
     auto rootdirs = iterateValues(args, ROOTDIR);
     if (!rootdirs.empty()) {
         if (std::distance(rootdirs.begin(), rootdirs.end()) > 1) {
-            std::cerr << "Error: Can't have multiple --rootdir options" << std::endl;
+            LOG(ERROR) << "Can't have multiple --rootdir options";
             return usage(argv[0]);
         }
         args.emplace(DIR_MAP, "/:" + *rootdirs.begin());
@@ -402,7 +405,7 @@ int main(int argc, char** argv) {
 
     std::string error;
     if (dirmap.empty()) {
-        std::cerr << "Missing --rootdir or --dirmap option." << std::endl;
+        LOG(ERROR) << "Missing --rootdir or --dirmap option.";
         return usage(argv[0]);
     }
 
@@ -413,10 +416,10 @@ int main(int argc, char** argv) {
         return EX_OK;
     }
     if (compat == INCOMPATIBLE) {
-        std::cerr << "Error: files are incompatible: " << error << std::endl;
+        LOG(ERROR) << "files are incompatible: " << error;
         std::cout << "INCOMPATIBLE" << std::endl;
         return EX_DATAERR;
     }
-    std::cerr << "Error: " << strerror(-compat) << ": " << error << std::endl;
+    LOG(ERROR) << strerror(-compat) << ": " << error;
     return EX_SOFTWARE;
 }
