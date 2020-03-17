@@ -374,7 +374,12 @@ android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties
     if (!hasFcmExt.has_value()) {
         return hasFcmExt.error();
     }
-    if (*hasFcmExt) {
+    auto deviceManifest = vintfObject->getDeviceHalManifest();
+    if (deviceManifest == nullptr) {
+        return android::base::Error(-NAME_NOT_FOUND) << "No device HAL manifest";
+    }
+    auto targetFcm = deviceManifest->level();
+    if (*hasFcmExt || (targetFcm != Level::UNSPECIFIED && targetFcm >= Level::R)) {
         return vintfObject->checkUnusedHals();
     }
     LOG(INFO) << "Skip checking unused HALs.";
