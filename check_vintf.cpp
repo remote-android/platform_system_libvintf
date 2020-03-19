@@ -24,7 +24,6 @@
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/parseint.h>
-#include <android-base/result.h>
 #include <android-base/strings.h>
 #include <utils/Errors.h>
 #include <vintf/KernelConfigParser.h>
@@ -346,8 +345,8 @@ int usage(const char* me) {
     return EX_USAGE;
 }
 
-android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties& props,
-                                          std::shared_ptr<StaticRuntimeInfo> runtimeInfo) {
+int checkAllFiles(const Dirmap& dirmap, const Properties& props,
+                  std::shared_ptr<StaticRuntimeInfo> runtimeInfo, std::string* error) {
     auto hostPropertyFetcher = std::make_unique<PresetPropertyFetcher>();
     hostPropertyFetcher->setProperties(props);
 
@@ -360,25 +359,7 @@ android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties
             .setPropertyFetcher(std::move(hostPropertyFetcher))
             .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(runtimeInfo))
             .build();
-
-    std::string error;
-    int compatibleResult = vintfObject->checkCompatibility(&error, flags);
-    if (compatibleResult == INCOMPATIBLE) {
-        return android::base::Error() << error;
-    }
-    if (compatibleResult != COMPATIBLE) {
-        return android::base::Error(-compatibleResult) << error;
-    }
-
-    auto hasFcmExt = vintfObject->hasFrameworkCompatibilityMatrixExtensions();
-    if (!hasFcmExt.has_value()) {
-        return hasFcmExt.error();
-    }
-    if (*hasFcmExt) {
-        return vintfObject->checkUnusedHals();
-    }
-    LOG(INFO) << "Skip checking unused HALs.";
-    return {};
+    return vintfObject->checkCompatibility(error, flags);
 }
 
 int checkDirmaps(const Dirmap& dirmap, const Properties& props) {
@@ -489,22 +470,23 @@ int main(int argc, char** argv) {
         }
     }
 
+    std::string error;
     if (dirmap.empty()) {
         LOG(ERROR) << "Missing --rootdir or --dirmap option.";
         return usage(argv[0]);
     }
 
-    auto compat = checkAllFiles(dirmap, properties, runtimeInfo);
+    int compat = checkAllFiles(dirmap, properties, runtimeInfo, &error);
 
-    if (compat.ok()) {
+    if (compat == COMPATIBLE) {
         std::cout << "COMPATIBLE" << std::endl;
         return EX_OK;
     }
-    if (compat.error().code() == 0) {
-        LOG(ERROR) << "files are incompatible: " << compat.error();
+    if (compat == INCOMPATIBLE) {
+        LOG(ERROR) << "files are incompatible: " << error;
         std::cout << "INCOMPATIBLE" << std::endl;
         return EX_DATAERR;
     }
-    LOG(ERROR) << strerror(compat.error().code()) << ": " << compat.error();
+    LOG(ERROR) << strerror(-compat) << ": " << error;
     return EX_SOFTWARE;
 }
