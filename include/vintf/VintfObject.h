@@ -191,7 +191,6 @@ class VintfObject {
      * other words, returns true if any of the following exists on the device:
      * - device framework compatibility matrix
      * - product framework compatibility matrix
-     * - system_ext framework compatibility matrix
      *
      * Return result:
      * - true if framework compatibility matrix has extensions
