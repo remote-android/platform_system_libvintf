@@ -21,7 +21,6 @@
 #include <optional>
 
 #include <android-base/result.h>
-#include <hidl/metadata.h>
 
 #include "CheckFlags.h"
 #include "CompatibilityMatrix.h"
@@ -214,8 +213,7 @@ class VintfObject {
      * - !result.ok() && result.error().code() != 0 if any error. Check
      *     result.error() for detailed message.
      */
-    android::base::Result<void> checkUnusedHals(
-        const std::vector<HidlInterfaceMetadata>& hidlMetadata);
+    android::base::Result<void> checkUnusedHals();
 
    private:
     std::unique_ptr<FileSystem> mFileSystem;
