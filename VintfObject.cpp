@@ -819,10 +819,6 @@ android::base::Result<bool> VintfObject::hasFrameworkCompatibilityMatrixExtensio
         if (android::base::StartsWith(namedMatrix.name, kProductVintfDir)) {
             return true;
         }
-        // Returns true if system_ext matrix exists.
-        if (android::base::StartsWith(namedMatrix.name, kSystemExtVintfDir)) {
-            return true;
-        }
         // Returns true if device system matrix exists.
         if (android::base::StartsWith(namedMatrix.name, kSystemVintfDir) &&
             namedMatrix.object.level() == Level::UNSPECIFIED &&
