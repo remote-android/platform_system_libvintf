@@ -321,9 +321,8 @@ int main(int argc, char** argv) {
     }
 
     if (vm && fcm) {
-        // TODO(b/131717099): Use correct information from libhidlmetadata
-        auto deprecate = VintfObject::GetInstance()->checkDeprecation({}, &error);
-        std::cout << "VintfObject::CheckDeprecation (against device manifest) (w/o hidlmetadata)? "
+        auto deprecate = VintfObject::CheckDeprecation(&error);
+        std::cout << "VintfObject::CheckDeprecation (against device manifest)? "
                   << deprecateString(deprecate);
         if (deprecate != NO_DEPRECATED_HALS) std::cout << ", " << error;
         std::cout << std::endl;
