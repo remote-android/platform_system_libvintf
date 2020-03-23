@@ -25,6 +25,7 @@
 #include <android-base/logging.h>
 #include <android-base/result.h>
 #include <android-base/strings.h>
+#include <hidl/metadata.h>
 
 #include "CompatibilityMatrix.h"
 #include "parse_string.h"
@@ -833,7 +834,8 @@ android::base::Result<bool> VintfObject::hasFrameworkCompatibilityMatrixExtensio
     return false;
 }
 
-android::base::Result<void> VintfObject::checkUnusedHals() {
+android::base::Result<void> VintfObject::checkUnusedHals(
+    const std::vector<HidlInterfaceMetadata>& hidlMetadata) {
     auto matrix = getFrameworkCompatibilityMatrix();
     if (matrix == nullptr) {
         return android::base::Error(-NAME_NOT_FOUND) << "Missing framework matrix.";
@@ -842,7 +844,7 @@ android::base::Result<void> VintfObject::checkUnusedHals() {
     if (manifest == nullptr) {
         return android::base::Error(-NAME_NOT_FOUND) << "Missing device manifest.";
     }
-    auto unused = manifest->checkUnusedHals(*matrix);
+    auto unused = manifest->checkUnusedHals(*matrix, hidlMetadata);
     if (!unused.empty()) {
         return android::base::Error()
                << "The following instances are in the device manifest but "
