@@ -24,8 +24,6 @@
 #include <string>
 #include <vector>
 
-#include <hidl/metadata.h>
-
 #include "CheckFlags.h"
 #include "FileSystem.h"
 #include "HalGroup.h"
@@ -177,9 +175,7 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
     // required HAL.
     // That is, return empty list iff
     // (instance in manifest) => (instance in matrix).
-    std::set<std::string> checkUnusedHals(
-        const CompatibilityMatrix& mat,
-        const std::vector<HidlInterfaceMetadata>& hidlMetadata) const;
+    std::set<std::string> checkUnusedHals(const CompatibilityMatrix& mat) const;
 
     // Check that manifest has no entries.
     bool empty() const;
