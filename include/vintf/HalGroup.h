@@ -101,10 +101,10 @@ struct HalGroup {
         });
     }
 
-    bool forEachInstanceOfPackage(HalFormat format, const std::string& package,
-                                  const std::function<bool(const InstanceType&)>& func) const {
+    bool forEachHidlInstanceOfPackage(const std::string& package,
+                                      const std::function<bool(const InstanceType&)>& func) const {
         for (const auto* hal : getHals(package)) {
-            if (hal->format != format) {
+            if (hal->format != HalFormat::HIDL) {
                 continue;
             }
             if (!hal->forEachInstance(func)) {
@@ -112,10 +112,6 @@ struct HalGroup {
             }
         }
         return true;
-    }
-    bool forEachHidlInstanceOfPackage(const std::string& package,
-                                      const std::function<bool(const InstanceType&)>& func) const {
-        return forEachInstanceOfPackage(HalFormat::HIDL, package, func);
     }
 
    protected:
