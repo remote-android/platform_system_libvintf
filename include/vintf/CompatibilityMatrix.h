@@ -64,6 +64,10 @@ struct CompatibilityMatrix : public HalGroup<MatrixHal>,
 
     std::string getVendorNdkVersion() const;
 
+    bool add(MatrixHal&&, std::string* error = nullptr) override;
+    // Move all hals from another CompatibilityMatrix to this.
+    bool addAllHals(CompatibilityMatrix* other, std::string* error = nullptr);
+
    protected:
     bool forEachInstanceOfVersion(
         HalFormat format, const std::string& package, const Version& expectVersion,

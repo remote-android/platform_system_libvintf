@@ -64,7 +64,9 @@ struct HalManifest : public HalGroup<ManifestHal>,
     // Construct a device HAL manifest.
     HalManifest() : mType(SchemaType::DEVICE) {}
 
-    bool add(ManifestHal&& hal) override;
+    bool add(ManifestHal&& hal, std::string* error = nullptr) override;
+    // Move all hals from another HalManifest to this.
+    bool addAllHals(HalManifest* other, std::string* error = nullptr);
 
     // Given a component name (e.g. "android.hardware.camera"),
     // return getHal(name)->transport if the component exist and v exactly matches
@@ -145,7 +147,7 @@ struct HalManifest : public HalGroup<ManifestHal>,
 
    protected:
     // Check before add()
-    bool shouldAdd(const ManifestHal& toAdd) const override;
+    bool shouldAdd(const ManifestHal& toAdd, std::string* error) const;
     bool shouldAddXmlFile(const ManifestXmlFile& toAdd) const override;
 
     bool forEachInstanceOfVersion(

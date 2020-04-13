@@ -41,7 +41,7 @@ using details::InstancesOfVersion;
 using details::mergeField;
 
 // Check <version> tag for all <hal> with the same name.
-bool HalManifest::shouldAdd(const ManifestHal& hal) const {
+bool HalManifest::shouldAdd(const ManifestHal& hal, std::string*) const {
     if (!hal.isValid()) {
         return false;
     }
@@ -90,7 +90,7 @@ void HalManifest::removeHals(const std::string& name, size_t majorVer) {
     });
 }
 
-bool HalManifest::add(ManifestHal&& halToAdd) {
+bool HalManifest::add(ManifestHal&& halToAdd, std::string* error) {
     if (halToAdd.isOverride()) {
         if (halToAdd.isDisabledHal()) {
             // Special syntax when there are no instances at all. Remove all existing HALs
@@ -103,7 +103,25 @@ bool HalManifest::add(ManifestHal&& halToAdd) {
         }
     }
 
-    return HalGroup::add(std::move(halToAdd));
+    if (!shouldAdd(halToAdd, error)) {
+        return false;
+    }
+
+    CHECK(addInternal(std::move(halToAdd)) != nullptr);
+    return true;
+}
+
+bool HalManifest::addAllHals(HalManifest* other, std::string* error) {
+    for (auto& pair : other->mHals) {
+        if (!add(std::move(pair.second), error)) {
+            if (error) {
+                error->insert(0, "HAL \"" + pair.first + "\" has a conflict: ");
+            }
+            return false;
+        }
+    }
+    other->mHals.clear();
+    return true;
 }
 
 bool HalManifest::shouldAddXmlFile(const ManifestXmlFile& xmlFile) const {

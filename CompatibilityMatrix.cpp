@@ -31,6 +31,20 @@ namespace vintf {
 
 using details::mergeField;
 
+bool CompatibilityMatrix::add(MatrixHal&& halToAdd, std::string*) {
+    CHECK(addInternal(std::move(halToAdd)) != nullptr);
+    return true;
+}
+
+bool CompatibilityMatrix::addAllHals(CompatibilityMatrix* other, std::string*) {
+    std::string internalError;
+    for (auto& pair : other->mHals) {
+        CHECK(add(std::move(pair.second), &internalError)) << internalError;
+    }
+    other->mHals.clear();
+    return true;
+}
+
 bool CompatibilityMatrix::addKernel(MatrixKernel&& kernel, std::string* error) {
     if (mType != SchemaType::FRAMEWORK) {
         if (error) {
