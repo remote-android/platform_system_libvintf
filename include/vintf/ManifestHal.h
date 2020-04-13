@@ -81,7 +81,7 @@ struct ManifestHal : public WithFileName {
 
     // Whether this hal is a valid one. Note that an empty ManifestHal
     // (constructed via ManifestHal()) is valid.
-    bool isValid() const;
+    bool isValid(std::string* error = nullptr) const;
 
     // Return all versions mentioned by <version>s and <fqname>s.
     void appendAllVersions(std::set<Version>* ret) const;

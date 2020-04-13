@@ -221,7 +221,7 @@ status_t VintfObject::addDirectoryManifests(const std::string& directory, HalMan
 
         if (!manifest->addAll(&fragmentManifest, error)) {
             if (error) {
-                error->insert(0, "Cannot add manifest fragment " + directory + file + ":");
+                error->insert(0, "Cannot add manifest fragment " + directory + file + ": ");
             }
             return UNKNOWN_ERROR;
         }

@@ -3242,13 +3242,6 @@ TEST_F(LibVintfTest, FqNameValid) {
             "    </hal>\n"
             "</manifest>\n";
         ASSERT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
-        EXPECT_IN(
-            "android.hardware.foo:\n"
-            "    required: @1.1::IFoo/custom\n"
-            "    provided: \n"
-            "        @1.0::IFoo/custom\n"
-            "        @1.0::IFoo/default",
-            error);
     }
 }
 
@@ -3545,6 +3538,39 @@ TEST_F(LibVintfTest, ManifestAddAllFrameworkManifest) {
     ASSERT_TRUE(manifest1.addAll(&manifest2, &error)) << error;
 
     EXPECT_EQ(xml2, gHalManifestConverter(manifest1));
+}
+
+TEST_F(LibVintfTest, ManifestAddAllConflictMajorVersion) {
+    std::string head =
+            "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+            "    <hal format=\"hidl\">\n"
+            "        <name>android.hardware.foo</name>\n"
+            "        <transport>hwbinder</transport>\n"
+            "        <version>";
+    std::string tail =
+            "</version>\n"
+            "        <interface>\n"
+            "            <name>IFoo</name>\n"
+            "        </interface>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+
+    std::string xml1 = head + "1.0" + tail;
+    std::string xml2 = head + "1.1" + tail;
+
+    std::string error;
+    HalManifest manifest1;
+    manifest1.setFileName("1.xml");
+    ASSERT_TRUE(gHalManifestConverter(&manifest1, xml1, &error)) << error;
+    HalManifest manifest2;
+    manifest2.setFileName("2.xml");
+    ASSERT_TRUE(gHalManifestConverter(&manifest2, xml2, &error)) << error;
+
+    ASSERT_FALSE(manifest1.addAll(&manifest2, &error));
+
+    EXPECT_IN("android.hardware.foo", error);
+    EXPECT_IN("1.0 (from 1.xml)", error);
+    EXPECT_IN("1.1 (from 2.xml)", error);
 }
 
 TEST_F(LibVintfTest, ManifestAddAllConflictLevel) {

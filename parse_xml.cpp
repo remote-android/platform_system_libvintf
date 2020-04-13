@@ -464,10 +464,7 @@ struct TransportArchConverter : public XmlNodeConverter<TransportArch> {
             !parseText(root, &object->transport, error)) {
             return false;
         }
-        if (!object->isValid()) {
-            *error = "transport == " + ::android::vintf::to_string(object->transport) +
-                     " and arch == " + ::android::vintf::to_string(object->arch) +
-                     " is not a valid combination.";
+        if (!object->isValid(error)) {
             return false;
         }
         return true;
@@ -760,7 +757,7 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                                   object->format);
             } break;
         }
-        if (!object->transportArch.isValid()) return false;
+        if (!object->transportArch.isValid(error)) return false;
 
         object->interfaces.clear();
         for (auto &&interface : interfaces) {
@@ -772,8 +769,8 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                 return false;
             }
         }
-        if (!object->isValid()) {
-            *error = "'" + object->name + "' is not a valid Manifest HAL.";
+        if (!object->isValid(error)) {
+            error->insert(0, "'" + object->name + "' is not a valid Manifest HAL: ");
             return false;
         }
 // Do not check for target-side libvintf to avoid restricting upgrade accidentally.
