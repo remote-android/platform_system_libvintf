@@ -30,12 +30,13 @@
 #include "ManifestInstance.h"
 #include "TransportArch.h"
 #include "Version.h"
+#include "WithFileName.h"
 
 namespace android {
 namespace vintf {
 
 // A component of HalManifest.
-struct ManifestHal {
+struct ManifestHal : public WithFileName {
     using InstanceType = ManifestInstance;
 
     ManifestHal() = default;

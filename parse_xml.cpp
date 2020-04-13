@@ -1033,11 +1033,18 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
             return false;
         }
 
-        std::vector<ManifestHal> hals;
-        if (!parseAttr(root, "type", &object->mType, error) ||
-            !parseChildren(root, manifestHalConverter, &hals, error)) {
+        if (!parseAttr(root, "type", &object->mType, error)) {
             return false;
         }
+
+        std::vector<ManifestHal> hals;
+        if (!parseChildren(root, manifestHalConverter, &hals, error)) {
+            return false;
+        }
+        for (auto&& hal : hals) {
+            hal.setFileName(object->fileName());
+        }
+
         if (object->mType == SchemaType::DEVICE) {
             // tags for device hal manifest only.
             // <sepolicy> can be missing because it can be determined at build time, not hard-coded

@@ -36,6 +36,7 @@ bool ManifestHal::isValid() const {
 }
 
 bool ManifestHal::operator==(const ManifestHal &other) const {
+    // ignore fileName().
     if (format != other.format)
         return false;
     if (name != other.name)
