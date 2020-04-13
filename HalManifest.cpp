@@ -465,6 +465,7 @@ std::string HalManifest::getXmlFilePath(const std::string& xmlFileName,
 }
 
 bool operator==(const HalManifest &lft, const HalManifest &rgt) {
+    // ignore fileName().
     return lft.mType == rgt.mType && lft.mLevel == rgt.mLevel && lft.mHals == rgt.mHals &&
            lft.mXmlFiles == rgt.mXmlFiles &&
            (lft.mType != SchemaType::DEVICE ||

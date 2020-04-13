@@ -39,6 +39,7 @@
 #include "VendorNdk.h"
 #include "Version.h"
 #include "Vndk.h"
+#include "WithFileName.h"
 #include "XmlFileGroup.h"
 
 namespace android {
@@ -55,7 +56,9 @@ using Instances = std::map<Version, InstancesOfVersion>;
 
 // A HalManifest is reported by the hardware and query-able from
 // framework code. This is the API for the framework.
-struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestXmlFile> {
+struct HalManifest : public HalGroup<ManifestHal>,
+                     public XmlFileGroup<ManifestXmlFile>,
+                     public WithFileName {
    public:
 
     // Construct a device HAL manifest.
@@ -226,7 +229,6 @@ struct HalManifest : public HalGroup<ManifestHal>, public XmlFileGroup<ManifestX
         SystemSdk mSystemSdk;
     } framework;
 };
-
 
 } // namespace vintf
 } // namespace android

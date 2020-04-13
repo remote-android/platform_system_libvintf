@@ -3945,33 +3945,32 @@ TEST_F(LibVintfTest, HalManifestMergeKernel) {
 
 struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
     virtual void SetUp() override {
-        matrices = {
-            {"compatibility_matrix.1_1.xml", CompatibilityMatrix{}},
-            {"compatibility_matrix.1_2.xml", CompatibilityMatrix{}},
-        };
+        matrices.resize(2);
+        matrices[0].setFileName("compatibility_matrix.1_1.xml");
+        matrices[1].setFileName("compatibility_matrix.1_2.xml");
     }
     // Access to private methods.
     std::unique_ptr<CompatibilityMatrix> combine(Level deviceLevel,
-                                                 std::vector<Named<CompatibilityMatrix>>* matrices,
+                                                 std::vector<CompatibilityMatrix>* matrices,
                                                  std::string* error) {
         return CompatibilityMatrix::combine(deviceLevel, matrices, error);
     }
 
-    std::vector<Named<CompatibilityMatrix>> matrices;
+    std::vector<CompatibilityMatrix> matrices;
     std::string error;
 };
 
 // Combining framework compatibility matrix with conflicting minlts fails
 TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictMinlts) {
     ASSERT_TRUE(gCompatibilityMatrixConverter(
-        &matrices[0].object,
+        &matrices[0],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <kernel version=\"3.18.5\" />\n"
         "</compatibility-matrix>\n",
         &error))
         << error;
     ASSERT_TRUE(gCompatibilityMatrixConverter(
-        &matrices[1].object,
+        &matrices[1],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <kernel version=\"3.18.6\" />\n"
         "</compatibility-matrix>\n",
@@ -4007,14 +4006,14 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, KernelNoConditions) {
         "    </kernel>\n";
 
     ASSERT_TRUE(gCompatibilityMatrixConverter(
-        &matrices[0].object,
+        &matrices[0],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <kernel version=\"3.18.5\" />\n" +
             conditionedKernel + "</compatibility-matrix>\n",
         &error))
         << error;
     ASSERT_TRUE(gCompatibilityMatrixConverter(
-        &matrices[1].object,
+        &matrices[1],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n" + simpleKernel +
             "</compatibility-matrix>\n",
         &error))
@@ -4031,7 +4030,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, KernelNoConditions) {
 // Combining framework compatibility matrix with conflicting sepolicy fails
 TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictSepolicy) {
     ASSERT_TRUE(gCompatibilityMatrixConverter(
-        &matrices[0].object,
+        &matrices[0],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <sepolicy>\n"
         "        <kernel-sepolicy-version>30</kernel-sepolicy-version>\n"
@@ -4040,7 +4039,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictSepolicy) {
         &error))
         << error;
     ASSERT_TRUE(gCompatibilityMatrixConverter(
-        &matrices[1].object,
+        &matrices[1],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <sepolicy>\n"
         "        <kernel-sepolicy-version>29</kernel-sepolicy-version>\n"
@@ -4057,7 +4056,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictSepolicy) {
 // Combining framework compatibility matrix with conflicting avb fails
 TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictAvb) {
     ASSERT_TRUE(gCompatibilityMatrixConverter(
-        &matrices[0].object,
+        &matrices[0],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <avb>\n"
         "        <vbmeta-version>1.1</vbmeta-version>\n"
@@ -4066,7 +4065,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictAvb) {
         &error))
         << error;
     ASSERT_TRUE(gCompatibilityMatrixConverter(
-        &matrices[1].object,
+        &matrices[1],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <avb>\n"
         "        <vbmeta-version>1.0</vbmeta-version>\n"
@@ -4105,9 +4104,9 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, AidlAndHidlNames) {
     std::string hidlOptional = std::string(hidl).replace(hidl.find("false"), 5, "true");
     std::string error;
     {
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0].object, head1 + aidl + tail, &error))
+        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head1 + aidl + tail, &error))
             << error;
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1].object, head1 + hidl + tail, &error))
+        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head1 + hidl + tail, &error))
             << error;
 
         auto combined = combine(Level{1}, &matrices, &error);
@@ -4118,9 +4117,9 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, AidlAndHidlNames) {
         EXPECT_IN(hidl, combinedXml);
     }
     {
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0].object, head1 + aidl + tail, &error))
+        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head1 + aidl + tail, &error))
             << error;
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1].object, head2 + hidl + tail, &error))
+        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head2 + hidl + tail, &error))
             << error;
 
         auto combined = combine(Level{1}, &matrices, &error);
@@ -4131,9 +4130,9 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, AidlAndHidlNames) {
         EXPECT_IN(hidlOptional, combinedXml);
     }
     {
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0].object, head2 + aidl + tail, &error))
+        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head2 + aidl + tail, &error))
             << error;
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1].object, head1 + hidl + tail, &error))
+        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head1 + hidl + tail, &error))
             << error;
 
         auto combined = combine(Level{1}, &matrices, &error);
@@ -4147,18 +4146,17 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, AidlAndHidlNames) {
 
 struct DeviceCompatibilityMatrixCombineTest : public LibVintfTest {
     virtual void SetUp() override {
-        matrices = {
-            {"compatibility_matrix.1.xml", CompatibilityMatrix{}},
-            {"compatibility_matrix.2.xml", CompatibilityMatrix{}},
-        };
+        matrices.resize(2);
+        matrices[0].setFileName("compatibility_matrix.1.xml");
+        matrices[1].setFileName("compatibility_matrix.2.xml");
     }
     // Access to private methods.
-    std::unique_ptr<CompatibilityMatrix> combine(std::vector<Named<CompatibilityMatrix>>* matrices,
+    std::unique_ptr<CompatibilityMatrix> combine(std::vector<CompatibilityMatrix>* matrices,
                                                  std::string* error) {
         return CompatibilityMatrix::combineDeviceMatrices(matrices, error);
     }
 
-    std::vector<Named<CompatibilityMatrix>> matrices;
+    std::vector<CompatibilityMatrix> matrices;
     std::string error;
 };
 
@@ -4183,9 +4181,9 @@ TEST_F(DeviceCompatibilityMatrixCombineTest, Success) {
         "            <instance>default</instance>\n"
         "        </interface>\n"
         "    </hal>\n"};
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0].object, head + halFoo + tail, &error))
+    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head + halFoo + tail, &error))
         << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1].object, head + halBar + tail, &error))
+    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head + halBar + tail, &error))
         << error;
 
     auto combined = combine(&matrices, &error);
@@ -4209,8 +4207,8 @@ TEST_F(DeviceCompatibilityMatrixCombineTest, ConflictVendorNdk) {
         "        <version>Q</version>\n"
         "    </vendor-ndk>\n"
         "</compatibility-matrix>\n"};
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0].object, vendorNdkP, &error)) << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1].object, vendorNdkQ, &error)) << error;
+    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], vendorNdkP, &error)) << error;
+    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], vendorNdkQ, &error)) << error;
 
     auto combined = combine(&matrices, &error);
     ASSERT_EQ(nullptr, combined) << gCompatibilityMatrixConverter(*combined);
@@ -4237,9 +4235,9 @@ TEST_F(DeviceCompatibilityMatrixCombineTest, AidlAndHidlNames) {
         "            <instance>default</instance>\n"
         "        </interface>\n"
         "    </hal>\n";
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0].object, head + aidl + tail, &error))
+    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head + aidl + tail, &error))
         << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1].object, head + hidl + tail, &error))
+    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head + hidl + tail, &error))
         << error;
 
     auto combined = combine(&matrices, &error);
