@@ -47,10 +47,12 @@ static const std::string gBaseConfig = "android-base.config";
 // It takes ownership on the istream.
 class NamedIstream {
    public:
+    NamedIstream() = default;
     NamedIstream(const std::string& name, std::unique_ptr<std::istream>&& stream)
         : mName(name), mStream(std::move(stream)) {}
     const std::string& name() const { return mName; }
     std::istream& stream() { return *mStream; }
+    bool hasStream() { return mStream != nullptr; }
 
    private:
     std::string mName;
@@ -433,9 +435,10 @@ class AssembleVintfImpl : public AssembleVintf {
         }
         out().flush();
 
-        if (mCheckFile != nullptr) {
+        if (mCheckFile.hasStream()) {
             CompatibilityMatrix checkMatrix;
-            if (!gCompatibilityMatrixConverter(&checkMatrix, read(*mCheckFile), &error)) {
+            checkMatrix.setFileName(mCheckFile.name());
+            if (!gCompatibilityMatrixConverter(&checkMatrix, read(mCheckFile.stream()), &error)) {
                 std::cerr << "Cannot parse check file as a compatibility matrix: " << error
                           << std::endl;
                 return false;
@@ -527,9 +530,10 @@ class AssembleVintfImpl : public AssembleVintf {
         std::unique_ptr<HalManifest> checkManifest;
         std::unique_ptr<CompatibilityMatrix> builtMatrix;
 
-        if (mCheckFile != nullptr) {
+        if (mCheckFile.hasStream()) {
             checkManifest = std::make_unique<HalManifest>();
-            if (!gHalManifestConverter(checkManifest.get(), read(*mCheckFile), &error)) {
+            checkManifest->setFileName(mCheckFile.name());
+            if (!gHalManifestConverter(checkManifest.get(), read(mCheckFile.stream()), &error)) {
                 std::cerr << "Cannot parse check file as a HAL manifest: " << error << std::endl;
                 return false;
             }
@@ -707,9 +711,9 @@ class AssembleVintfImpl : public AssembleVintf {
         return it->stream();
     }
 
-    std::istream& setCheckInputStream(Istream&& in) override {
-        mCheckFile = std::move(in);
-        return *mCheckFile;
+    std::istream& setCheckInputStream(const std::string& name, Istream&& in) override {
+        mCheckFile = NamedIstream(name, std::move(in));
+        return mCheckFile.stream();
     }
 
     bool hasKernelVersion(const KernelVersion& kernelVer) const override {
@@ -763,7 +767,7 @@ class AssembleVintfImpl : public AssembleVintf {
    private:
     std::vector<NamedIstream> mInFiles;
     Ostream mOutRef;
-    Istream mCheckFile;
+    NamedIstream mCheckFile;
     bool mOutputMatrix = false;
     bool mHasSetHalsOnlyFlag = false;
     SerializeFlags::Type mSerializeFlags = SerializeFlags::EVERYTHING;
@@ -783,7 +787,8 @@ bool AssembleVintf::openInFile(const std::string& path) {
 }
 
 bool AssembleVintf::openCheckFile(const std::string& path) {
-    return static_cast<std::ifstream&>(setCheckInputStream(std::make_unique<std::ifstream>(path)))
+    return static_cast<std::ifstream&>(
+               setCheckInputStream(path, std::make_unique<std::ifstream>(path)))
         .is_open();
 }
 
