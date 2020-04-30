@@ -57,6 +57,7 @@ static std::shared_ptr<const T> Get(const char* id, LockedSharedPtr<T>* ptr, boo
         std::string error;
         status_t status = fetchAllInformation(ptr->object.get(), &error);
         if (status == OK) {
+            ptr->fetchedOnce = true;
             LOG(INFO) << id << ": Successfully processed VINTF information";
         } else {
             // Doubled because a malformed error std::string might cause us to
@@ -65,7 +66,6 @@ static std::shared_ptr<const T> Get(const char* id, LockedSharedPtr<T>* ptr, boo
             LOG(ERROR) << id << ": " << status << " VINTF parse error: " << error;
             ptr->object = nullptr; // frees the old object
         }
-        ptr->fetchedOnce = true;
     }
     return ptr->object;
 }
