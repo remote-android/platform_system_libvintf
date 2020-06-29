@@ -46,9 +46,8 @@ status_t FileSystemImpl::listFiles(const std::string& path, std::vector<std::str
         return -errno;
     }
 
-    errno = 0;
     dirent* dp;
-    while ((dp = readdir(dir.get())) != nullptr) {
+    while (errno = 0, dp = readdir(dir.get()), dp != nullptr) {
         if (dp->d_type != DT_DIR) {
             out->push_back(dp->d_name);
         }
