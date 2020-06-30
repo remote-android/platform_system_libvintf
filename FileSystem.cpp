@@ -28,10 +28,11 @@ namespace details {
 status_t FileSystemImpl::fetch(const std::string& path, std::string* fetched,
                                std::string* error) const {
     if (!android::base::ReadFileToString(path, fetched, true /* follow_symlinks */)) {
+        int saved_errno = errno;
         if (error) {
-            *error = "Cannot read " + path + ": " + strerror(errno);
+            *error = "Cannot read " + path + ": " + strerror(saved_errno);
         }
-        return errno == 0 ? UNKNOWN_ERROR : -errno;
+        return saved_errno == 0 ? UNKNOWN_ERROR : -saved_errno;
     }
     return OK;
 }
@@ -40,10 +41,11 @@ status_t FileSystemImpl::listFiles(const std::string& path, std::vector<std::str
                                    std::string* error) const {
     std::unique_ptr<DIR, decltype(&closedir)> dir(opendir(path.c_str()), closedir);
     if (!dir) {
+        int saved_errno = errno;
         if (error) {
-            *error = "Cannot open " + path + ": " + strerror(errno);
+            *error = "Cannot open " + path + ": " + strerror(saved_errno);
         }
-        return -errno;
+        return saved_errno == 0 ? UNKNOWN_ERROR : -saved_errno;
     }
 
     dirent* dp;
@@ -52,12 +54,13 @@ status_t FileSystemImpl::listFiles(const std::string& path, std::vector<std::str
             out->push_back(dp->d_name);
         }
     }
-    if (errno != 0) {
+    int saved_errno = errno;
+    if (saved_errno != 0) {
         if (error) {
-            *error = "Failed while reading directory " + path + ": " + strerror(errno);
+            *error = "Failed while reading directory " + path + ": " + strerror(saved_errno);
         }
     }
-    return -errno;
+    return -saved_errno;
 }
 
 status_t FileSystemNoOp::fetch(const std::string&, std::string*, std::string*) const {
