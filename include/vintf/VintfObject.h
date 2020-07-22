@@ -129,7 +129,7 @@ class VintfObject {
      * @param flags bitwise-or of RuntimeInfo::FetchFlag
      */
     std::shared_ptr<const RuntimeInfo> getRuntimeInfo(
-        bool skipCache = false, RuntimeInfo::FetchFlags flags = RuntimeInfo::FetchFlag::ALL);
+        RuntimeInfo::FetchFlags flags = RuntimeInfo::FetchFlag::ALL);
 
     /**
      * Check compatibility on the device.
@@ -298,7 +298,7 @@ class VintfObject {
      * @param flags bitwise-or of RuntimeInfo::FetchFlag
      */
     static std::shared_ptr<const RuntimeInfo> GetRuntimeInfo(
-        bool skipCache = false, RuntimeInfo::FetchFlags flags = RuntimeInfo::FetchFlag::ALL);
+        RuntimeInfo::FetchFlags flags = RuntimeInfo::FetchFlag::ALL);
 
    private:
     status_t getCombinedFrameworkMatrix(const std::shared_ptr<const HalManifest>& deviceManifest,
