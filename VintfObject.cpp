@@ -496,17 +496,14 @@ status_t VintfObject::getAllFrameworkMatrixLevels(std::vector<CompatibilityMatri
     return OK;
 }
 
-std::shared_ptr<const RuntimeInfo> VintfObject::GetRuntimeInfo(bool skipCache,
-                                                               RuntimeInfo::FetchFlags flags) {
-    return GetInstance()->getRuntimeInfo(skipCache, flags);
+std::shared_ptr<const RuntimeInfo> VintfObject::GetRuntimeInfo(RuntimeInfo::FetchFlags flags) {
+    return GetInstance()->getRuntimeInfo(flags);
 }
-std::shared_ptr<const RuntimeInfo> VintfObject::getRuntimeInfo(bool skipCache,
-                                                               RuntimeInfo::FetchFlags flags) {
+std::shared_ptr<const RuntimeInfo> VintfObject::getRuntimeInfo(RuntimeInfo::FetchFlags flags) {
     std::unique_lock<std::mutex> _lock(mDeviceRuntimeInfo.mutex);
 
-    if (!skipCache) {
-        flags &= (~mDeviceRuntimeInfo.fetchedFlags);
-    }
+    // Skip fetching information that has already been fetched previously.
+    flags &= (~mDeviceRuntimeInfo.fetchedFlags);
 
     if (mDeviceRuntimeInfo.object == nullptr) {
         mDeviceRuntimeInfo.object = getRuntimeInfoFactory()->make_shared();

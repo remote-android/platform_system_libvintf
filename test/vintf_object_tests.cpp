@@ -552,25 +552,18 @@ TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfo) {
     EXPECT_CALL(*runtimeInfoFactory().getInfo(),
                 fetchAllInformation(RuntimeInfo::FetchFlag::CPU_VERSION));
     EXPECT_CALL(*runtimeInfoFactory().getInfo(), fetchAllInformation(RuntimeInfo::FetchFlag::NONE));
-    EXPECT_CALL(*runtimeInfoFactory().getInfo(),
-                fetchAllInformation(RuntimeInfo::FetchFlag::CPU_VERSION));
     EXPECT_CALL(
         *runtimeInfoFactory().getInfo(),
         fetchAllInformation(allExceptKernelFcm & ~RuntimeInfo::FetchFlag::CPU_VERSION));
-    EXPECT_CALL(*runtimeInfoFactory().getInfo(), fetchAllInformation(allExceptKernelFcm));
     EXPECT_CALL(*runtimeInfoFactory().getInfo(), fetchAllInformation(RuntimeInfo::FetchFlag::NONE));
 
-    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(false /* skipCache */,
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(
                                                    RuntimeInfo::FetchFlag::CPU_VERSION));
-    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(false /* skipCache */,
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(
                                                    RuntimeInfo::FetchFlag::CPU_VERSION));
-    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(true /* skipCache */,
-                                                   RuntimeInfo::FetchFlag::CPU_VERSION));
-    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(false /* skipCache */,
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(
                                                    RuntimeInfo::FetchFlag::ALL));
-    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(true /* skipCache */,
-                                                   RuntimeInfo::FetchFlag::ALL));
-    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(false /* skipCache */,
+    EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(
                                                    RuntimeInfo::FetchFlag::ALL));
 }
 
