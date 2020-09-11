@@ -124,6 +124,7 @@ cc_binary_host {
         "libhidlmetadata",
         "liblog",
         "libvintf",
+        "libvintf_fcm_exclude",
         "libutils",
         "libtinyxml2",
     ],
