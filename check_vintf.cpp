@@ -490,10 +490,12 @@ android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties
         LOG(INFO) << "Skip checking unused HALs.";
     }
 
-    AddResult(&retError,
-              vintfObject->checkMissingHalsInMatrices(hidlMetadata, AidlInterfaceMetadata::all(),
-                                                      checkMissingHalsInMatricesPredicate),
-              gCheckMissingHalsSuggestion);
+    // TODO(b/110261831): make this an error when the bug on generating OTA packages is resolved.
+    auto res = vintfObject->checkMissingHalsInMatrices(hidlMetadata, AidlInterfaceMetadata::all(),
+                                                       checkMissingHalsInMatricesPredicate);
+    if (!res) {
+        LOG(WARNING) << res.error() << gCheckMissingHalsSuggestion;
+    }
 
     if (retError.has_value()) {
         return *retError;
