@@ -33,6 +33,7 @@
 #include <utils/Errors.h>
 #include <vintf/KernelConfigParser.h>
 #include <vintf/VintfObject.h>
+#include <vintf/fcm_exclude.h>
 #include <vintf/parse_string.h>
 #include <vintf/parse_xml.h>
 #include "utils.h"
@@ -375,68 +376,10 @@ void AddResult(std::optional<android::base::Error>* retError, const android::bas
     SetErrorCode(retError, other.error().code()) << other.error() << additionalMessage;
 }
 
-// The predicate to VintfObject::checkMissingHalsInMatrices.
-bool checkMissingHalsInMatricesPredicate(const std::string& interfaceName) {
-    using std::placeholders::_1;
-
-    static std::vector<std::string> includedPrefixes{
-        // Other AOSP HALs (e.g. android.frameworks.*) are not added because only framework matrix
-        // is checked.
-        "android.hardware.",
-    };
-
-    static std::vector<std::string> excludedPrefixes{
-        // TODO(b/110261831): reduce items in this list
-        "android.hardware.gnss.measurement_corrections@",
-        "android.hardware.graphics.bufferqueue@",
-
-        // Exempted.
-        "android.hardware.camera.device@",
-        "android.hardware.tests.",
-    };
-
-    static std::vector<std::string> excludedExact{
-        // TODO(b/110261831): reduce items in this list
-        "android.hardware.audio@7.0",
-        "android.hardware.audio.effect@7.0",
-        "android.hardware.biometrics.fingerprint@2.3",
-        "android.hardware.cas.native@1.0",
-        "android.hardware.fastboot@1.0",
-        "android.hardware.gnss.visibility_control@1.0",
-        "android.hardware.media.bufferpool@1.0",
-        "android.hardware.media.bufferpool@2.0",
-        "android.hardware.radio.config@1.2",
-        "android.hardware.tv.cec@2.0",
-        "android.hardware.tv.tuner@1.0",
-        "android.hardware.keymaster",
-
-        // Exempted
-        "android.hardware.common",
-        "android.hardware.graphics.common",
-    };
-
-    auto interfaceNameHasPrefix = [&](const std::string& prefix) {
-        return android::base::StartsWith(interfaceName, prefix);
-    };
-
-    // Only check interfaceNames that are in the include list and not in the exclude list.
-    if (!std::any_of(includedPrefixes.begin(), includedPrefixes.end(), interfaceNameHasPrefix)) {
-        return false;
-    }
-
-    if (std::find(excludedExact.begin(), excludedExact.end(), interfaceName) !=
-        excludedExact.end()) {
-        return false;
-    }
-
-    return !std::any_of(excludedPrefixes.begin(), excludedPrefixes.end(), interfaceNameHasPrefix);
-}
-
 static constexpr const char* gCheckMissingHalsSuggestion{
     "\n- If this is a new package, add it to the latest framework compatibility matrix."
     "\n- If no interface should be added to the framework compatibility matrix (e.g. "
-    "types-only package), add it to the exempt list in "
-    "checkMissingHalsInMatricesPredicate"};
+    "types-only package), add it to the exempt list in libvintf_fcm_exclude."};
 
 android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties& props,
                                           std::shared_ptr<StaticRuntimeInfo> runtimeInfo) {
@@ -524,7 +467,7 @@ int checkDirmaps(const Dirmap& dirmap, const Properties& props) {
             }
             auto res = vintfObject->checkMissingHalsInMatrices(HidlInterfaceMetadata::all(),
                                                                AidlInterfaceMetadata::all(),
-                                                               checkMissingHalsInMatricesPredicate);
+                                                               ShouldCheckMissingHalsInFcm);
             if (!res.ok()) {
                 LOG(ERROR) << res.error() << gCheckMissingHalsSuggestion;
                 exitCode = EX_SOFTWARE;
