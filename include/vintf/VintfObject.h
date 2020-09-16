@@ -222,9 +222,10 @@ class VintfObject {
     android::base::Result<void> checkUnusedHals(
         const std::vector<HidlInterfaceMetadata>& hidlMetadata);
 
-    // Check that all HALs with specified prefixes are added to the any
-    // framework compatibility matrix.
-    // If shouldCheck is set, only check if shouldCheck(interfaceName).
+    // Check that all HALs are added to the any framework compatibility matrix.
+    // If shouldCheck is set, only check if:
+    // - For HIDL, shouldCheck(packageAndVersion) (e.g. android.hardware.foo@1.0)
+    // - For AIDL and native, shouldCheck(package) (e.g. android.hardware.foo)
     android::base::Result<void> checkMissingHalsInMatrices(
         const std::vector<HidlInterfaceMetadata>& hidlMetadata,
         const std::vector<AidlInterfaceMetadata>& aidlMetadata,
