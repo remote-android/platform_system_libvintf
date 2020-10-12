@@ -22,6 +22,7 @@
 #include <android-base/logging.h>
 #include <android-base/parseint.h>
 #include <android-base/strings.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include <vintf/CompatibilityMatrix.h>
@@ -31,6 +32,10 @@
 #include <vintf/parse_xml.h>
 #include "constants-private.h"
 #include "test_constants.h"
+
+using ::testing::ElementsAre;
+using ::testing::Eq;
+using ::testing::Property;
 
 namespace android {
 namespace vintf {
@@ -3994,6 +3999,41 @@ TEST_F(LibVintfTest, HalManifestMergeKernel) {
     EXPECT_IN("CONFIG_64BIT", merged_xml);
 }
 
+// clang-format on
+
+TEST_F(LibVintfTest, FrameworkManifestHalMaxLevel) {
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="framework">
+                           <hal max-level="3">
+                               <name>android.frameworks.schedulerservice</name>
+                               <transport>hwbinder</transport>
+                               <fqname>@1.0::ISchedulingPolicyService/default</fqname>
+                           </hal>
+                           <hal format="aidl" max-level="4">
+                               <name>android.frameworks.myaidl</name>
+                               <fqname>IAidl/default</fqname>
+                           </hal>
+                           <hal format="native" max-level="5">
+                               <name>some-native-hal</name>
+                               <version>1.0</version>
+                           </hal>
+                       </manifest>)";
+
+    std::string error;
+    HalManifest manifest;
+    ASSERT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+
+    auto hals = getHals(manifest, "android.frameworks.schedulerservice");
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMaxLevel, Eq(static_cast<Level>(3)))));
+
+    hals = getHals(manifest, "android.frameworks.myaidl");
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMaxLevel, Eq(static_cast<Level>(4)))));
+
+    hals = getHals(manifest, "some-native-hal");
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMaxLevel, Eq(static_cast<Level>(5)))));
+}
+
+// clang-format off
+
 struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
     virtual void SetUp() override {
         matrices.resize(2);
@@ -4305,6 +4345,6 @@ TEST_F(DeviceCompatibilityMatrixCombineTest, AidlAndHidlNames) {
 } // namespace android
 
 int main(int argc, char **argv) {
-    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::InitGoogleMock(&argc, argv);
     return RUN_ALL_TESTS();
 }
