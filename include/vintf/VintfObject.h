@@ -329,6 +329,9 @@ class VintfObject {
     status_t fetchVendorHalManifest(HalManifest* out, std::string* error = nullptr);
     status_t fetchFrameworkHalManifest(HalManifest* out, std::string* error = nullptr);
 
+    status_t fetchUnfilteredFrameworkHalManifest(HalManifest* out, std::string* error);
+    void filterHalsByDeviceManifestLevel(HalManifest* out);
+
     using ChildrenMap = std::multimap<std::string, std::string>;
     static bool IsHalDeprecated(const MatrixHal& oldMatrixHal,
                                 const CompatibilityMatrix& targetMatrix,
