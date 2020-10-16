@@ -169,3 +169,45 @@ cc_binary_host {
     ],
 }
 
+cc_defaults {
+    name: "libvintffm-defaults",
+    defaults: ["libvintf-defaults"],
+    host_supported: true,
+    export_include_dirs: [
+        "include-host",
+        "include-test",
+    ],
+    target: {
+        android: {
+            enabled: false,
+        },
+    },
+    static_libs: [
+        "libbase",
+        "libhidl-gen-utils",
+        "liblog",
+        "libtinyxml2",
+        "libutils",
+        "libvintf",
+    ],
+}
+
+cc_library_static {
+    name: "libvintffm",
+    defaults: ["libvintffm-defaults"],
+    srcs: [
+        "HostFileSystem.cpp",
+        "VintfFm.cpp",
+    ],
+}
+
+cc_binary_host {
+    name: "vintffm",
+    defaults: ["libvintffm-defaults"],
+    static_libs: [
+        "libvintffm",
+    ],
+    srcs: [
+        "VintfFmMain.cpp",
+    ],
+}

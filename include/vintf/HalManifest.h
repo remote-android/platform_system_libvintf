@@ -54,6 +54,7 @@ using InstancesOfVersion =
 using Instances = std::map<Version, InstancesOfVersion>;
 
 class CheckVintfUtils;
+class FmOnlyVintfObject;
 
 }  // namespace details
 
@@ -89,7 +90,7 @@ struct HalManifest : public HalGroup<ManifestHal>,
                             CheckFlags::Type flags = CheckFlags::DEFAULT) const;
 
     // Generate a compatibility matrix such that checkCompatibility will return true.
-    CompatibilityMatrix generateCompatibleMatrix() const;
+    CompatibilityMatrix generateCompatibleMatrix(bool optional = true) const;
 
     // Returns all component names.
     std::set<std::string> getHalNames() const;
@@ -163,6 +164,7 @@ struct HalManifest : public HalGroup<ManifestHal>,
     friend class AssembleVintfImpl;
     friend class details::CheckVintfUtils;
     friend struct LibVintfTest;
+    friend class details::FmOnlyVintfObject;
     friend std::string dump(const HalManifest &vm);
     friend bool operator==(const HalManifest &lft, const HalManifest &rgt);
 

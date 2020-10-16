@@ -22,7 +22,16 @@
 namespace android::vintf::details {
 
 HostFileSystem::HostFileSystem(const Dirmap& dirmap, status_t missingError)
-    : mDirMap(dirmap), mMissingError(missingError) {}
+    : HostFileSystem(dirmap, missingError, std::make_unique<FileSystemImpl>()) {}
+
+HostFileSystem::HostFileSystem(const Dirmap& dirmap, status_t missingError,
+                               std::unique_ptr<FileSystem>&& impl)
+    : HostFileSystem(dirmap, missingError, impl.get()) {
+    mImplUniq = std::move(impl);
+}
+
+HostFileSystem::HostFileSystem(const Dirmap& dirmap, status_t missingError, FileSystem* impl)
+    : mDirMap(dirmap), mMissingError(missingError), mImpl(impl) {}
 
 status_t HostFileSystem::fetch(const std::string& path, std::string* fetched,
                                std::string* error) const {
@@ -30,7 +39,7 @@ status_t HostFileSystem::fetch(const std::string& path, std::string* fetched,
     if (resolved.empty()) {
         return mMissingError;
     }
-    status_t status = FileSystemImpl::fetch(resolved, fetched, error);
+    status_t status = mImpl->fetch(resolved, fetched, error);
     LOG(INFO) << "Fetch '" << resolved << "': " << statusToString(status);
     return status;
 }
@@ -41,7 +50,7 @@ status_t HostFileSystem::listFiles(const std::string& path, std::vector<std::str
     if (resolved.empty()) {
         return mMissingError;
     }
-    status_t status = FileSystemImpl::listFiles(resolved, out, error);
+    status_t status = mImpl->listFiles(resolved, out, error);
     LOG(INFO) << "List '" << resolved << "': " << statusToString(status);
     return status;
 }
