@@ -382,7 +382,7 @@ status_t VintfObject::fetchDeviceMatrix(CompatibilityMatrix* out, std::string* e
 //    + /product/etc/vintf/manifest.xml if it exists
 //    + /product/etc/vintf/manifest/*.xml if they exist
 // 2. (deprecated) /system/manifest.xml
-status_t VintfObject::fetchFrameworkHalManifest(HalManifest* out, std::string* error) {
+status_t VintfObject::fetchUnfilteredFrameworkHalManifest(HalManifest* out, std::string* error) {
     auto systemEtcStatus = fetchOneHalManifest(kSystemManifest, out, error);
     if (systemEtcStatus == OK) {
         auto dirStatus = addDirectoryManifests(kSystemManifestFragmentDir, out, error);
@@ -414,6 +414,7 @@ status_t VintfObject::fetchFrameworkHalManifest(HalManifest* out, std::string* e
                 return fragmentStatus;
             }
         }
+
         return OK;
     } else {
         LOG(WARNING) << "Cannot fetch " << kSystemManifest << ": "
@@ -421,6 +422,36 @@ status_t VintfObject::fetchFrameworkHalManifest(HalManifest* out, std::string* e
     }
 
     return out->fetchAllInformation(getFileSystem().get(), kSystemLegacyManifest, error);
+}
+
+status_t VintfObject::fetchFrameworkHalManifest(HalManifest* out, std::string* error) {
+    status_t status = fetchUnfilteredFrameworkHalManifest(out, error);
+    if (status != OK) {
+        return status;
+    }
+    filterHalsByDeviceManifestLevel(out);
+    return OK;
+}
+
+void VintfObject::filterHalsByDeviceManifestLevel(HalManifest* out) {
+    auto deviceManifest = getDeviceHalManifest();
+    if (deviceManifest == nullptr) {
+        LOG(WARNING) << "Cannot fetch device manifest to determine target FCM version to "
+                        "filter framework manifest HALs.";
+        return;
+    }
+    Level deviceManifestLevel = deviceManifest->level();
+    if (deviceManifestLevel == Level::UNSPECIFIED) {
+        LOG(WARNING)
+            << "Not filtering framework manifest HALs because target FCM version is unspecified.";
+        return;
+    }
+    out->removeHalsIf([deviceManifestLevel](const ManifestHal& hal) {
+        if (hal.getMaxLevel() == Level::UNSPECIFIED) {
+            return false;
+        }
+        return hal.getMaxLevel() < deviceManifestLevel;
+    });
 }
 
 static void appendLine(std::string* error, const std::string& message) {
