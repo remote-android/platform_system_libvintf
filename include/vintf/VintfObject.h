@@ -42,6 +42,7 @@ namespace vintf {
 
 namespace details {
 class CheckVintfUtils;
+class FmOnlyVintfObject;
 class VintfObjectAfterUpdate;
 
 template <typename T>
@@ -257,6 +258,7 @@ class VintfObject {
     // Expose functions to simulate dependency injection.
     friend class details::VintfObjectAfterUpdate;
     friend class details::CheckVintfUtils;
+    friend class details::FmOnlyVintfObject;
 
    protected:
     virtual const std::unique_ptr<FileSystem>& getFileSystem();

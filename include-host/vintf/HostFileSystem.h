@@ -16,15 +16,24 @@
 
 #pragma once
 
+#include <memory>
+
 #include <utils/Errors.h>
 #include <vintf/Dirmap.h>
 #include <vintf/FileSystem.h>
 
 namespace android::vintf::details {
 
+// A FileSystem object that uses Dirmap to redirect reads.
+// FileSystem is read via the internal impl.
 class HostFileSystem : public FileSystemImpl {
    public:
+    // Use FileSystemImpl for any actual reads.
     HostFileSystem(const Dirmap& dirmap, status_t missingError);
+    // Use |impl| for any actual reads. Does not own impl.
+    HostFileSystem(const Dirmap& dirmap, status_t missingError, FileSystem* impl);
+    // Use |impl| for any actual reads. Owns impl.
+    HostFileSystem(const Dirmap& dirmap, status_t missingError, std::unique_ptr<FileSystem>&& impl);
 
     status_t fetch(const std::string& path, std::string* fetched,
                    std::string* error) const override;
@@ -37,6 +46,9 @@ class HostFileSystem : public FileSystemImpl {
 
     Dirmap mDirMap;
     status_t mMissingError;
+
+    std::unique_ptr<FileSystem> mImplUniq;
+    FileSystem* mImpl;
 };
 
 }  // namespace android::vintf::details
