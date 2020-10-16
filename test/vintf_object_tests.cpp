@@ -1783,6 +1783,12 @@ TEST_F(CheckMissingHalsTest, FailVersion) {
 }  // namespace android
 
 int main(int argc, char** argv) {
+#ifndef LIBVINTF_TARGET
+    // Silence logs on host because they pollute the gtest output. Negative tests writes a lot
+    // of warning and error logs.
+    android::base::SetMinimumLogSeverity(android::base::LogSeverity::FATAL);
+#endif
+
     ::testing::InitGoogleMock(&argc, argv);
     return RUN_ALL_TESTS();
 }
