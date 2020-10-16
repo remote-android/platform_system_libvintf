@@ -33,6 +33,7 @@ cc_test {
         "libvintf",
     ],
     static_libs: [
+        "libgmock",
         "libgtest",
         "libassemblevintf",
         "libhidl-gen-utils",
