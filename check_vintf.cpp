@@ -32,6 +32,8 @@
 #include <android-base/strings.h>
 #include <hidl/metadata.h>
 #include <utils/Errors.h>
+#include <vintf/Dirmap.h>
+#include <vintf/HostFileSystem.h>
 #include <vintf/KernelConfigParser.h>
 #include <vintf/VintfObject.h>
 #include <vintf/fcm_exclude.h>
@@ -45,8 +47,6 @@ namespace details {
 
 // fake sysprops
 using Properties = std::map<std::string, std::string>;
-
-using Dirmap = std::map<std::string, std::string>;
 
 enum Option : int {
     // Modes
@@ -63,56 +63,6 @@ enum Option : int {
 };
 // command line arguments
 using Args = std::multimap<Option, std::string>;
-
-class HostFileSystem : public details::FileSystemImpl {
-   public:
-    HostFileSystem(const Dirmap& dirmap, status_t missingError)
-        : mDirMap(dirmap), mMissingError(missingError) {}
-    status_t fetch(const std::string& path, std::string* fetched,
-                   std::string* error) const override {
-        auto resolved = resolve(path, error);
-        if (resolved.empty()) {
-            return mMissingError;
-        }
-        status_t status = details::FileSystemImpl::fetch(resolved, fetched, error);
-        LOG(INFO) << "Fetch '" << resolved << "': " << toString(status);
-        return status;
-    }
-    status_t listFiles(const std::string& path, std::vector<std::string>* out,
-                       std::string* error) const override {
-        auto resolved = resolve(path, error);
-        if (resolved.empty()) {
-            return mMissingError;
-        }
-        status_t status = details::FileSystemImpl::listFiles(resolved, out, error);
-        LOG(INFO) << "List '" << resolved << "': " << toString(status);
-        return status;
-    }
-
-   private:
-    static std::string toString(status_t status) {
-        return status == OK ? "SUCCESS" : strerror(-status);
-    }
-    std::string resolve(const std::string& path, std::string* error) const {
-        for (auto [prefix, mappedPath] : mDirMap) {
-            if (path == prefix) {
-                return mappedPath;
-            }
-            if (android::base::StartsWith(path, prefix + "/")) {
-                return mappedPath + "/" + path.substr(prefix.size() + 1);
-            }
-        }
-        if (error) {
-            *error = "Cannot resolve path " + path;
-        } else {
-            LOG(mMissingError == NAME_NOT_FOUND ? INFO : ERROR) << "Cannot resolve path " << path;
-        }
-        return "";
-    }
-
-    Dirmap mDirMap;
-    status_t mMissingError;
-};
 
 class PresetPropertyFetcher : public PropertyFetcher {
    public:
@@ -270,24 +220,8 @@ Args parseArgs(int argc, char** argv) {
 }
 
 template <typename T>
-std::map<std::string, std::string> splitArgs(const T& args, char split) {
-    std::map<std::string, std::string> ret;
-    for (const auto& arg : args) {
-        auto pos = arg.find(split);
-        auto key = arg.substr(0, pos);
-        auto value = pos == std::string::npos ? std::string{} : arg.substr(pos + 1);
-        ret[key] = value;
-    }
-    return ret;
-}
-template <typename T>
 Properties getProperties(const T& args) {
     return splitArgs(args, '=');
-}
-
-template <typename T>
-Dirmap getDirmap(const T& args) {
-    return splitArgs(args, ':');
 }
 
 template <typename T>

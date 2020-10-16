@@ -131,7 +131,9 @@ cc_binary_host {
     stl: "libc++_static",
     srcs: [
         "check_vintf.cpp",
+        "HostFileSystem.cpp",
     ],
+    local_include_dirs: ["include-host"],
 }
 
 cc_library_static {
