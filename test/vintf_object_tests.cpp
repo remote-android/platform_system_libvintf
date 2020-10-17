@@ -21,6 +21,7 @@
 
 #include <android-base/file.h>
 #include <android-base/logging.h>
+#include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <hidl-util/FQName.h>
 
@@ -1530,11 +1531,13 @@ class FrameworkManifestTest : public VintfObjectTestBase,
         ASSERT_NE(nullptr, manifest);
         EXPECT_NE(manifest->getHidlInstances("android.hardware.foo", {1, 0}, interface).empty(),
                   contains)
-            << interface << " is missing.";
+            << interface << " should " << (contains ? "" : "not ") << "exist.";
     }
 };
 
 TEST_P(FrameworkManifestTest, Existence) {
+    useEmptyFileSystem();
+
     expectFileNotExist(StrEq(kSystemLegacyManifest));
 
     expectManifest(kSystemManifest, "ISystemEtc", std::get<0>(GetParam()));
@@ -1560,6 +1563,116 @@ TEST_P(FrameworkManifestTest, Existence) {
 INSTANTIATE_TEST_SUITE_P(Vintf, FrameworkManifestTest,
                          ::testing::Combine(Bool(), Bool(), Bool(), Bool(), Bool(), Bool()));
 
+// clang-format on
+
+class FrameworkManifestLevelTest : public VintfObjectTestBase {
+   protected:
+    void SetUp() override {
+        VintfObjectTestBase::SetUp();
+        useEmptyFileSystem();
+
+        auto head = "<manifest " + kMetaVersionStr + R"( type="framework">)";
+        auto tail = "</manifest>";
+
+        auto systemManifest = head + getFragment(HalFormat::HIDL, 13, "@3.0::ISystemEtc") +
+                              getFragment(HalFormat::AIDL, 14, "ISystemEtc4") + tail;
+        expectFetch(kSystemManifest, systemManifest);
+
+        auto hidlFragment =
+            head + getFragment(HalFormat::HIDL, 14, "@4.0::ISystemEtcFragment") + tail;
+        expectFetch(kSystemManifestFragmentDir + "hidl.xml", hidlFragment);
+
+        auto aidlFragment = head + getFragment(HalFormat::AIDL, 13, "ISystemEtcFragment3") + tail;
+        expectFetch(kSystemManifestFragmentDir + "aidl.xml", aidlFragment);
+
+        EXPECT_CALL(fetcher(), listFiles(StrEq(kSystemManifestFragmentDir), _, _))
+            .Times(AnyNumber())
+            .WillRepeatedly(Invoke([](const auto&, auto* out, auto*) {
+                *out = {"hidl.xml", "aidl.xml"};
+                return ::android::OK;
+            }));
+    }
+
+    void expectTargetFcmVersion(size_t level) {
+        std::string xml = android::base::StringPrintf(
+            R"(<manifest %s type="device" target-level="%s"/>)", kMetaVersionStr.c_str(),
+            to_string(static_cast<Level>(level)).c_str());
+        expectFetch(kVendorManifest, xml);
+        (void)vintfObject->getDeviceHalManifest();
+    }
+
+    void expectContainsHidl(const Version& version, const std::string& interfaceName,
+                            bool exists = true) {
+        auto manifest = vintfObject->getFrameworkHalManifest();
+        ASSERT_NE(nullptr, manifest);
+        EXPECT_NE(
+            manifest->getHidlInstances("android.frameworks.foo", version, interfaceName).empty(),
+            exists)
+            << "@" << version << "::" << interfaceName << " should " << (exists ? "" : "not ")
+            << "exist.";
+    }
+
+    void expectContainsAidl(const std::string& interfaceName, bool exists = true) {
+        auto manifest = vintfObject->getFrameworkHalManifest();
+        ASSERT_NE(nullptr, manifest);
+        EXPECT_NE(manifest->getAidlInstances("android.frameworks.foo", interfaceName).empty(),
+                  exists)
+            << interfaceName << " should " << (exists ? "" : "not ") << "exist.";
+    }
+
+   private:
+    std::string getFragment(HalFormat halFormat, size_t maxLevel, const char* versionedInterface) {
+        auto format = R"(<hal format="%s" max-level="%s">
+                             <name>android.frameworks.foo</name>
+                             %s
+                             <fqname>%s/default</fqname>
+                         </hal>)";
+        std::string level = to_string(static_cast<Level>(maxLevel));
+        const char* transport = "";
+        if (halFormat == HalFormat::HIDL) {
+            transport = "<transport>hwbinder</transport>";
+        }
+        return android::base::StringPrintf(format, to_string(halFormat).c_str(), level.c_str(),
+                                           transport, versionedInterface);
+    }
+};
+
+TEST_F(FrameworkManifestLevelTest, NoTargetFcmVersion) {
+    auto xml =
+        android::base::StringPrintf(R"(<manifest %s type="device"/> )", kMetaVersionStr.c_str());
+    expectFetch(kVendorManifest, xml);
+
+    expectContainsHidl({3, 0}, "ISystemEtc");
+    expectContainsHidl({4, 0}, "ISystemEtcFragment");
+    expectContainsAidl("ISystemEtcFragment3");
+    expectContainsAidl("ISystemEtc4");
+}
+
+TEST_F(FrameworkManifestLevelTest, TargetFcmVersion13) {
+    expectTargetFcmVersion(13);
+    expectContainsHidl({3, 0}, "ISystemEtc");
+    expectContainsHidl({4, 0}, "ISystemEtcFragment");
+    expectContainsAidl("ISystemEtcFragment3");
+    expectContainsAidl("ISystemEtc4");
+}
+
+TEST_F(FrameworkManifestLevelTest, TargetFcmVersion14) {
+    expectTargetFcmVersion(14);
+    expectContainsHidl({3, 0}, "ISystemEtc", false);
+    expectContainsHidl({4, 0}, "ISystemEtcFragment");
+    expectContainsAidl("ISystemEtcFragment3", false);
+    expectContainsAidl("ISystemEtc4");
+}
+
+TEST_F(FrameworkManifestLevelTest, TargetFcmVersion15) {
+    expectTargetFcmVersion(15);
+    expectContainsHidl({3, 0}, "ISystemEtc", false);
+    expectContainsHidl({4, 0}, "ISystemEtcFragment", false);
+    expectContainsAidl("ISystemEtcFragment3", false);
+    expectContainsAidl("ISystemEtc4", false);
+}
+
+// clang-format off
 
 //
 // Set of OEM FCM matrices at different FCM version.
