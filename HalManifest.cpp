@@ -445,7 +445,15 @@ bool HalManifest::shouldCheckKernelCompatibility() const {
 CompatibilityMatrix HalManifest::generateCompatibleMatrix() const {
     CompatibilityMatrix matrix;
 
-    forEachInstance([&matrix](const ManifestInstance& e) {
+    std::set<std::tuple<HalFormat, std::string, Version, std::string, std::string>> instances;
+
+    forEachInstance([&matrix, &instances](const ManifestInstance& e) {
+        auto&& [it, added] =
+            instances.emplace(e.format(), e.package(), e.version(), e.interface(), e.instance());
+        if (!added) {
+            return true;
+        }
+
         matrix.add(MatrixHal{
             .format = e.format(),
             .name = e.package(),
