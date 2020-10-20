@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+// This needs to be on top of the file to work.
+#include "gmock-logging-compat.h"
+
 #include <sysexits.h>
 
 #include <filesystem>
@@ -24,7 +27,6 @@
 #include <android-base/parseint.h>
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <vintf/VintfFm.h>
 #include <vintf/parse_xml.h>
