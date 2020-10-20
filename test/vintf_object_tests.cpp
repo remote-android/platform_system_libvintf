@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+// This needs to be on top of the file to work.
+#include "gmock-logging-compat.h"
+
 #include <stdio.h>
 #include <unistd.h>
 
@@ -23,6 +24,7 @@
 #include <android-base/logging.h>
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
+#include <gtest/gtest.h>
 #include <hidl-util/FQName.h>
 
 #include <vintf/VintfObject.h>
