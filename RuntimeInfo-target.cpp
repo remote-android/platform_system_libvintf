@@ -147,9 +147,7 @@ status_t RuntimeInfoFetcher::parseKernelVersion() {
     if (!parse(mRuntimeInfo->mOsRelease.substr(0, pos), &mRuntimeInfo->mKernel.mVersion)) {
         return UNKNOWN_ERROR;
     }
-    mRuntimeInfo->mIsMainline =
-        pos != std::string::npos &&
-        android::base::StartsWith(mRuntimeInfo->mOsRelease.substr(pos), kMainline);
+    mRuntimeInfo->mIsMainline = mRuntimeInfo->mOsRelease.find(kMainline) != std::string::npos;
     return OK;
 }
 
