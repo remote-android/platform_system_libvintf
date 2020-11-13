@@ -549,11 +549,7 @@ std::shared_ptr<const RuntimeInfo> VintfObject::getRuntimeInfo(RuntimeInfo::Fetc
             mDeviceRuntimeInfo.fetchedFlags &= ~RuntimeInfo::FetchFlag::KERNEL_FCM;
             return nullptr;
         }
-        Level level = Level::UNSPECIFIED;
-        if (manifest->kernel().has_value()) {
-            level = manifest->kernel()->level();
-        }
-        mDeviceRuntimeInfo.object->setKernelLevel(level);
+        mDeviceRuntimeInfo.object->setKernelLevel(manifest->inferredKernelLevel());
         flags &= ~RuntimeInfo::FetchFlag::KERNEL_FCM;
     }
 
@@ -935,6 +931,7 @@ Level VintfObject::getKernelLevel(std::string* error) {
         if (error) *error = "Cannot retrieve device manifest.";
         return Level::UNSPECIFIED;
     }
+    // TODO(b/161317193): read kernel level from RuntimeInfo
     if (manifest->kernel().has_value() && manifest->kernel()->level() != Level::UNSPECIFIED) {
         return manifest->kernel()->level();
     }
