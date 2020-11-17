@@ -542,20 +542,39 @@ std::shared_ptr<const RuntimeInfo> VintfObject::getRuntimeInfo(RuntimeInfo::Fetc
         mDeviceRuntimeInfo.object = getRuntimeInfoFactory()->make_shared();
     }
 
-    // Fetch kernel FCM version from device HAL manifest and store it in RuntimeInfo too.
-    if ((flags & RuntimeInfo::FetchFlag::KERNEL_FCM) != 0) {
-        auto manifest = getDeviceHalManifest();
-        if (!manifest) {
-            mDeviceRuntimeInfo.fetchedFlags &= ~RuntimeInfo::FetchFlag::KERNEL_FCM;
-            return nullptr;
-        }
-        mDeviceRuntimeInfo.object->setKernelLevel(manifest->inferredKernelLevel());
-    }
-
     status_t status = mDeviceRuntimeInfo.object->fetchAllInformation(flags);
     if (status != OK) {
-        mDeviceRuntimeInfo.fetchedFlags &= (~flags);  // mark the fields as "not fetched"
-        return nullptr;
+        // If only kernel FCM is needed, ignore errors when fetching RuntimeInfo because RuntimeInfo
+        // is not available on host. On host, the kernel level can still be inferred from device
+        // manifest.
+        // If other information is needed, flag the error by returning nullptr.
+        auto allExceptKernelFcm = RuntimeInfo::FetchFlag::ALL & ~RuntimeInfo::FetchFlag::KERNEL_FCM;
+        bool needDeviceRuntimeInfo = flags & allExceptKernelFcm;
+        if (needDeviceRuntimeInfo) {
+            mDeviceRuntimeInfo.fetchedFlags &= (~flags);  // mark the fields as "not fetched"
+            return nullptr;
+        }
+    }
+
+    // To support devices without GKI, RuntimeInfo::fetchAllInformation does not report errors
+    // if kernel level cannot be retrieved. If so, fetch kernel FCM version from device HAL
+    // manifest and store it in RuntimeInfo too.
+    if (flags & RuntimeInfo::FetchFlag::KERNEL_FCM) {
+        Level deviceManifestKernelLevel = Level::UNSPECIFIED;
+        auto manifest = getDeviceHalManifest();
+        if (manifest) {
+            deviceManifestKernelLevel = manifest->inferredKernelLevel();
+        }
+        if (deviceManifestKernelLevel != Level::UNSPECIFIED) {
+            Level kernelLevel = mDeviceRuntimeInfo.object->kernelLevel();
+            if (kernelLevel == Level::UNSPECIFIED) {
+                mDeviceRuntimeInfo.object->setKernelLevel(deviceManifestKernelLevel);
+            } else if (kernelLevel != deviceManifestKernelLevel) {
+                LOG(WARNING) << "uname() reports kernel level " << kernelLevel
+                             << " but device manifest sets kernel level "
+                             << deviceManifestKernelLevel << ". Using kernel level " << kernelLevel;
+            }
+        }
     }
 
     mDeviceRuntimeInfo.fetchedFlags |= flags;
