@@ -710,7 +710,12 @@ Level HalManifest::inferredKernelLevel() const {
             return kernel()->level();
         }
     }
-    // TODO(b/161317193): infer kernel level from level() too.
+    // As a special case, for devices launching with R and above, also infer from <manifest>.level.
+    // Devices launching before R may leave kernel level unspecified to use legacy kernel
+    // matching behavior; see KernelInfo::getMatchedKernelRequirements.
+    if (level() >= Level::R) {
+        return level();
+    }
     return Level::UNSPECIFIED;
 }
 
