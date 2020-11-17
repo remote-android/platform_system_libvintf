@@ -67,6 +67,9 @@ cc_library {
         "libaidlmetadata_headers",
         "libhidlmetadata_headers",
     ],
+    whole_static_libs: [
+        "libkver",
+    ],
     export_include_dirs: ["include", "."],
     local_include_dirs: ["include/vintf"],
 

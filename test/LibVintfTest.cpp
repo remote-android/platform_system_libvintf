@@ -132,6 +132,11 @@ public:
     std::set<std::string> checkUnusedHals(const HalManifest& m, const CompatibilityMatrix& cm) {
         return m.checkUnusedHals(cm, {});
     }
+    static status_t parseGkiKernelRelease(RuntimeInfo::FetchFlags flags,
+                                          const std::string& kernelRelease, KernelVersion* version,
+                                          Level* kernelLevel) {
+        return RuntimeInfo::parseGkiKernelRelease(flags, kernelRelease, version, kernelLevel);
+    }
 
     std::map<std::string, HalInterface> testHalInterfaces() {
         HalInterface intf("IFoo", {"default"});
@@ -4030,6 +4035,43 @@ TEST_F(LibVintfTest, FrameworkManifestHalMaxLevel) {
 
     hals = getHals(manifest, "some-native-hal");
     EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMaxLevel, Eq(static_cast<Level>(5)))));
+}
+
+TEST_F(LibVintfTest, RuntimeInfoParseGkiKernelReleaseOk) {
+    KernelVersion version;
+    Level level = Level::UNSPECIFIED;
+    EXPECT_EQ(OK, parseGkiKernelRelease(RuntimeInfo::FetchFlag::ALL, "5.4.42-android12-0-something",
+                                        &version, &level));
+    EXPECT_EQ(KernelVersion(5, 4, 42), version);
+    EXPECT_EQ(Level::S, level);
+}
+
+TEST_F(LibVintfTest, RuntimeInfoParseGkiKernelReleaseVersionOnly) {
+    KernelVersion version;
+    EXPECT_EQ(OK, parseGkiKernelRelease(RuntimeInfo::FetchFlag::CPU_VERSION,
+                                        "5.4.42-android12-0-something", &version, nullptr));
+    EXPECT_EQ(KernelVersion(5, 4, 42), version);
+}
+
+TEST_F(LibVintfTest, RuntimeInfoParseGkiKernelReleaseLevelOnly) {
+    Level level = Level::UNSPECIFIED;
+    EXPECT_EQ(OK, parseGkiKernelRelease(RuntimeInfo::FetchFlag::KERNEL_FCM,
+                                        "5.4.42-android12-0-something", nullptr, &level));
+    EXPECT_EQ(Level::S, level);
+}
+
+TEST_F(LibVintfTest, RuntimeInfoParseGkiKernelReleaseLevelConsistent) {
+    Level level = Level::S;
+    EXPECT_EQ(OK, parseGkiKernelRelease(RuntimeInfo::FetchFlag::KERNEL_FCM,
+                                        "5.4.42-android12-0-something", nullptr, &level));
+    EXPECT_EQ(Level::S, level);
+}
+
+TEST_F(LibVintfTest, RuntimeInfoParseGkiKernelReleaseLevelInconsistent) {
+    Level level = Level::R;
+    EXPECT_EQ(UNKNOWN_ERROR,
+              parseGkiKernelRelease(RuntimeInfo::FetchFlag::KERNEL_FCM,
+                                    "5.4.42-android12-0-something", nullptr, &level));
 }
 
 // clang-format off
