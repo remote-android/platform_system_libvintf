@@ -190,7 +190,7 @@ status_t RuntimeInfoFetcher::fetchAllInformation(RuntimeInfo::FetchFlags flags) 
 
     status_t err;
     for (const auto& fetchFunction : gFetchFunctions)
-        if ((flags & fetchFunction.flags) && (err = (fetchFunction.fetch(this, flags)) != OK))
+        if ((flags & fetchFunction.flags) && ((err = fetchFunction.fetch(this, flags)) != OK))
             LOG(WARNING) << "Cannot fetch or parse " << fetchFunction.description << ": "
                          << strerror(-err);
 
