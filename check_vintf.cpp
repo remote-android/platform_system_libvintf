@@ -31,6 +31,7 @@
 #include <android-base/result.h>
 #include <android-base/strings.h>
 #include <hidl/metadata.h>
+#include <kver/kernel_release.h>
 #include <utils/Errors.h>
 #include <vintf/Dirmap.h>
 #include <vintf/HostFileSystem.h>
@@ -40,6 +41,8 @@
 #include <vintf/parse_string.h>
 #include <vintf/parse_xml.h>
 #include "utils.h"
+
+using android::kver::KernelRelease;
 
 namespace android {
 namespace vintf {
@@ -100,12 +103,17 @@ class PresetPropertyFetcher : public PropertyFetcher {
 
 struct StaticRuntimeInfo : public RuntimeInfo {
     KernelVersion kernelVersion;
+    Level kernelLevel = Level::UNSPECIFIED;
     std::string kernelConfigFile;
 
     status_t fetchAllInformation(FetchFlags flags) override {
         if (flags & RuntimeInfo::FetchFlag::CPU_VERSION) {
             mKernel.mVersion = kernelVersion;
             LOG(INFO) << "fetched kernel version " << kernelVersion;
+        }
+        if (flags & RuntimeInfo::FetchFlag::KERNEL_FCM) {
+            mKernel.mLevel = kernelLevel;
+            LOG(INFO) << "fetched kernel level from RuntimeInfo '" << kernelLevel << "'";
         }
         if (flags & RuntimeInfo::FetchFlag::CONFIG_GZ) {
             std::string content;
@@ -224,6 +232,57 @@ Properties getProperties(const T& args) {
     return splitArgs(args, '=');
 }
 
+// Parse a kernel version or a GKI kernel release.
+bool parseKernelVersionOrRelease(const std::string& s, StaticRuntimeInfo* ret) {
+    // 5.4.42
+    if (parse(s, &ret->kernelVersion)) {
+        ret->kernelLevel = Level::UNSPECIFIED;
+        return true;
+    }
+    LOG(INFO) << "Cannot parse \"" << s << "\" as kernel version, parsing as GKI kernel release.";
+
+    // 5.4.42-android12-0-something
+    auto kernelRelease = KernelRelease::Parse(s, true /* allow suffix */);
+    if (kernelRelease.has_value()) {
+        ret->kernelVersion = KernelVersion{kernelRelease->version(), kernelRelease->patch_level(),
+                                           kernelRelease->sub_level()};
+        ret->kernelLevel = RuntimeInfo::gkiAndroidReleaseToLevel(kernelRelease->android_release());
+        return true;
+    }
+    LOG(INFO) << "Cannot parse \"" << s << "\" as GKI kernel release, parsing as kernel release";
+
+    // 5.4.42-something
+    auto pos = s.find_first_not_of("0123456789.");
+    // substr handles pos == npos case
+    if (parse(s.substr(0, pos), &ret->kernelVersion)) {
+        ret->kernelLevel = Level::UNSPECIFIED;
+        return true;
+    }
+
+    LOG(INFO) << "Cannot parse \"" << s << "\" as kernel release";
+    return false;
+}
+
+// Parse the first half of --kernel. |s| can either be a kernel version, a GKI kernel release,
+// or a file that contains either of them.
+bool parseKernelArgFirstHalf(const std::string& s, StaticRuntimeInfo* ret) {
+    if (parseKernelVersionOrRelease(s, ret)) {
+        LOG(INFO) << "Successfully parsed \"" << s << "\"";
+        return true;
+    }
+    std::string content;
+    if (!android::base::ReadFileToString(s, &content)) {
+        PLOG(INFO) << "Cannot read file " << s;
+        return false;
+    }
+    if (parseKernelVersionOrRelease(content, ret)) {
+        LOG(INFO) << "Successfully parsed content of " << s << ": " << content;
+        return true;
+    }
+    LOG(ERROR) << "Cannot parse content of " << s << ": " << content;
+    return false;
+}
+
 template <typename T>
 std::shared_ptr<StaticRuntimeInfo> getRuntimeInfo(const T& args) {
     auto ret = std::make_shared<StaticRuntimeInfo>();
@@ -231,16 +290,18 @@ std::shared_ptr<StaticRuntimeInfo> getRuntimeInfo(const T& args) {
         LOG(ERROR) << "Can't have multiple --kernel options";
         return nullptr;
     }
-    auto pair = android::base::Split(*args.begin(), ":");
-    if (pair.size() != 2) {
+    const auto& arg = *args.begin();
+    auto colonPos = arg.rfind(":");
+    if (colonPos == std::string::npos) {
         LOG(ERROR) << "Invalid --kernel";
         return nullptr;
     }
-    if (!parse(pair[0], &ret->kernelVersion)) {
-        LOG(ERROR) << "Cannot parse " << pair[0] << " as kernel version";
+
+    if (!parseKernelArgFirstHalf(arg.substr(0, colonPos), ret.get())) {
         return nullptr;
     }
-    ret->kernelConfigFile = std::move(pair[1]);
+
+    ret->kernelConfigFile = arg.substr(colonPos + 1);
     return ret;
 }
 
@@ -262,10 +323,11 @@ int usage(const char* me) {
         << "        --dirmap </system:/dir/to/system> [--dirmap </vendor:/dir/to/vendor>[...]]"
         << std::endl
         << "                Map partitions to directories. Cannot be specified with --rootdir."
-        << "        --kernel <x.y.z:path/to/config>" << std::endl
+        << "        --kernel <version:path/to/config>" << std::endl
         << "                Use the given kernel version and config to check. If" << std::endl
         << "                unspecified, kernel requirements are skipped." << std::endl
-        << std::endl
+        << "                The first half, version, can be just x.y.z, or a file " << std::endl
+        << "                containing the full kernel release string x.y.z-something." << std::endl
         << "        --help: show this message." << std::endl
         << std::endl
         << "    Example:" << std::endl
