@@ -361,6 +361,7 @@ class AssembleVintfImpl : public AssembleVintf {
         // Kernel FCM already set.
         if (manifest->kernel()->level() != Level::UNSPECIFIED) return;
 
+        // TODO(b/161317193): Do not infer kernel level on host.
         manifest->device.mKernel->mLevel = manifest->level();
     }
 
