@@ -1427,12 +1427,15 @@ std::vector<KernelTestP::ParamType> RKernelTestParamValues() {
     std::vector<KernelTestP::ParamType> ret;
     std::vector<std::string> matrices = systemMatrixKernelXmls;
 
-    // Must not use *-r+ kernels without specifying kernel FCM version
+    // Devices launching O~Q: Must not use *-r+ kernels without specifying kernel FCM version
     ret.emplace_back(matrices, MakeKernelInfo("7.0.0", "G5"), Level{1}, Level::UNSPECIFIED, false);
     ret.emplace_back(matrices, MakeKernelInfo("7.0.0", "G5"), Level{2}, Level::UNSPECIFIED, false);
     ret.emplace_back(matrices, MakeKernelInfo("7.0.0", "G5"), Level{3}, Level::UNSPECIFIED, false);
     ret.emplace_back(matrices, MakeKernelInfo("7.0.0", "G5"), Level{4}, Level::UNSPECIFIED, false);
-    ret.emplace_back(matrices, MakeKernelInfo("7.0.0", "G5"), Level{5}, Level::UNSPECIFIED, false);
+
+    // Devices launching R: may use r kernel without specifying kernel FCM version because
+    // assemble_vintf does not insert <kernel> tags to device manifest any more.
+    ret.emplace_back(matrices, MakeKernelInfo("7.0.0", "G5"), Level{5}, Level::UNSPECIFIED, true);
 
     // May use *-r+ kernels with kernel FCM version
     ret.emplace_back(matrices, MakeKernelInfo("7.0.0", "G5"), Level{1}, Level{5}, true);
