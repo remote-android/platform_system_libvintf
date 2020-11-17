@@ -547,9 +547,6 @@ class VintfObjectRuntimeInfoTest : public VintfObjectTestBase {
 };
 
 TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfo) {
-    // RuntimeInfo.fetchAllInformation is never called with KERNEL_FCM set.
-    auto allExceptKernelFcm = RuntimeInfo::FetchFlag::ALL & ~RuntimeInfo::FetchFlag::KERNEL_FCM;
-
     InSequence s;
 
     EXPECT_CALL(*runtimeInfoFactory().getInfo(),
@@ -557,7 +554,7 @@ TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfo) {
     EXPECT_CALL(*runtimeInfoFactory().getInfo(), fetchAllInformation(RuntimeInfo::FetchFlag::NONE));
     EXPECT_CALL(
         *runtimeInfoFactory().getInfo(),
-        fetchAllInformation(allExceptKernelFcm & ~RuntimeInfo::FetchFlag::CPU_VERSION));
+        fetchAllInformation(RuntimeInfo::FetchFlag::ALL & ~RuntimeInfo::FetchFlag::CPU_VERSION));
     EXPECT_CALL(*runtimeInfoFactory().getInfo(), fetchAllInformation(RuntimeInfo::FetchFlag::NONE));
 
     EXPECT_NE(nullptr, vintfObject->getRuntimeInfo(

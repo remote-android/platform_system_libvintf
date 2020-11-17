@@ -550,7 +550,6 @@ std::shared_ptr<const RuntimeInfo> VintfObject::getRuntimeInfo(RuntimeInfo::Fetc
             return nullptr;
         }
         mDeviceRuntimeInfo.object->setKernelLevel(manifest->inferredKernelLevel());
-        flags &= ~RuntimeInfo::FetchFlag::KERNEL_FCM;
     }
 
     status_t status = mDeviceRuntimeInfo.object->fetchAllInformation(flags);
