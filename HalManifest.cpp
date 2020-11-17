@@ -427,9 +427,15 @@ bool HalManifest::checkCompatibility(const CompatibilityMatrix& mat, std::string
             return false;
         }
 
+        // Not using inferredKernelLevel() to preserve the legacy behavior if <kernel> does not have
+        // level attribute.
+        // Note that shouldCheckKernelCompatibility() only returns true on host, because the
+        // on-device HalManifest does not have kernel version set. On the device, kernel information
+        // is retrieved from RuntimeInfo.
+        Level kernelTagLevel = kernel()->level();
         if (flags.isKernelEnabled() && shouldCheckKernelCompatibility() &&
             kernel()
-                ->getMatchedKernelRequirements(mat.framework.mKernels, kernel()->level(), error)
+                ->getMatchedKernelRequirements(mat.framework.mKernels, kernelTagLevel, error)
                 .empty()) {
             return false;
         }
@@ -696,6 +702,16 @@ bool HalManifest::addAll(HalManifest* other, std::string* error) {
     }
 
     return true;
+}
+
+Level HalManifest::inferredKernelLevel() const {
+    if (kernel().has_value()) {
+        if (kernel()->level() != Level::UNSPECIFIED) {
+            return kernel()->level();
+        }
+    }
+    // TODO(b/161317193): infer kernel level from level() too.
+    return Level::UNSPECIFIED;
 }
 
 } // namespace vintf
