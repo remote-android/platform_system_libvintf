@@ -221,6 +221,9 @@ struct HalManifest : public HalGroup<ManifestHal>,
     // false if hal should not be added, and set |error| accordingly. Return true if check passes.
     bool addingConflictingMajorVersion(const ManifestHal& hal, std::string* error) const;
 
+    // Inferred kernel level.
+    Level inferredKernelLevel() const;
+
     SchemaType mType;
     Level mLevel = Level::UNSPECIFIED;
 
