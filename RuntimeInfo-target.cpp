@@ -114,7 +114,7 @@ status_t RuntimeInfoFetcher::fetchKernelSepolicyVers(RuntimeInfo::FetchFlags) {
     return OK;
 }
 
-status_t RuntimeInfoFetcher::fetchVersion(RuntimeInfo::FetchFlags) {
+status_t RuntimeInfoFetcher::fetchVersion(RuntimeInfo::FetchFlags flags) {
     struct utsname buf;
     if (uname(&buf)) {
         return -errno;
@@ -127,7 +127,12 @@ status_t RuntimeInfoFetcher::fetchVersion(RuntimeInfo::FetchFlags) {
 
     mRuntimeInfo->mIsMainline = mRuntimeInfo->mOsRelease.find(kMainline) != std::string::npos;
 
-    status_t err = parseKernelVersion();
+    status_t err = RuntimeInfo::parseGkiKernelRelease(flags, mRuntimeInfo->mOsRelease,
+                                                      &mRuntimeInfo->mKernel.mVersion,
+                                                      &mRuntimeInfo->mKernel.mLevel);
+    if (err == OK) return OK;
+
+    err = parseKernelVersion();
     if (err != OK) {
         LOG(ERROR) << "Could not parse kernel version from \""
                    << mRuntimeInfo->mOsRelease << "\"";
@@ -175,7 +180,7 @@ status_t RuntimeInfoFetcher::fetchAllInformation(RuntimeInfo::FetchFlags flags) 
     using RF = RuntimeInfoFetcher;
     // clang-format off
     const static std::vector<FetchFunction> gFetchFunctions({
-        {F::CPU_VERSION,                 &RF::fetchVersion,            "/proc/version"},
+        {F::CPU_VERSION | F::KERNEL_FCM, &RF::fetchVersion,            "/proc/version"},
         {F::CONFIG_GZ,                   &RF::fetchKernelConfigs,      "/proc/config.gz"},
         {F::CPU_INFO,                    &RF::fetchCpuInfo,            "/proc/cpuinfo"},
         {F::POLICYVERS,                  &RF::fetchKernelSepolicyVers, "kernel sepolicy version"},
