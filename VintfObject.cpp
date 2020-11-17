@@ -944,16 +944,17 @@ int32_t VintfObject::checkDeprecation(const std::vector<HidlInterfaceMetadata>& 
 }
 
 Level VintfObject::getKernelLevel(std::string* error) {
-    auto manifest = getDeviceHalManifest();
-    if (!manifest) {
-        if (error) *error = "Cannot retrieve device manifest.";
+    auto runtimeInfo = getRuntimeInfo(RuntimeInfo::FetchFlag::KERNEL_FCM);
+    if (!runtimeInfo) {
+        if (error) *error = "Cannot retrieve runtime info with kernel level.";
         return Level::UNSPECIFIED;
     }
-    // TODO(b/161317193): read kernel level from RuntimeInfo
-    if (manifest->kernel().has_value() && manifest->kernel()->level() != Level::UNSPECIFIED) {
-        return manifest->kernel()->level();
+    if (runtimeInfo->kernelLevel() != Level::UNSPECIFIED) {
+        return runtimeInfo->kernelLevel();
     }
-    if (error) *error = "Device manifest does not specify kernel FCM version.";
+    if (error) {
+        *error = "Both device manifest and kernel release do not specify kernel FCM version.";
+    }
     return Level::UNSPECIFIED;
 }
 

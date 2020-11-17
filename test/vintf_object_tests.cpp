@@ -537,8 +537,6 @@ class VintfObjectRuntimeInfoTest : public VintfObjectTestBase {
    protected:
     virtual void SetUp() {
         VintfObjectTestBase::SetUp();
-        setupMockFetcher(vendorManifestKernelFcm, "", "", "");
-        expectVendorManifest();
     }
     virtual void TearDown() {
         Mock::VerifyAndClear(&runtimeInfoFactory());
@@ -547,6 +545,8 @@ class VintfObjectRuntimeInfoTest : public VintfObjectTestBase {
 };
 
 TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfo) {
+    setupMockFetcher(vendorManifestKernelFcm, "", "", "");
+    expectVendorManifest();
     InSequence s;
 
     EXPECT_CALL(*runtimeInfoFactory().getInfo(),
@@ -567,9 +567,47 @@ TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfo) {
                                                    RuntimeInfo::FetchFlag::ALL));
 }
 
-TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfoKernelFcm) {
-    ASSERT_EQ(Level{92}, vintfObject->getKernelLevel());
+TEST_F(VintfObjectRuntimeInfoTest, GetRuntimeInfoHost) {
+    runtimeInfoFactory().getInfo()->failNextFetch();
+    EXPECT_EQ(nullptr, vintfObject->getRuntimeInfo(RuntimeInfo::FetchFlag::ALL));
 }
+
+class VintfObjectKernelFcmTest : public VintfObjectTestBase,
+                                 public WithParamInterface<std::tuple<bool, bool>> {
+   protected:
+    virtual void SetUp() {
+        VintfObjectTestBase::SetUp();
+        auto [isHost, hasDeviceManifest] = GetParam();
+        if (hasDeviceManifest) {
+            setupMockFetcher(vendorManifestKernelFcm, "", "", "");
+            expectVendorManifest();
+        }
+
+        if (isHost) {
+            runtimeInfoFactory().getInfo()->failNextFetch();
+        } else {
+            runtimeInfoFactory().getInfo()->setNextFetchKernelLevel(Level{92});
+        }
+    }
+
+    Level expectedKernelFcm() {
+        auto [isHost, hasDeviceManifest] = GetParam();
+        return !isHost || hasDeviceManifest ? Level{92} : Level::UNSPECIFIED;
+    }
+};
+
+TEST_P(VintfObjectKernelFcmTest, GetRuntimeInfoKernelFcm) {
+    auto r = vintfObject->getRuntimeInfo(RuntimeInfo::FetchFlag::KERNEL_FCM);
+    ASSERT_NE(nullptr, r);
+    ASSERT_EQ(expectedKernelFcm(), r->kernelLevel());
+}
+
+TEST_P(VintfObjectKernelFcmTest, GetKernelLevel) {
+    ASSERT_EQ(expectedKernelFcm(), vintfObject->getKernelLevel());
+}
+
+INSTANTIATE_TEST_SUITE_P(KernelFcm, VintfObjectKernelFcmTest,
+    ::testing::Combine(::testing::Bool(), ::testing::Bool()));
 
 // Test fixture that provides incompatible metadata from the mock device.
 class VintfObjectTest : public VintfObjectTestBase {
