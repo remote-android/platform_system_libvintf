@@ -97,7 +97,6 @@ struct RuntimeInfo {
         ALL = ((LAST_PLUS_ONE - 1) << 1) - 1,
     };
 
-    Level kernelLevel() const;
 
     // GKI kernel release string specifies the kernel level using a string like
     // "android12". This function converts the trailing number of this string to
@@ -110,6 +109,7 @@ struct RuntimeInfo {
     virtual status_t fetchAllInformation(FetchFlags flags);
 
     void setKernelLevel(Level level);
+    Level kernelLevel() const;
 
     // Helper function to parse kernel release string as a GKI kernel release string.
     // Return error if:
