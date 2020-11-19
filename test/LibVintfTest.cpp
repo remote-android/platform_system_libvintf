@@ -132,6 +132,7 @@ public:
     std::set<std::string> checkUnusedHals(const HalManifest& m, const CompatibilityMatrix& cm) {
         return m.checkUnusedHals(cm, {});
     }
+    Level getLevel(const KernelInfo& ki) { return ki.level(); }
     static status_t parseGkiKernelRelease(RuntimeInfo::FetchFlags flags,
                                           const std::string& kernelRelease, KernelVersion* version,
                                           Level* kernelLevel) {
@@ -3970,7 +3971,7 @@ TEST_F(LibVintfTest, KernelInfoLevel) {
     std::string xml = "<kernel version=\"3.18.31\" target-level=\"1\"/>\n";
     KernelInfo ki;
     ASSERT_TRUE(gKernelInfoConverter(&ki, xml, &error)) << error;
-    EXPECT_EQ(Level{1}, ki.level());
+    EXPECT_EQ(Level{1}, getLevel(ki));
     EXPECT_EQ(xml, gKernelInfoConverter(ki));
 }
 
