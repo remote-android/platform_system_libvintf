@@ -596,12 +596,6 @@ class VintfObjectKernelFcmTest : public VintfObjectTestBase,
     }
 };
 
-TEST_P(VintfObjectKernelFcmTest, GetRuntimeInfoKernelFcm) {
-    auto r = vintfObject->getRuntimeInfo(RuntimeInfo::FetchFlag::KERNEL_FCM);
-    ASSERT_NE(nullptr, r);
-    ASSERT_EQ(expectedKernelFcm(), r->kernelLevel());
-}
-
 TEST_P(VintfObjectKernelFcmTest, GetKernelLevel) {
     ASSERT_EQ(expectedKernelFcm(), vintfObject->getKernelLevel());
 }
