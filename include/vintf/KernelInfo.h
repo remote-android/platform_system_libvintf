@@ -68,6 +68,9 @@ class KernelInfo {
     std::vector<const MatrixKernel*> getMatchedKernelVersionAndConfigs(
         const std::vector<const MatrixKernel*>& kernels, std::string* error) const;
 
+    // The kernel FCM version.
+    // This API is for internal use only, depending on the parent object that contains this
+    // KernelInfo. For public clients of libvintf, use VintfObject::getKernelLevel().
     Level level() const;
 
     // x.y.z
