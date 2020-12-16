@@ -17,7 +17,10 @@
 // Convert objects from and to strings.
 
 #include "parse_string.h"
+
 #include <android-base/parseint.h>
+
+#include "constants-private.h"
 
 namespace android {
 using base::ParseUint;
@@ -407,7 +410,6 @@ std::string expandInstances(const MatrixHal& req, const VersionRange& vr, bool b
                                                  : matrixInstance.exactInstance();
         switch (req.format) {
             case HalFormat::AIDL: {
-                // Hide fake version when printing human-readable error messages.
                 s += toFQNameString(matrixInstance.interface(), instance);
             } break;
             case HalFormat::HIDL:
@@ -545,6 +547,14 @@ std::string toAidlFqnameString(const std::string& package, const std::string& in
         ss << "/" << instance;
     }
     return ss.str();
+}
+
+std::string aidlVersionToString(const Version& v) {
+    return to_string(v.minorVer);
+}
+bool parseAidlVersion(const std::string& s, Version* version) {
+    version->majorVer = details::kFakeAidlMajorVersion;
+    return android::base::ParseUint(s, &version->minorVer);
 }
 
 } // namespace vintf

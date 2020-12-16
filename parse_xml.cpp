@@ -23,6 +23,7 @@
 
 #include <type_traits>
 
+#include <android-base/parseint.h>
 #include <tinyxml2.h>
 
 #include "Regex.h"
@@ -390,8 +391,16 @@ struct XmlNodeConverter : public XmlConverter<Object> {
 
     template <typename T>
     inline bool parseText(NodeType* node, T* s, std::string* error) const {
+        bool (*parser)(const std::string&, T*) = ::android::vintf::parse;
+        return parseText(node, s, {parser}, error);
+    }
+
+    template <typename T>
+    inline bool parseText(NodeType* node, T* s,
+                          const std::function<bool(const std::string&, T*)>& parse,
+                          std::string* error) const {
         std::string text = getText(node);
-        bool ret = ::android::vintf::parse(text, s);
+        bool ret = parse(text, s);
         if (!ret) {
             *error = "Could not parse text \"" + text + "\" in element <" + elementName() + ">";
         }
@@ -450,6 +459,19 @@ struct XmlPairConverter : public XmlNodeConverter<Pair> {
 XmlTextConverter<Version> versionConverter{"version"};
 
 XmlTextConverter<VersionRange> versionRangeConverter{"version"};
+
+// <version>100</version> <=> Version{kFakeAidlMajorVersion, 100}
+struct AidlVersionConverter : public XmlNodeConverter<Version> {
+    std::string elementName() const override { return "version"; }
+    void mutateNode(const Version& object, NodeType* root, DocType* d) const override {
+        appendText(root, aidlVersionToString(object), d);
+    }
+    bool buildObject(Version* object, NodeType* root, std::string* error) const override {
+        return parseText(root, object, {parseAidlVersion}, error);
+    }
+};
+
+AidlVersionConverter aidlVersionConverter{};
 
 struct TransportArchConverter : public XmlNodeConverter<TransportArch> {
     std::string elementName() const override { return "transport"; }
@@ -694,8 +716,14 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         if (!hal.transportArch.empty()) {
             appendChild(root, transportArchConverter(hal.transportArch, d));
         }
-        // Don't output <version> for format="aidl"
-        if (hal.format != HalFormat::AIDL) {
+        if (hal.format == HalFormat::AIDL) {
+            // By default, buildObject() assumes a <version>0</version> tag if no <version> tag
+            // is specified. Don't output any <version> tag if there's only one <version>0</version>
+            // tag.
+            if (hal.versions.size() != 1 || hal.versions[0] != details::kDefaultAidlVersion) {
+                appendChildren(root, aidlVersionConverter, hal.versions, d);
+            }
+        } else {
             appendChildren(root, versionConverter, hal.versions, d);
         }
         appendChildren(root, halInterfaceConverter, iterateValues(hal.interfaces), d);
@@ -721,7 +749,6 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             !parseOptionalAttr(root, "override", false, &object->mIsOverride, error) ||
             !parseTextElement(root, "name", &object->name, error) ||
             !parseOptionalChild(root, transportArchConverter, {}, &object->transportArch, error) ||
-            !parseChildren(root, versionConverter, &object->versions, error) ||
             !parseChildren(root, halInterfaceConverter, &interfaces, error) ||
             !parseOptionalAttr(root, "max-level", Level::UNSPECIFIED, &object->mMaxLevel, error)) {
             return false;
@@ -729,12 +756,14 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
 
         switch (object->format) {
             case HalFormat::HIDL: {
+                if (!parseChildren(root, versionConverter, &object->versions, error)) return false;
                 if (object->transportArch.empty()) {
                     *error = "HIDL HAL '" + object->name + "' should have <transport> defined.";
                     return false;
                 }
             } break;
             case HalFormat::NATIVE: {
+                if (!parseChildren(root, versionConverter, &object->versions, error)) return false;
                 if (!object->transportArch.empty()) {
                     *error =
                         "Native HAL '" + object->name + "' should not have <transport> defined.";
@@ -747,13 +776,13 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                                  << object->name;
                     object->transportArch = {};
                 }
-                if (!object->versions.empty()) {
-                    LOG(WARNING) << "Ignoring <version> on manifest <hal format=\"aidl\"> "
-                                 << object->name;
-                    object->versions.clear();
+                if (!parseChildren(root, aidlVersionConverter, &object->versions, error)) {
+                    return false;
                 }
                 // Insert fake version for AIDL HALs so that forEachInstance works.
-                object->versions.push_back(details::kFakeAidlVersion);
+                if (object->versions.empty()) {
+                    object->versions.push_back(details::kDefaultAidlVersion);
+                }
             } break;
             default: {
                 LOG(FATAL) << "Unhandled HalFormat "
