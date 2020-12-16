@@ -25,8 +25,16 @@ namespace details {
 // is inserted so that compatibility checks for different HAL formats can be unified.
 // This is an implementation detail of libvintf and won't be written to actual XML files.
 // 0.0 is not used because FQName / FqInstance consider it an invalid value.
-static constexpr VersionRange kFakeAidlVersionRange{SIZE_MAX, SIZE_MAX};
-static constexpr Version kFakeAidlVersion = kFakeAidlVersionRange.minVer();
+static constexpr size_t kFakeAidlMajorVersion = SIZE_MAX;
+static constexpr size_t kDefaultAidlMinorVersion = 1;
+static constexpr VersionRange kDefaultAidlVersionRange{kFakeAidlMajorVersion,
+                                                       kDefaultAidlMinorVersion};
+static constexpr Version kDefaultAidlVersion = kDefaultAidlVersionRange.minVer();
+
+// Deprecated. Use kDefaultAidlVersionRange
+static constexpr VersionRange kFakeAidlVersionRange = kDefaultAidlVersionRange;
+// Deprecated. Use kDefaultAidlVersion
+static constexpr Version kFakeAidlVersion = kDefaultAidlVersion;
 
 }  // namespace details
 }  // namespace vintf
