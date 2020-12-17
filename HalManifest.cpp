@@ -578,7 +578,13 @@ std::set<std::string> HalManifest::getHidlInstances(const std::string& package,
 
 std::set<std::string> HalManifest::getAidlInstances(const std::string& package,
                                                     const std::string& interfaceName) const {
-    return getInstances(HalFormat::AIDL, package, details::kFakeAidlVersion, interfaceName);
+    return getAidlInstances(package, 0, interfaceName);
+}
+
+std::set<std::string> HalManifest::getAidlInstances(const std::string& package, size_t version,
+                                                    const std::string& interfaceName) const {
+    return getInstances(HalFormat::AIDL, package, {details::kFakeAidlMajorVersion, version},
+                        interfaceName);
 }
 
 bool HalManifest::hasHidlInstance(const std::string& package, const Version& version,
@@ -589,7 +595,13 @@ bool HalManifest::hasHidlInstance(const std::string& package, const Version& ver
 
 bool HalManifest::hasAidlInstance(const std::string& package, const std::string& interface,
                                   const std::string& instance) const {
-    return hasInstance(HalFormat::AIDL, package, details::kFakeAidlVersion, interface, instance);
+    return hasAidlInstance(package, 0, interface, instance);
+}
+
+bool HalManifest::hasAidlInstance(const std::string& package, size_t version,
+                                  const std::string& interface, const std::string& instance) const {
+    return hasInstance(HalFormat::AIDL, package, {details::kFakeAidlMajorVersion, version},
+                       interface, instance);
 }
 
 bool HalManifest::insertInstance(const FqInstance& fqInstance, Transport transport, Arch arch,

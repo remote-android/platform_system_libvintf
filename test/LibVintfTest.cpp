@@ -3909,10 +3909,14 @@ TEST_F(LibVintfTest, AidlVersion) {
         EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", 5, "IFoo", "default"));
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", 5, "IFoo", "test0"));
         EXPECT_FALSE(manifest.hasAidlInstance("android.system.foo", "IFoo", "does_not_exist"));
         EXPECT_FALSE(manifest.hasAidlInstance("android.system.foo", "IDoesNotExist", "default"));
         EXPECT_FALSE(manifest.hasAidlInstance("android.system.does_not_exist", "IFoo", "default"));
         EXPECT_EQ(manifest.getAidlInstances("android.system.foo", "IFoo"),
+                  std::set<std::string>({"default", "test0"}));
+        EXPECT_EQ(manifest.getAidlInstances("android.system.foo", 5, "IFoo"),
                   std::set<std::string>({"default", "test0"}));
         EXPECT_EQ(manifest.getAidlInstances("android.system.does_not_exist", "IFoo"),
                   std::set<std::string>({}));
