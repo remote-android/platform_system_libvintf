@@ -24,6 +24,7 @@
 #include <type_traits>
 
 #include <android-base/parseint.h>
+#include <android-base/strings.h>
 #include <tinyxml2.h>
 
 #include "Regex.h"
@@ -473,6 +474,20 @@ struct AidlVersionConverter : public XmlNodeConverter<Version> {
 
 AidlVersionConverter aidlVersionConverter{};
 
+// <version>100</version> <=> VersionRange{kFakeAidlMajorVersion, 100, 100}
+// <version>100-105</version> <=> VersionRange{kFakeAidlMajorVersion, 100, 105}
+struct AidlVersionRangeConverter : public XmlNodeConverter<VersionRange> {
+    std::string elementName() const override { return "version"; }
+    void mutateNode(const VersionRange& object, NodeType* root, DocType* d) const override {
+        appendText(root, aidlVersionRangeToString(object), d);
+    }
+    bool buildObject(VersionRange* object, NodeType* root, std::string* error) const override {
+        return parseText(root, object, {parseAidlVersionRange}, error);
+    }
+};
+
+AidlVersionRangeConverter aidlVersionRangeConverter{};
+
 struct TransportArchConverter : public XmlNodeConverter<TransportArch> {
     std::string elementName() const override { return "transport"; }
     void mutateNode(const TransportArch &object, NodeType *root, DocType *d) const override {
@@ -570,8 +585,15 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
         appendAttr(root, "format", hal.format);
         appendAttr(root, "optional", hal.optional);
         appendTextElement(root, "name", hal.name, d);
-        // Don't write <version> for format="aidl"
-        if (hal.format != HalFormat::AIDL) {
+        if (hal.format == HalFormat::AIDL) {
+            // By default, buildObject() assumes a <version>0</version> tag if no <version> tag
+            // is specified. Don't output any <version> tag if there's only one <version>0</version>
+            // tag.
+            if (hal.versionRanges.size() != 1 ||
+                hal.versionRanges[0] != details::kDefaultAidlVersionRange) {
+                appendChildren(root, aidlVersionRangeConverter, hal.versionRanges, d);
+            }
+        } else {
             appendChildren(root, versionRangeConverter, hal.versionRanges, d);
         }
         appendChildren(root, halInterfaceConverter, iterateValues(hal.interfaces), d);
@@ -582,19 +604,22 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
             !parseOptionalAttr(root, "optional", false /* defaultValue */, &object->optional,
                                error) ||
             !parseTextElement(root, "name", &object->name, error) ||
-            !parseChildren(root, versionRangeConverter, &object->versionRanges, error) ||
             !parseChildren(root, halInterfaceConverter, &interfaces, error)) {
             return false;
         }
         if (object->format == HalFormat::AIDL) {
-            if (!object->versionRanges.empty()) {
-                LOG(WARNING) << "Ignoring <version> on matrix <hal format=\"aidl\"> "
-                             << object->name;
-                object->versionRanges.clear();
+            if (!parseChildren(root, aidlVersionRangeConverter, &object->versionRanges, error)) {
+                return false;
             }
             // Insert fake version for AIDL HALs so that compatibility check for AIDL and other
             // HAL formats can be unified.
-            object->versionRanges.push_back(details::kFakeAidlVersionRange);
+            if (object->versionRanges.empty()) {
+                object->versionRanges.push_back(details::kDefaultAidlVersionRange);
+            }
+        } else {
+            if (!parseChildren(root, versionRangeConverter, &object->versionRanges, error)) {
+                return false;
+            }
         }
         for (auto&& interface : interfaces) {
             std::string name{interface.name()};

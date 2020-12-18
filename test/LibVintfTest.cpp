@@ -36,6 +36,7 @@
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::Property;
+using ::testing::SizeIs;
 
 namespace android {
 namespace vintf {
@@ -3890,7 +3891,35 @@ TEST_F(LibVintfTest, AidlAndHidlCheckUnused) {
 }
 
 TEST_F(LibVintfTest, AidlVersion) {
+    std::string xml =
+        "<compatibility-matrix " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"aidl\" optional=\"false\">\n"
+        "        <name>android.system.foo</name>\n"
+        "        <version>4-100</version>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "            <regex-instance>test.*</regex-instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</compatibility-matrix>\n";
     std::string error;
+    CompatibilityMatrix matrix;
+    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << error;
+    EXPECT_EQ(xml, gCompatibilityMatrixConverter(matrix, SerializeFlags::HALS_NO_FQNAME));
+
+    {
+        std::vector<std::string> matrixInstances;
+        (void)matrix.forEachInstance([&](const MatrixInstance& matrixInstance) {
+            EXPECT_EQ(matrixInstance.versionRange(),
+                      VersionRange(details::kFakeAidlMajorVersion, 4, 100));
+            matrixInstances.push_back(matrixInstance.description(
+                matrixInstance.versionRange().minVer()));
+            return true;
+        });
+        EXPECT_THAT(matrixInstances, SizeIs(2)) << android::base::Join(matrixInstances, ", ");
+    }
+
     {
         HalManifest manifest;
         std::string manifestXml =

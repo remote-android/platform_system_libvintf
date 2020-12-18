@@ -236,13 +236,17 @@ std::ostream &operator<<(std::ostream &os, const Version &ver) {
     return os << ver.majorVer << "." << ver.minorVer;
 }
 
-bool parse(const std::string &s, VersionRange *vr) {
+// Helper for parsing a VersionRange object. versionParser defines how the first half
+// (before the '-' character) of the string is parsed.
+static bool parseVersionRange(
+    const std::string& s, VersionRange* vr,
+    const std::function<bool(const std::string&, Version*)>& versionParser) {
     std::vector<std::string> v = SplitString(s, '-');
     if (v.size() != 1 && v.size() != 2) {
         return false;
     }
     Version minVer;
-    if (!parse(v[0], &minVer)) {
+    if (!versionParser(v[0], &minVer)) {
         return false;
     }
     if (v.size() == 1) {
@@ -255,6 +259,11 @@ bool parse(const std::string &s, VersionRange *vr) {
         *vr = VersionRange(minVer.majorVer, minVer.minorVer, maxMinor);
     }
     return true;
+}
+
+bool parse(const std::string& s, VersionRange* vr) {
+    bool (*versionParser)(const std::string&, Version*) = parse;
+    return parseVersionRange(s, vr, versionParser);
 }
 
 std::ostream &operator<<(std::ostream &os, const VersionRange &vr) {
@@ -555,6 +564,17 @@ std::string aidlVersionToString(const Version& v) {
 bool parseAidlVersion(const std::string& s, Version* version) {
     version->majorVer = details::kFakeAidlMajorVersion;
     return android::base::ParseUint(s, &version->minorVer);
+}
+
+std::string aidlVersionRangeToString(const VersionRange& vr) {
+    if (vr.isSingleVersion()) {
+        return to_string(vr.minMinor);
+    }
+    return to_string(vr.minMinor) + "-" + to_string(vr.maxMinor);
+}
+
+bool parseAidlVersionRange(const std::string& s, VersionRange* vr) {
+    return parseVersionRange(s, vr, parseAidlVersion);
 }
 
 } // namespace vintf
