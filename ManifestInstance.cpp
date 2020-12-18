@@ -23,6 +23,8 @@
 
 #include <utility>
 
+#include <android-base/logging.h>
+
 #include "parse_string.h"
 
 namespace android {
@@ -119,6 +121,13 @@ std::string ManifestInstance::description() const {
             return getFqInstance().string();
         } break;
     }
+}
+
+ManifestInstance ManifestInstance::withVersion(const Version& v) const {
+    FqInstance fqInstance;
+    CHECK(fqInstance.setTo(getFqInstance().getPackage(), v.majorVer, v.minorVer,
+                           getFqInstance().getInterface(), getFqInstance().getInstance()));
+    return ManifestInstance(fqInstance, mTransportArch, format());
 }
 
 }  // namespace vintf

@@ -60,6 +60,9 @@ class ManifestInstance {
     // For others, return package@version::interface/instance.
     std::string description() const;
 
+    // Return a new ManifestInstance that's the same as this, but with the given version.
+    ManifestInstance withVersion(const Version& v) const;
+
    private:
     FqInstance mFqInstance;
     TransportArch mTransportArch;

@@ -3921,6 +3921,34 @@ TEST_F(LibVintfTest, AidlVersion) {
         EXPECT_EQ(manifest.getAidlInstances("android.system.does_not_exist", "IFoo"),
                   std::set<std::string>({}));
     }
+
+    {
+        HalManifest manifest;
+        std::string manifestXml =
+            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"aidl\">\n"
+            "        <name>android.system.foo</name>\n"
+            "        <version>5</version>\n"
+            "        <fqname>IFoo/default</fqname>\n"
+            "        <fqname>IFoo/test0</fqname>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_ONLY));
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", 5, "IFoo", "default"));
+        EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", 5, "IFoo", "test0"));
+        EXPECT_FALSE(manifest.hasAidlInstance("android.system.foo", "IFoo", "does_not_exist"));
+        EXPECT_FALSE(manifest.hasAidlInstance("android.system.foo", "IDoesNotExist", "default"));
+        EXPECT_FALSE(manifest.hasAidlInstance("android.system.does_not_exist", "IFoo", "default"));
+        EXPECT_EQ(manifest.getAidlInstances("android.system.foo", "IFoo"),
+                  std::set<std::string>({"default", "test0"}));
+        EXPECT_EQ(manifest.getAidlInstances("android.system.foo", 5, "IFoo"),
+                  std::set<std::string>({"default", "test0"}));
+        EXPECT_EQ(manifest.getAidlInstances("android.system.does_not_exist", "IFoo"),
+                  std::set<std::string>({}));
+    }
 }
 
 TEST_F(LibVintfTest, GetTransportHidlHalWithFakeAidlVersion) {
