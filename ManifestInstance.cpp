@@ -113,7 +113,8 @@ std::string ManifestInstance::getSimpleFqInstance() const {
 std::string ManifestInstance::description() const {
     switch (format()) {
         case HalFormat::AIDL: {
-            return toAidlFqnameString(package(), interface(), instance());
+            return toAidlFqnameString(package(), interface(), instance()) + " (@" +
+                   aidlVersionToString(version()) + ")";
         } break;
         case HalFormat::HIDL:
             [[fallthrough]];

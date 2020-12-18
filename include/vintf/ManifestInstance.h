@@ -56,8 +56,8 @@ class ManifestInstance {
     // return [@version::]interface/instance printing and writing XML.
     std::string getSimpleFqInstance() const;
 
-    // For AIDL, return package.interface/instance.
-    // For others, return package@version::interface/instance.
+    // For AIDL, return "package.interface/instance (@version)".
+    // For others, return "package@version::interface/instance".
     std::string description() const;
 
     // Return a new ManifestInstance that's the same as this, but with the given version.
