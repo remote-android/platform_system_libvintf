@@ -3774,10 +3774,10 @@ TEST_F(LibVintfTest, Aidl) {
         EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "Should not be compatible because default instance is missing";
-        EXPECT_IN("required: (IFoo/default AND IFoo/test.*)", error);
+        EXPECT_IN("required: (IFoo/default (@1) AND IFoo/test.* (@1))", error);
         EXPECT_IN("provided: \n"
-                  "        IFoo/incompat_instance\n"
-                  "        IFoo/test0",
+                  "        IFoo/incompat_instance (@1)\n"
+                  "        IFoo/test0 (@1)",
                   error);
     }
     {
@@ -3797,10 +3797,10 @@ TEST_F(LibVintfTest, Aidl) {
         EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "Should not be compatible because test.* instance is missing";
-        EXPECT_IN("required: (IFoo/default AND IFoo/test.*)", error);
+        EXPECT_IN("required: (IFoo/default (@1) AND IFoo/test.* (@1))", error);
         EXPECT_IN("provided: \n"
-                  "        IFoo/default\n"
-                  "        IFoo/incompat_instance\n",
+                  "        IFoo/default (@1)\n"
+                  "        IFoo/incompat_instance (@1)\n",
                   error);
     }
 }

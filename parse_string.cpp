@@ -419,7 +419,8 @@ std::string expandInstances(const MatrixHal& req, const VersionRange& vr, bool b
                                                  : matrixInstance.exactInstance();
         switch (req.format) {
             case HalFormat::AIDL: {
-                s += toFQNameString(matrixInstance.interface(), instance);
+                s += toFQNameString(matrixInstance.interface(), instance) + " (@" +
+                     aidlVersionRangeToString(vr) + ")";
             } break;
             case HalFormat::HIDL:
                 [[fallthrough]];
