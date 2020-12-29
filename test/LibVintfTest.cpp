@@ -3951,6 +3951,20 @@ TEST_F(LibVintfTest, AidlVersion) {
     }
 }
 
+TEST_F(LibVintfTest, AidlFqnameNoVersion) {
+    std::string error;
+    HalManifest manifest;
+    std::string manifestXml =
+        "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+        "    <hal format=\"aidl\">\n"
+        "        <name>android.system.foo</name>\n"
+        "        <fqname>@1.0::IFoo/default</fqname>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    EXPECT_FALSE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+    EXPECT_IN("Should not specify version in <fqname> for AIDL HAL: \"@1.0::IFoo/default\"", error);
+}
+
 TEST_F(LibVintfTest, GetTransportHidlHalWithFakeAidlVersion) {
     std::string xml =
         "<manifest " + kMetaVersionStr + " type=\"framework\">\n"

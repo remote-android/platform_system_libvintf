@@ -824,11 +824,17 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                 return false;
             }
             if (object->format == HalFormat::AIDL) {
-                // <fqname> in AIDL HALs should not contain version. Put in the fake
-                // kFakeAidlVersion so that compatibility check works.
+                // <fqname> in AIDL HALs should not contain version.
+                if (e.hasVersion()) {
+                    *error = "Should not specify version in <fqname> for AIDL HAL: \"" +
+                             e.string() + "\"";
+                    return false;
+                }
+                // Put in the fake kDefaultAidlVersion so that HalManifest can
+                // store it in an FqInstance object with a non-empty package.
                 FqInstance withFakeVersion;
-                if (!withFakeVersion.setTo(details::kFakeAidlVersion.majorVer,
-                                           details::kFakeAidlVersion.minorVer, e.getInterface(),
+                if (!withFakeVersion.setTo(details::kDefaultAidlVersion.majorVer,
+                                           details::kDefaultAidlVersion.minorVer, e.getInterface(),
                                            e.getInstance())) {
                     return false;
                 }
