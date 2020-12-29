@@ -4103,14 +4103,14 @@ TEST_F(LibVintfTest, GetTransportHidlHalWithFakeAidlVersion) {
         "    <hal format=\"hidl\">\n"
         "        <name>android.system.foo</name>\n"
         "        <transport>hwbinder</transport>\n"
-        "        <fqname>@" + to_string(details::kFakeAidlVersion) + "::IFoo/default</fqname>\n"
+        "        <fqname>@" + to_string(details::kDefaultAidlVersion) + "::IFoo/default</fqname>\n"
         "    </hal>\n"
         "</manifest>\n";
     std::string error;
     HalManifest manifest;
     EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
     EXPECT_EQ(Transport::HWBINDER,
-              manifest.getHidlTransport("android.system.foo", details::kFakeAidlVersion, "IFoo",
+              manifest.getHidlTransport("android.system.foo", details::kDefaultAidlVersion, "IFoo",
                                         "default"));
 }
 
@@ -4129,7 +4129,7 @@ TEST_F(LibVintfTest, GetTransportAidlHalWithDummyTransport) {
     HalManifest manifest;
     EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
     EXPECT_EQ(Transport::EMPTY,
-              manifest.getHidlTransport("android.system.foo", details::kFakeAidlVersion, "IFoo",
+              manifest.getHidlTransport("android.system.foo", details::kDefaultAidlVersion, "IFoo",
                                         "default"));
 }
 

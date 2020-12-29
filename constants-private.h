@@ -31,11 +31,6 @@ static constexpr VersionRange kDefaultAidlVersionRange{kFakeAidlMajorVersion,
                                                        kDefaultAidlMinorVersion};
 static constexpr Version kDefaultAidlVersion = kDefaultAidlVersionRange.minVer();
 
-// Deprecated. Use kDefaultAidlVersionRange
-static constexpr VersionRange kFakeAidlVersionRange = kDefaultAidlVersionRange;
-// Deprecated. Use kDefaultAidlVersion
-static constexpr Version kFakeAidlVersion = kDefaultAidlVersion;
-
 }  // namespace details
 }  // namespace vintf
 }  // namespace android

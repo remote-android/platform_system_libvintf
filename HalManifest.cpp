@@ -58,7 +58,7 @@ bool HalManifest::shouldAdd(const ManifestHal& hal, std::string* error) const {
 }
 
 bool HalManifest::addingConflictingMajorVersion(const ManifestHal& hal, std::string* error) const {
-    // Skip checking for AIDL HALs because they all contain kFakeAidlVersion.
+    // Skip checking for AIDL HALs because they all contain kFakeAidlMajorVersion.
     if (hal.format == HalFormat::AIDL) {
         return true;
     }
