@@ -3936,6 +3936,7 @@ TEST_F(LibVintfTest, AidlVersion) {
             "</manifest>\n";
         EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
         EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", 5, "IFoo", "default"));
@@ -3964,6 +3965,7 @@ TEST_F(LibVintfTest, AidlVersion) {
             "</manifest>\n";
         EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
         EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_ONLY));
+        EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", 5, "IFoo", "default"));
@@ -3977,6 +3979,107 @@ TEST_F(LibVintfTest, AidlVersion) {
                   std::set<std::string>({"default", "test0"}));
         EXPECT_EQ(manifest.getAidlInstances("android.system.does_not_exist", "IFoo"),
                   std::set<std::string>({}));
+    }
+
+    {
+        HalManifest manifest;
+        std::string manifestXml =
+            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"aidl\">\n"
+            "        <name>android.system.foo</name>\n"
+            "        <version>5</version>\n"
+            "        <interface>\n"
+            "            <name>IFoo</name>\n"
+            "            <instance>incompat_instance</instance>\n"
+            "            <instance>test0</instance>\n"
+            "        </interface>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
+            << "Should not be compatible because default instance is missing";
+        EXPECT_IN("required: (IFoo/default (@4-100) AND IFoo/test.* (@4-100))", error);
+        EXPECT_IN("provided: \n"
+                  "        IFoo/incompat_instance (@5)\n"
+                  "        IFoo/test0 (@5)",
+                  error);
+    }
+
+    {
+        HalManifest manifest;
+        std::string manifestXml =
+            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"aidl\">\n"
+            "        <name>android.system.foo</name>\n"
+            "        <version>5</version>\n"
+            "        <interface>\n"
+            "            <name>IFoo</name>\n"
+            "            <instance>default</instance>\n"
+            "            <instance>incompat_instance</instance>\n"
+            "        </interface>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
+            << "Should not be compatible because test.* instance is missing";
+        EXPECT_IN("required: (IFoo/default (@4-100) AND IFoo/test.* (@4-100))", error);
+        EXPECT_IN("provided: \n"
+                  "        IFoo/default (@5)\n"
+                  "        IFoo/incompat_instance (@5)",
+                  error);
+    }
+
+    {
+        HalManifest manifest;
+        std::string manifestXml =
+            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"aidl\">\n"
+            "        <name>android.system.foo</name>\n"
+            "        <version>3</version>\n"
+            "        <interface>\n"
+            "            <name>IFoo</name>\n"
+            "            <instance>default</instance>\n"
+            "            <instance>test0</instance>\n"
+            "        </interface>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
+            << "Should not be compatible because version 3 cannot satisfy version 4-100";
+        EXPECT_IN("required: (IFoo/default (@4-100) AND IFoo/test.* (@4-100))", error);
+        EXPECT_IN("provided: \n"
+                  "        IFoo/default (@3)\n"
+                  "        IFoo/test0 (@3)",
+                  error);
+
+    }
+
+    {
+        HalManifest manifest;
+        std::string manifestXml =
+            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"aidl\">\n"
+            "        <name>android.system.foo</name>\n"
+            "        <version>3</version>\n"
+            "        <interface>\n"
+            "            <name>IFoo</name>\n"
+            "            <instance>default</instance>\n"
+            "            <instance>test0</instance>\n"
+            "        </interface>\n"
+            "    </hal>\n"
+            "</manifest>\n";
+        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
+            << "Should not be compatible because version 3 cannot satisfy version 4-100";
+        EXPECT_IN("required: (IFoo/default (@4-100) AND IFoo/test.* (@4-100))", error);
+        EXPECT_IN("provided: \n"
+                  "        IFoo/default (@3)\n"
+                  "        IFoo/test0 (@3)",
+                  error);
     }
 }
 
