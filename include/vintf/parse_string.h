@@ -98,6 +98,15 @@ bool parseKernelConfigValue(const std::string &s, KernelConfigTypedValue *kctv);
 // Do not expect quotes in strings.
 bool parseKernelConfigTypedValue(const std::string& s, KernelConfigTypedValue* kctv);
 
+// "100" <=> Version{kFakeAidlMajorVersion, 100}
+std::string aidlVersionToString(const Version& v);
+bool parseAidlVersion(const std::string& s, Version* version);
+
+// "100" <=> VersionRange{kFakeAidlMajorVersion, 100}
+// "100-105" <=> VersionRange{kFakeAidlMajorVersion, 100, 105}
+std::string aidlVersionRangeToString(const VersionRange& vr);
+bool parseAidlVersionRange(const std::string& s, VersionRange* vr);
+
 // A string that describes the whole object, with versions of all
 // its components. For debugging and testing purposes only. This is not
 // the XML string.

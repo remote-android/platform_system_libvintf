@@ -86,8 +86,19 @@ bool ManifestHal::forEachInstance(const std::function<bool(const ManifestInstanc
     }
 
     for (const auto& manifestInstance : mAdditionalInstances) {
-        if (!func(manifestInstance)) {
-            return false;
+        // For AIDL HALs, <version> tag is mangled with <fqname>. Note that if there's no
+        // <version> tag, libvintf will create one by default, so each <fqname> is executed
+        // at least once.
+        if (format == HalFormat::AIDL) {
+            for (const auto& v : versions) {
+                if (!func(manifestInstance.withVersion(v))) {
+                    return false;
+                }
+            }
+        } else {
+            if (!func(manifestInstance)) {
+                return false;
+            }
         }
     }
 
