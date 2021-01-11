@@ -25,6 +25,9 @@ namespace vintf {
 /* libvintf meta-version */
 constexpr Version kMetaVersion{4, 0};
 
+// Default version for an AIDL HAL if no version is specified.
+constexpr size_t kDefaultAidlMinorVersion = 1;
+
 }  // namespace vintf
 }  // namespace android
 
