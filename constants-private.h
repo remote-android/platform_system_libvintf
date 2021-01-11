@@ -16,6 +16,7 @@
 
 #include <vintf/Version.h>
 #include <vintf/VersionRange.h>
+#include <vintf/constants.h>
 
 namespace android {
 namespace vintf {
@@ -26,7 +27,6 @@ namespace details {
 // This is an implementation detail of libvintf and won't be written to actual XML files.
 // 0.0 is not used because FQName / FqInstance consider it an invalid value.
 static constexpr size_t kFakeAidlMajorVersion = SIZE_MAX;
-static constexpr size_t kDefaultAidlMinorVersion = 1;
 static constexpr VersionRange kDefaultAidlVersionRange{kFakeAidlMajorVersion,
                                                        kDefaultAidlMinorVersion};
 static constexpr Version kDefaultAidlVersion = kDefaultAidlVersionRange.minVer();
