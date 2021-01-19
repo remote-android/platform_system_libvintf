@@ -35,6 +35,7 @@
 
 using ::testing::ElementsAre;
 using ::testing::Eq;
+using ::testing::HasSubstr;
 using ::testing::Property;
 using ::testing::SizeIs;
 
@@ -4281,6 +4282,44 @@ TEST_F(LibVintfTest, RuntimeInfoParseGkiKernelReleaseLevelInconsistent) {
     EXPECT_EQ(UNKNOWN_ERROR,
               parseGkiKernelRelease(RuntimeInfo::FetchFlag::KERNEL_FCM,
                                     "5.4.42-android12-0-something", nullptr, &level));
+}
+
+TEST_F(LibVintfTest, HalManifestMissingI) {
+    // If package name, interface or instance contains characters invalid to FqInstance,
+    // it must be rejected because forEachInstance requires them to fit into FqInstance.
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="framework">
+                           <hal format="aidl">
+                               <name>android.frameworks.foo</name>
+                               <version>1</version>
+                               <interface>
+                                   <name>MyFoo</name>
+                                   <instance>default</instance>
+                               </interface>
+                           </hal>
+                       </manifest>)";
+    HalManifest manifest;
+    std::string error;
+    ASSERT_FALSE(gHalManifestConverter(&manifest, xml, &error)) << "Should not be valid:\n" << xml;
+    EXPECT_THAT(error, HasSubstr("Interface 'MyFoo' should have the format I[a-zA-Z0-9_]*"));
+}
+
+TEST_F(LibVintfTest, HalManifestInvalidPackage) {
+    // If package name, interface or instance contains characters invalid to FqInstance,
+    // it must be rejected because forEachInstance requires them to fit into FqInstance.
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="framework">
+                           <hal format="aidl">
+                               <name>not_a_valid_package!</name>
+                               <version>1</version>
+                               <interface>
+                                   <name>MyFoo</name>
+                                   <instance>default</instance>
+                               </interface>
+                           </hal>
+                       </manifest>)";
+    HalManifest manifest;
+    std::string error;
+    ASSERT_FALSE(gHalManifestConverter(&manifest, xml, &error)) << "Should not be valid:\n" << xml;
+    EXPECT_THAT(error, HasSubstr("not_a_valid_package!"));
 }
 
 // clang-format off
