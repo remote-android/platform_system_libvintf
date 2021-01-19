@@ -827,10 +827,6 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                 return false;
             }
         }
-        if (!object->isValid(error)) {
-            error->insert(0, "'" + object->name + "' is not a valid Manifest HAL: ");
-            return false;
-        }
 // Do not check for target-side libvintf to avoid restricting upgrade accidentally.
 #ifndef LIBVINTF_TARGET
         if (!checkAdditionalRestrictionsOnHal(*object, error)) {
@@ -869,6 +865,11 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             }
         }
         if (!object->insertInstances(fqInstancesToInsert, error)) {
+            return false;
+        }
+
+        if (!object->isValid(error)) {
+            error->insert(0, "'" + object->name + "' is not a valid Manifest HAL: ");
             return false;
         }
 
