@@ -384,32 +384,6 @@ std::ostream &operator<<(std::ostream &os, const ManifestHal &hal) {
               << hal.versions;
 }
 
-bool parse(const std::string &s, MatrixHal *req) {
-    std::vector<std::string> v = SplitString(s, '/');
-    if (v.size() != 4) {
-        return false;
-    }
-    if (!parse(v[0], &req->format)) {
-        return false;
-    }
-    req->name = v[1];
-    if (!parse(v[2], &req->versionRanges)) {
-        return false;
-    }
-    if (v[3] != kRequired || v[3] != kOptional) {
-        return false;
-    }
-    req->optional = (v[3] == kOptional);
-    return true;
-}
-
-std::ostream &operator<<(std::ostream &os, const MatrixHal &req) {
-    return os << req.format << "/"
-              << req.name << "/"
-              << req.versionRanges << "/"
-              << (req.optional ? kOptional : kRequired);
-}
-
 std::string expandInstances(const MatrixHal& req, const VersionRange& vr, bool brace) {
     std::string s;
     size_t count = 0;
