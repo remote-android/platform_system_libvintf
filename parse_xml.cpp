@@ -637,6 +637,11 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
             return false;
         }
 #endif
+
+        if (!object->isValid(error)) {
+            error->insert(0, "'" + object->name + "' is not a valid Matrix HAL: ");
+            return false;
+        }
         return true;
     }
 

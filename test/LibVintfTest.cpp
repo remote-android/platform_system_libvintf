@@ -4322,6 +4322,46 @@ TEST_F(LibVintfTest, HalManifestInvalidPackage) {
     EXPECT_THAT(error, HasSubstr("not_a_valid_package!"));
 }
 
+TEST_F(LibVintfTest, CompatibilityMatrixMissingI) {
+    // If package name, interface or instance contains characters invalid to FqInstance,
+    // it must be rejected because forEachInstance requires them to fit into FqInstance.
+    std::string xml = "<compatibility-matrix " + kMetaVersionStr + R"( type="framework">
+                           <hal format="aidl">
+                               <name>android.frameworks.foo</name>
+                               <version>1-2</version>
+                               <interface>
+                                   <name>MyFoo</name>
+                                   <instance>default</instance>
+                               </interface>
+                           </hal>
+                       </compatibility-matrix>)";
+    CompatibilityMatrix matrix;
+    std::string error;
+    ASSERT_FALSE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << "Should not be valid:\n"
+                                                                      << xml;
+    EXPECT_THAT(error, HasSubstr("Interface 'MyFoo' should have the format I[a-zA-Z0-9_]*"));
+}
+
+TEST_F(LibVintfTest, CompatibilityMatrixInvalidPackage) {
+    // If package name, interface or instance contains characters invalid to FqInstance,
+    // it must be rejected because forEachInstance requires them to fit into FqInstance.
+    std::string xml = "<compatibility-matrix " + kMetaVersionStr + R"( type="framework">
+                           <hal format="aidl">
+                               <name>not_a_valid_package!</name>
+                               <version>1-2</version>
+                               <interface>
+                                   <name>MyFoo</name>
+                                   <instance>default</instance>
+                               </interface>
+                           </hal>
+                       </compatibility-matrix>)";
+    CompatibilityMatrix matrix;
+    std::string error;
+    ASSERT_FALSE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << "Should not be valid:\n"
+                                                                      << xml;
+    EXPECT_THAT(error, HasSubstr("not_a_valid_package!"));
+}
+
 // clang-format off
 
 struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
