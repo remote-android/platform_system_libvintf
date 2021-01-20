@@ -4,6 +4,10 @@
       "name": "libvintf_test"
     },
     {
+      "name": "libvintffm_test",
+      "host": true
+    },
+    {
       "name": "vintf_object_test"
     },
     {
