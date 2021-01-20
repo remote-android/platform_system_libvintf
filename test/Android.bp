@@ -113,5 +113,11 @@ cc_test_host {
     srcs: [
         "VintfFmTest.cpp",
     ],
+    test_suites: [
+        "general-tests",
+    ],
+    test_options: {
+        unit_test: true,
+    },
 }
 
