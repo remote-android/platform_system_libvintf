@@ -15,14 +15,18 @@
  */
 
 #include "ManifestHal.h"
+
 #include <unordered_set>
 
 #include "MapValueIterator.h"
 #include "constants-private.h"
 #include "parse_string.h"
+#include "utils.h"
 
 namespace android {
 namespace vintf {
+
+using details::canConvertToFqInstance;
 
 bool ManifestHal::isValid(std::string* error) const {
     if (error) {
@@ -38,13 +42,29 @@ bool ManifestHal::isValid(std::string* error) const {
         }
         success = false;
         if (error) {
-            *error += "Duplicated major version: " + to_string(v) + " vs. " + to_string(it->second);
+            *error += "Duplicated major version: " + to_string(v) + " vs. " +
+                      to_string(it->second) + ".\n";
         }
     }
+
+    // Check legacy instances (i.e. <version> + <interface> + <instance>) can be
+    // converted into FqInstance because forEachInstance relies on FqInstance.
+    for (const auto& v : versions) {
+        for (const auto& intf : iterateValues(interfaces)) {
+            intf.forEachInstance(
+                [&](const auto& interface, const auto& instance, bool /* isRegex */) {
+                    if (!canConvertToFqInstance(getName(), v, interface, instance, format, error)) {
+                        success = false;
+                    }
+                    return true;  // continue
+                });
+        }
+    }
+
     std::string transportArchError;
     if (!transportArch.isValid(&transportArchError)) {
         success = false;
-        if (error) *error += transportArchError;
+        if (error) *error += transportArchError + "\n";
     }
     return success;
 }

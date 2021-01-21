@@ -37,7 +37,6 @@ std::ostream &operator<<(std::ostream &os, SchemaType ksv);
 std::ostream& operator<<(std::ostream& os, XmlSchemaFormat f);
 std::ostream& operator<<(std::ostream& os, Level l);
 std::ostream& operator<<(std::ostream& os, KernelSepolicyVersion v);
-std::ostream &operator<<(std::ostream &os, const ManifestHal &hal);
 std::ostream &operator<<(std::ostream &os, const Version &ver);
 std::ostream &operator<<(std::ostream &os, const VersionRange &vr);
 
@@ -49,7 +48,6 @@ std::ostream &operator<<(std::ostream &os, const VndkVersionRange &vr);
 std::ostream &operator<<(std::ostream &os, const KernelVersion &ver);
 std::ostream &operator<<(std::ostream &os, const TransportArch &ta);
 std::ostream &operator<<(std::ostream &os, const ManifestHal &hal);
-std::ostream &operator<<(std::ostream &os, const MatrixHal &req);
 std::ostream &operator<<(std::ostream &os, const KernelConfigTypedValue &kcv);
 std::ostream& operator<<(std::ostream& os, const FqInstance& fqInstance);
 
@@ -83,7 +81,6 @@ bool parse(const std::string &s, KernelVersion *ver);
 bool parse(const std::string &s, TransportArch *ta);
 // if return true, hal->isValid() must be true.
 bool parse(const std::string &s, ManifestHal *hal);
-bool parse(const std::string &s, MatrixHal *req);
 bool parse(const std::string& s, FqInstance* fqInstance);
 
 bool parseKernelConfigInt(const std::string &s, int64_t *i);
