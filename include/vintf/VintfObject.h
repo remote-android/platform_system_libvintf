@@ -231,6 +231,12 @@ class VintfObject {
         const std::vector<AidlInterfaceMetadata>& aidlMetadata,
         std::function<bool(const std::string&)> shouldCheck = {});
 
+    // Check that all HALs in all framework compatibility matrices have the
+    // proper interface definition (HIDL / AIDL files).
+    android::base::Result<void> checkMatrixHalsHasDefinition(
+        const std::vector<HidlInterfaceMetadata>& hidlMetadata,
+        const std::vector<AidlInterfaceMetadata>& aidlMetadata);
+
    private:
     std::unique_ptr<FileSystem> mFileSystem;
     std::unique_ptr<ObjectFactory<RuntimeInfo>> mRuntimeInfoFactory;
