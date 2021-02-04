@@ -83,6 +83,9 @@ cc_test {
         "libhidl-gen-utils",
         "libz",
     ],
+    header_libs: [
+        "libvintf_local_headers",
+    ],
     cflags: [
         "-O0",
         "-g",
