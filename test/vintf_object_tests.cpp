@@ -30,6 +30,7 @@
 #include <vintf/VintfObject.h>
 #include <vintf/parse_string.h>
 #include <vintf/parse_xml.h>
+#include "constants-private.h"
 #include "test_constants.h"
 #include "utils-fake.h"
 
@@ -622,9 +623,9 @@ TEST_F(VintfObjectTest, FrameworkCompatibilityMatrixCombine) {
             };
             return ::android::OK;
         }));
-    expectFetch(kSystemVintfDir + "compatibility_matrix.1.xml",
+    expectFetch(kSystemVintfDir + "compatibility_matrix.1.xml"s,
                 "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\"/>");
-    expectFetch(kSystemVintfDir + "compatibility_matrix.empty.xml",
+    expectFetch(kSystemVintfDir + "compatibility_matrix.empty.xml"s,
                 "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\"/>");
     expectFileNotExist(StrEq(kProductMatrix));
     expectFetch(kVendorManifest, "<manifest " + kMetaVersionStr + " type=\"device\" />\n");
@@ -648,9 +649,9 @@ TEST_F(VintfObjectTest, ProductCompatibilityMatrix) {
             *out = {android::base::Basename(kProductMatrix)};
             return ::android::OK;
         }));
-    expectFetch(kSystemVintfDir + "compatibility_matrix.1.xml",
+    expectFetch(kSystemVintfDir + "compatibility_matrix.1.xml"s,
                 "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\"/>");
-    expectFetch(kSystemVintfDir + "compatibility_matrix.empty.xml",
+    expectFetch(kSystemVintfDir + "compatibility_matrix.empty.xml"s,
                 "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\"/>");
     expectFetch(kProductMatrix,
                 "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\">\n"
@@ -844,7 +845,7 @@ class OdmManifestTest : public VintfObjectTestBase,
 
 TEST_P(OdmManifestTest, OdmProductManifest) {
     if (productModel.empty()) return;
-    expectFetch(kOdmVintfDir + "manifest_" + productModel + ".xml", odmProductManifest);
+    expectFetch(kOdmVintfDir + "manifest_"s + productModel + ".xml", odmProductManifest);
     // /odm/etc/vintf/manifest.xml should not be fetched when the product variant exists.
     expectNeverFetch(kOdmManifest);
     auto p = get();
@@ -861,7 +862,7 @@ TEST_P(OdmManifestTest, OdmManifest) {
 
 TEST_P(OdmManifestTest, OdmLegacyProductManifest) {
     if (productModel.empty()) return;
-    expectFetch(kOdmLegacyVintfDir + "manifest_" + productModel + ".xml", odmProductManifest);
+    expectFetch(kOdmLegacyVintfDir + "manifest_"s + productModel + ".xml", odmProductManifest);
     // /odm/manifest.xml should not be fetched when the product variant exists.
     expectNeverFetch(kOdmLegacyManifest);
     auto p = get();
@@ -914,8 +915,8 @@ class DeprecateTest : public VintfObjectTestBase {
                 };
                 return ::android::OK;
             }));
-        expectFetchRepeatedly(kSystemVintfDir + "compatibility_matrix.1.xml", systemMatrixLevel1);
-        expectFetchRepeatedly(kSystemVintfDir + "compatibility_matrix.2.xml", systemMatrixLevel2);
+        expectFetchRepeatedly(kSystemVintfDir + "compatibility_matrix.1.xml"s, systemMatrixLevel1);
+        expectFetchRepeatedly(kSystemVintfDir + "compatibility_matrix.2.xml"s, systemMatrixLevel2);
         expectFileNotExist(StrEq(kProductMatrix));
         expectNeverFetch(kSystemLegacyMatrix);
 
@@ -1614,10 +1615,10 @@ class FrameworkManifestLevelTest : public VintfObjectTestBase {
 
         auto hidlFragment =
             head + getFragment(HalFormat::HIDL, 14, "@4.0::ISystemEtcFragment") + tail;
-        expectFetch(kSystemManifestFragmentDir + "hidl.xml", hidlFragment);
+        expectFetch(kSystemManifestFragmentDir + "hidl.xml"s, hidlFragment);
 
         auto aidlFragment = head + getFragment(HalFormat::AIDL, 13, "ISystemEtcFragment3") + tail;
-        expectFetch(kSystemManifestFragmentDir + "aidl.xml", aidlFragment);
+        expectFetch(kSystemManifestFragmentDir + "aidl.xml"s, aidlFragment);
 
         EXPECT_CALL(fetcher(), listFiles(StrEq(kSystemManifestFragmentDir), _, _))
             .Times(AnyNumber())
