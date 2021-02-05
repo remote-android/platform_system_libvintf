@@ -379,30 +379,6 @@ enum : int32_t {
 // exposed for testing.
 namespace details {
 
-extern const std::string kSystemVintfDir;
-extern const std::string kVendorVintfDir;
-extern const std::string kOdmVintfDir;
-extern const std::string kProductVintfDir;
-extern const std::string kSystemExtVintfDir;
-extern const std::string kOdmLegacyVintfDir;
-extern const std::string kOdmLegacyManifest;
-extern const std::string kVendorManifest;
-extern const std::string kSystemManifest;
-extern const std::string kVendorMatrix;
-extern const std::string kOdmManifest;
-extern const std::string kProductMatrix;
-extern const std::string kProductManifest;
-extern const std::string kSystemExtManifest;
-extern const std::string kVendorManifestFragmentDir;
-extern const std::string kSystemManifestFragmentDir;
-extern const std::string kOdmManifestFragmentDir;
-extern const std::string kProductManifestFragmentDir;
-extern const std::string kSystemExtManifestFragmentDir;
-extern const std::string kVendorLegacyManifest;
-extern const std::string kVendorLegacyMatrix;
-extern const std::string kSystemLegacyManifest;
-extern const std::string kSystemLegacyMatrix;
-
 // Convenience function to dump all files and directories that could be read
 // by calling Get(Framework|Device)(HalManifest|CompatibilityMatrix). The list
 // include files that may not actually be read when the four functions are called
