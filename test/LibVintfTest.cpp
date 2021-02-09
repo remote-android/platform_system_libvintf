@@ -31,6 +31,7 @@
 #include <vintf/parse_string.h>
 #include <vintf/parse_xml.h>
 #include "constants-private.h"
+#include "parse_xml_for_test.h"
 #include "test_constants.h"
 
 using ::testing::ElementsAre;
@@ -42,7 +43,6 @@ using ::testing::SizeIs;
 namespace android {
 namespace vintf {
 
-extern XmlConverter<Version>& gVersionConverter;
 extern XmlConverter<ManifestHal>& gManifestHalConverter;
 extern XmlConverter<MatrixHal>& gMatrixHalConverter;
 extern XmlConverter<KernelConfigTypedValue>& gKernelConfigTypedValueConverter;
@@ -478,10 +478,10 @@ TEST_F(LibVintfTest, HalManifestInstances) {
 
 TEST_F(LibVintfTest, VersionConverter) {
     Version v(3, 6);
-    std::string xml = gVersionConverter(v);
+    std::string xml = toXml(v);
     EXPECT_EQ(xml, "<version>3.6</version>\n");
     Version v2;
-    EXPECT_TRUE(gVersionConverter(&v2, xml));
+    EXPECT_TRUE(fromXml(&v2, xml));
     EXPECT_EQ(v, v2);
 }
 
