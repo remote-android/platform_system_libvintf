@@ -47,15 +47,20 @@ std::optional<T> readObject(const std::string& path, const XmlConverter<T>& conv
 }
 
 template <typename F>
-std::set<std::string> getDescription(const CompatibilityMatrix& mat, F descriptionFn) {
+std::set<std::string> getDescription(const CompatibilityMatrix& mat, F descriptionFn,
+                                     bool emitReq) {
     std::set<std::string> set;
-    mat.forEachInstance([&set, descriptionFn](const auto& matrixInstance) {
+    mat.forEachInstance([&set, descriptionFn, emitReq](const auto& matrixInstance) {
         for (auto minorVer = matrixInstance.versionRange().minMinor;
              minorVer >= matrixInstance.versionRange().minMinor &&
              minorVer <= matrixInstance.versionRange().maxMinor;
              ++minorVer) {
             Version version{matrixInstance.versionRange().majorVer, minorVer};
-            set.insert(std::invoke(descriptionFn, matrixInstance, version));
+            std::string s = std::invoke(descriptionFn, matrixInstance, version);
+            if (emitReq) {
+                s += (matrixInstance.optional() ? " optional" : " required");
+            }
+            set.insert(s);
         }
         return true;  // continue
     });
@@ -100,6 +105,7 @@ DEFINE_bool(level, false, "Write level (FCM version) of the compatibility matrix
 DEFINE_bool(level_name, false, "Write level name (FCM version) of the compatibility matrix.");
 DEFINE_bool(interfaces, false, "Write strings like \"android.hardware.foo@1.0::IFoo\".");
 DEFINE_bool(instances, false, "Write strings like \"android.hardware.foo@1.0::IFoo/default\".");
+DEFINE_bool(requirement, false, "Append optional/required after each interface / instance.");
 
 int main(int argc, char** argv) {
     using namespace android::vintf;
@@ -132,7 +138,8 @@ int main(int argc, char** argv) {
     }
 
     if (FLAGS_interfaces) {
-        auto interfaces = getDescription(*mat, &MatrixInstance::interfaceDescription);
+        auto interfaces =
+            getDescription(*mat, &MatrixInstance::interfaceDescription, FLAGS_requirement);
         if (interfaces.empty()) {
             LOG(WARNING) << "No interfaces are found.";
         }
@@ -145,7 +152,7 @@ int main(int argc, char** argv) {
     }
 
     if (FLAGS_instances) {
-        auto instances = getDescription(*mat, &MatrixInstance::description);
+        auto instances = getDescription(*mat, &MatrixInstance::description, FLAGS_requirement);
         if (instances.empty()) {
             LOG(WARNING) << "No instances are found.";
         }
