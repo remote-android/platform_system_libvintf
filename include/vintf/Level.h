@@ -39,7 +39,9 @@ enum Level : size_t {
     Q = 4,
     R = 5,
     S = 6,
-    // To add new values: (1) add above this line. (2) edit gkiAndroidReleaseToLevel if needed.
+    // To add new values: (1) add above this line.  (2) edit if needed:
+    // - RuntimeInfo::gkiAndroidReleaseToLevel
+    // - analyze_matrix.cpp, LevelDescription()
 
     // The maximum of all specified Levels + 1.
     LAST_PLUS_ONE,
@@ -47,6 +49,8 @@ enum Level : size_t {
     // For older manifests and compatibility matrices, "level" is not specified.
     UNSPECIFIED = SIZE_MAX,
 };
+
+std::string GetDescription(Level level);
 
 }  // namespace vintf
 }  // namespace android
