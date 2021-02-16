@@ -64,6 +64,29 @@ std::set<std::string> getDescription(const CompatibilityMatrix& mat, F descripti
 
 }  // namespace
 
+std::string GetDescription(Level level) {
+    switch (level) {
+        case Level::LEGACY:
+            return "Level legacy";
+        case Level::O:
+            return "Android 8.0 (O)";
+        case Level::O_MR1:
+            return "Android 8.1 (O-MR1)";
+        case Level::P:
+            return "Android 9 (P)";
+        case Level::Q:
+            return "Android 10 (Q)";
+        case Level::R:
+            return "Android 11 (R)";
+        case Level::S:
+            return "Android 12 (S)";
+        case Level::UNSPECIFIED:
+            return "Level unspecified";
+        default:
+            return "Level " + std::to_string(level);
+    }
+}
+
 }  // namespace vintf
 }  // namespace android
 
@@ -74,6 +97,7 @@ static bool ValidateInput(const char* /* flagname */, const std::string& value) 
 DEFINE_validator(input, &ValidateInput);
 
 DEFINE_bool(level, false, "Write level (FCM version) of the compatibility matrix.");
+DEFINE_bool(level_name, false, "Write level name (FCM version) of the compatibility matrix.");
 DEFINE_bool(interfaces, false, "Write strings like \"android.hardware.foo@1.0::IFoo\".");
 DEFINE_bool(instances, false, "Write strings like \"android.hardware.foo@1.0::IFoo/default\".");
 
@@ -94,6 +118,15 @@ int main(int argc, char** argv) {
             LOG(WARNING) << "FCM version is unspecified.";
         }
         std::cout << mat->level() << std::endl;
+
+        written = true;
+    }
+
+    if (FLAGS_level_name) {
+        if (mat->level() == Level::UNSPECIFIED) {
+            LOG(WARNING) << "FCM version is unspecified.";
+        }
+        std::cout << GetDescription(mat->level()) << std::endl;
 
         written = true;
     }
