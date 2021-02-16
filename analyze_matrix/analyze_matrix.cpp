@@ -46,15 +46,16 @@ std::optional<T> readObject(const std::string& path, const XmlConverter<T>& conv
     return ret;
 }
 
-std::set<std::string> getInterfaces(const CompatibilityMatrix& mat) {
+template <typename F>
+std::set<std::string> getDescription(const CompatibilityMatrix& mat, F descriptionFn) {
     std::set<std::string> set;
-    mat.forEachInstance([&set](const auto& matrixInstance) {
+    mat.forEachInstance([&set, descriptionFn](const auto& matrixInstance) {
         for (auto minorVer = matrixInstance.versionRange().minMinor;
              minorVer >= matrixInstance.versionRange().minMinor &&
              minorVer <= matrixInstance.versionRange().maxMinor;
              ++minorVer) {
             Version version{matrixInstance.versionRange().majorVer, minorVer};
-            set.insert(matrixInstance.interfaceDescription(version));
+            set.insert(std::invoke(descriptionFn, matrixInstance, version));
         }
         return true;  // continue
     });
@@ -74,6 +75,7 @@ DEFINE_validator(input, &ValidateInput);
 
 DEFINE_bool(level, false, "Write level (FCM version) of the compatibility matrix.");
 DEFINE_bool(interfaces, false, "Write strings like \"android.hardware.foo@1.0::IFoo\".");
+DEFINE_bool(instances, false, "Write strings like \"android.hardware.foo@1.0::IFoo/default\".");
 
 int main(int argc, char** argv) {
     using namespace android::vintf;
@@ -97,13 +99,26 @@ int main(int argc, char** argv) {
     }
 
     if (FLAGS_interfaces) {
-        auto interfaces = getInterfaces(*mat);
+        auto interfaces = getDescription(*mat, &MatrixInstance::interfaceDescription);
         if (interfaces.empty()) {
             LOG(WARNING) << "No interfaces are found.";
         }
 
         for (const auto& interface : interfaces) {
             std::cout << interface << std::endl;
+        }
+
+        written = true;
+    }
+
+    if (FLAGS_instances) {
+        auto instances = getDescription(*mat, &MatrixInstance::description);
+        if (instances.empty()) {
+            LOG(WARNING) << "No instances are found.";
+        }
+
+        for (const auto& instance : instances) {
+            std::cout << instance << std::endl;
         }
 
         written = true;
