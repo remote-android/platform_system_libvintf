@@ -46,15 +46,15 @@ std::optional<T> readObject(const std::string& path, const XmlConverter<T>& conv
     return ret;
 }
 
-std::optional<std::set<std::string>> getInterfaces(const CompatibilityMatrix& mat) {
-    auto set = std::make_optional<std::set<std::string>>();
+std::set<std::string> getInterfaces(const CompatibilityMatrix& mat) {
+    std::set<std::string> set;
     mat.forEachInstance([&set](const auto& matrixInstance) {
         for (auto minorVer = matrixInstance.versionRange().minMinor;
              minorVer >= matrixInstance.versionRange().minMinor &&
              minorVer <= matrixInstance.versionRange().maxMinor;
              ++minorVer) {
             Version version{matrixInstance.versionRange().majorVer, minorVer};
-            set->insert(matrixInstance.interfaceDescription(version));
+            set.insert(matrixInstance.interfaceDescription(version));
         }
         return true;  // continue
     });
@@ -97,16 +97,13 @@ int main(int argc, char** argv) {
     }
 
     if (FLAGS_interfaces) {
-        auto pvs = getInterfaces(*mat);
-        if (!pvs) {
-            return 1;
-        }
-        if (pvs->empty()) {
-            LOG(WARNING) << "No package and versions are found.";
+        auto interfaces = getInterfaces(*mat);
+        if (interfaces.empty()) {
+            LOG(WARNING) << "No interfaces are found.";
         }
 
-        for (const auto& pv : *pvs) {
-            std::cout << pv << std::endl;
+        for (const auto& interface : interfaces) {
+            std::cout << interface << std::endl;
         }
 
         written = true;
