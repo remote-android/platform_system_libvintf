@@ -46,15 +46,21 @@ std::optional<T> readObject(const std::string& path, const XmlConverter<T>& conv
     return ret;
 }
 
-std::optional<std::set<std::string>> getInterfaces(const CompatibilityMatrix& mat) {
-    auto set = std::make_optional<std::set<std::string>>();
-    mat.forEachInstance([&set](const auto& matrixInstance) {
+template <typename F>
+std::set<std::string> getDescription(const CompatibilityMatrix& mat, F descriptionFn,
+                                     bool emitReq) {
+    std::set<std::string> set;
+    mat.forEachInstance([&set, descriptionFn, emitReq](const auto& matrixInstance) {
         for (auto minorVer = matrixInstance.versionRange().minMinor;
              minorVer >= matrixInstance.versionRange().minMinor &&
              minorVer <= matrixInstance.versionRange().maxMinor;
              ++minorVer) {
             Version version{matrixInstance.versionRange().majorVer, minorVer};
-            set->insert(matrixInstance.interfaceDescription(version));
+            std::string s = std::invoke(descriptionFn, matrixInstance, version);
+            if (emitReq) {
+                s += (matrixInstance.optional() ? " optional" : " required");
+            }
+            set.insert(s);
         }
         return true;  // continue
     });
@@ -62,6 +68,29 @@ std::optional<std::set<std::string>> getInterfaces(const CompatibilityMatrix& ma
 }
 
 }  // namespace
+
+std::string GetDescription(Level level) {
+    switch (level) {
+        case Level::LEGACY:
+            return "Level legacy";
+        case Level::O:
+            return "Android 8.0 (O)";
+        case Level::O_MR1:
+            return "Android 8.1 (O-MR1)";
+        case Level::P:
+            return "Android 9 (P)";
+        case Level::Q:
+            return "Android 10 (Q)";
+        case Level::R:
+            return "Android 11 (R)";
+        case Level::S:
+            return "Android 12 (S)";
+        case Level::UNSPECIFIED:
+            return "Level unspecified";
+        default:
+            return "Level " + std::to_string(level);
+    }
+}
 
 }  // namespace vintf
 }  // namespace android
@@ -73,7 +102,10 @@ static bool ValidateInput(const char* /* flagname */, const std::string& value) 
 DEFINE_validator(input, &ValidateInput);
 
 DEFINE_bool(level, false, "Write level (FCM version) of the compatibility matrix.");
+DEFINE_bool(level_name, false, "Write level name (FCM version) of the compatibility matrix.");
 DEFINE_bool(interfaces, false, "Write strings like \"android.hardware.foo@1.0::IFoo\".");
+DEFINE_bool(instances, false, "Write strings like \"android.hardware.foo@1.0::IFoo/default\".");
+DEFINE_bool(requirement, false, "Append optional/required after each interface / instance.");
 
 int main(int argc, char** argv) {
     using namespace android::vintf;
@@ -96,17 +128,37 @@ int main(int argc, char** argv) {
         written = true;
     }
 
-    if (FLAGS_interfaces) {
-        auto pvs = getInterfaces(*mat);
-        if (!pvs) {
-            return 1;
+    if (FLAGS_level_name) {
+        if (mat->level() == Level::UNSPECIFIED) {
+            LOG(WARNING) << "FCM version is unspecified.";
         }
-        if (pvs->empty()) {
-            LOG(WARNING) << "No package and versions are found.";
+        std::cout << GetDescription(mat->level()) << std::endl;
+
+        written = true;
+    }
+
+    if (FLAGS_interfaces) {
+        auto interfaces =
+            getDescription(*mat, &MatrixInstance::interfaceDescription, FLAGS_requirement);
+        if (interfaces.empty()) {
+            LOG(WARNING) << "No interfaces are found.";
         }
 
-        for (const auto& pv : *pvs) {
-            std::cout << pv << std::endl;
+        for (const auto& interface : interfaces) {
+            std::cout << interface << std::endl;
+        }
+
+        written = true;
+    }
+
+    if (FLAGS_instances) {
+        auto instances = getDescription(*mat, &MatrixInstance::description, FLAGS_requirement);
+        if (instances.empty()) {
+            LOG(WARNING) << "No instances are found.";
+        }
+
+        for (const auto& instance : instances) {
+            std::cout << instance << std::endl;
         }
 
         written = true;
