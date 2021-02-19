@@ -516,6 +516,13 @@ int checkDirmaps(const Dirmap& dirmap, const Properties& props) {
                 LOG(ERROR) << res.error() << gCheckMissingHalsSuggestion;
                 exitCode = EX_SOFTWARE;
             }
+
+            res = vintfObject->checkMatrixHalsHasDefinition(HidlInterfaceMetadata::all(),
+                                                            AidlInterfaceMetadata::all());
+            if (!res.ok()) {
+                LOG(ERROR) << res.error();
+                exitCode = EX_SOFTWARE;
+            }
             continue;
         }
 

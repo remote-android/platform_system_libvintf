@@ -1929,6 +1929,33 @@ TEST_F(CheckMissingHalsTest, FailVersion) {
     EXPECT_THAT(res, HasErrorMessage("android.hardware.aidl2"));
 }
 
+// A set of tests on VintfObject::checkMatrixHalsHasDefinition
+class CheckMatrixHalsHasDefinitionTest : public CheckMatricesWithHalDefTestBase {};
+
+TEST_F(CheckMatrixHalsHasDefinitionTest, Pass) {
+    std::vector<HidlInterfaceMetadata> hidl{{.name = "android.hardware.hidl@1.0::IHidl"}};
+    std::vector<AidlInterfaceMetadata> aidl{{.types = {"android.hardware.aidl.IAidl"}}};
+    EXPECT_RESULT_OK(vintfObject->checkMatrixHalsHasDefinition(hidl, aidl));
+}
+
+TEST_F(CheckMatrixHalsHasDefinitionTest, FailMissingHidl) {
+    std::vector<AidlInterfaceMetadata> aidl{{.types = {"android.hardware.aidl.IAidl"}}};
+    auto res = vintfObject->checkMatrixHalsHasDefinition({}, aidl);
+    EXPECT_THAT(res, HasErrorMessage("android.hardware.hidl@1.0::IHidl"));
+}
+
+TEST_F(CheckMatrixHalsHasDefinitionTest, FailMissingAidl) {
+    std::vector<HidlInterfaceMetadata> hidl{{.name = "android.hardware.hidl@1.0::IHidl"}};
+    auto res = vintfObject->checkMatrixHalsHasDefinition(hidl, {});
+    EXPECT_THAT(res, HasErrorMessage("android.hardware.aidl.IAidl"));
+}
+
+TEST_F(CheckMatrixHalsHasDefinitionTest, FailMissingBoth) {
+    auto res = vintfObject->checkMatrixHalsHasDefinition({}, {});
+    EXPECT_THAT(res, HasErrorMessage("android.hardware.hidl@1.0::IHidl"));
+    EXPECT_THAT(res, HasErrorMessage("android.hardware.aidl.IAidl"));
+}
+
 }  // namespace testing
 }  // namespace vintf
 }  // namespace android
