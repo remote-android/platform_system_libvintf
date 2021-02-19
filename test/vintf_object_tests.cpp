@@ -1832,8 +1832,8 @@ PolymorphicMatcher<ErrorMessageMatcher> HasErrorMessage(const std::string& messa
     return MakePolymorphicMatcher(ErrorMessageMatcher(message));
 }
 
-// A set of tests on VintfObject::checkMissingHalsInMatrices
-class CheckMissingHalsTest : public MultiMatrixTest {
+// Common test set up for checking matrices against lib*idlmetadata.
+class CheckMatricesWithHalDefTestBase : public MultiMatrixTest {
     void SetUp() override {
         MultiMatrixTest::SetUp();
 
@@ -1862,6 +1862,9 @@ class CheckMissingHalsTest : public MultiMatrixTest {
         SetUpMockSystemMatrices(matrices);
     }
 };
+
+// A set of tests on VintfObject::checkMissingHalsInMatrices
+class CheckMissingHalsTest : public CheckMatricesWithHalDefTestBase {};
 
 TEST_F(CheckMissingHalsTest, Empty) {
     EXPECT_RESULT_OK(vintfObject->checkMissingHalsInMatrices({}, {}));
