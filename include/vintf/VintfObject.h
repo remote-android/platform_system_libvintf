@@ -222,7 +222,7 @@ class VintfObject {
     android::base::Result<void> checkUnusedHals(
         const std::vector<HidlInterfaceMetadata>& hidlMetadata);
 
-    // Check that all HALs are added to the any framework compatibility matrix.
+    // Check that all HALs are added to any framework compatibility matrix.
     // If shouldCheck is set, only check if:
     // - For HIDL, shouldCheck(packageAndVersion) (e.g. android.hardware.foo@1.0)
     // - For AIDL and native, shouldCheck(package) (e.g. android.hardware.foo)
@@ -230,6 +230,12 @@ class VintfObject {
         const std::vector<HidlInterfaceMetadata>& hidlMetadata,
         const std::vector<AidlInterfaceMetadata>& aidlMetadata,
         std::function<bool(const std::string&)> shouldCheck = {});
+
+    // Check that all HALs in all framework compatibility matrices have the
+    // proper interface definition (HIDL / AIDL files).
+    android::base::Result<void> checkMatrixHalsHasDefinition(
+        const std::vector<HidlInterfaceMetadata>& hidlMetadata,
+        const std::vector<AidlInterfaceMetadata>& aidlMetadata);
 
    private:
     std::unique_ptr<FileSystem> mFileSystem;
@@ -324,6 +330,10 @@ class VintfObject {
 
     status_t fetchUnfilteredFrameworkHalManifest(HalManifest* out, std::string* error);
     void filterHalsByDeviceManifestLevel(HalManifest* out);
+
+    // Helper for checking matrices against lib*idlmetadata. Wrapper of the other variant of
+    // getAllFrameworkMatrixLevels. Treat empty output as an error.
+    android::base::Result<std::vector<CompatibilityMatrix>> getAllFrameworkMatrixLevels();
 
     using ChildrenMap = std::multimap<std::string, std::string>;
     static bool IsHalDeprecated(const MatrixHal& oldMatrixHal,
