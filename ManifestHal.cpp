@@ -80,6 +80,7 @@ bool ManifestHal::operator==(const ManifestHal &other) const {
     if (!(transportArch == other.transportArch)) return false;
     if (interfaces != other.interfaces) return false;
     if (isOverride() != other.isOverride()) return false;
+    if (updatableViaApex() != other.updatableViaApex()) return false;
     if (mAdditionalInstances != other.mAdditionalInstances) return false;
     return true;
 }
@@ -93,7 +94,7 @@ bool ManifestHal::forEachInstance(const std::function<bool(const ManifestInstanc
                 FqInstance fqInstance;
                 if (fqInstance.setTo(getName(), v.majorVer, v.minorVer, interface, instance)) {
                     if (!func(ManifestInstance(std::move(fqInstance), TransportArch{transportArch},
-                                               format))) {
+                                               format, updatableViaApex()))) {
                         return false;
                     }
                 }
@@ -202,7 +203,8 @@ bool ManifestHal::insertInstance(const FqInstance& e, std::string* error) {
         return false;
     }
 
-    mAdditionalInstances.emplace(std::move(toAdd), this->transportArch, this->format);
+    mAdditionalInstances.emplace(std::move(toAdd), this->transportArch, this->format,
+                                 this->updatableViaApex());
     return true;
 }
 
