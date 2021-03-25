@@ -19,6 +19,7 @@
 #define ANDROID_VINTF_MANIFEST_HAL_H
 
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -70,6 +71,7 @@ struct ManifestHal : public WithFileName {
     bool forEachInstance(const std::function<bool(const ManifestInstance&)>& func) const;
 
     bool isOverride() const { return mIsOverride; }
+    const std::optional<std::string>& updatableViaApex() const { return mUpdatableViaApex; }
 
     // When true, the existence of this <hal> tag means the component does NOT
     // exist on the device. This is useful for ODM manifests to specify that
@@ -102,6 +104,7 @@ struct ManifestHal : public WithFileName {
     bool verifyInstance(const FqInstance& fqInstance, std::string* error = nullptr) const;
 
     bool mIsOverride = false;
+    std::optional<std::string> mUpdatableViaApex;
     // Additional instances to <version> x <interface> x <instance>.
     std::set<ManifestInstance> mAdditionalInstances;
 
