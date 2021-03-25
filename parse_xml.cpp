@@ -32,6 +32,8 @@
 #include "constants.h"
 #include "parse_string.h"
 
+using namespace std::string_literals;
+
 namespace android {
 namespace vintf {
 
@@ -133,6 +135,11 @@ static bool parse(const std::string &attrText, bool *attr) {
         return true;
     }
     return false;
+}
+
+static bool parse(const std::string& attrText, std::optional<std::string>* attr) {
+    *attr = attrText;
+    return true;
 }
 
 // ---------------------- XmlNodeConverter definitions
@@ -760,7 +767,9 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         if (hal.isOverride()) {
             appendAttr(root, "override", hal.isOverride());
         }
-
+        if (const auto& apex = hal.updatableViaApex(); apex.has_value()) {
+            appendAttr(root, "updatable-via-apex", apex.value());
+        }
         if (flags.isFqnameEnabled()) {
             std::set<std::string> simpleFqInstances;
             hal.forEachInstance([&simpleFqInstances](const auto& manifestInstance) {
@@ -777,6 +786,7 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         std::vector<HalInterface> interfaces;
         if (!parseOptionalAttr(root, "format", HalFormat::HIDL, &object->format, error) ||
             !parseOptionalAttr(root, "override", false, &object->mIsOverride, error) ||
+            !parseOptionalAttr(root, "updatable-via-apex", {}, &object->mUpdatableViaApex, error) ||
             !parseTextElement(root, "name", &object->name, error) ||
             !parseOptionalChild(root, transportArchConverter, {}, &object->transportArch, error) ||
             !parseChildren(root, halInterfaceConverter, &interfaces, error) ||

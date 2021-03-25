@@ -2935,6 +2935,24 @@ TEST_F(LibVintfTest, Empty) {
     EXPECT_TRUE(manifest.checkCompatibility(cm, &error)) << error;
 }
 
+TEST_F(LibVintfTest, ParsingUpdatableHals) {
+    std::string error;
+
+    HalManifest manifest;
+    std::string manifestXml =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"aidl\" updatable-via-apex=\"com.android.foo\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+    EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+}
+
 TEST_F(LibVintfTest, SystemSdk) {
     CompatibilityMatrix cm;
     std::string xml;

@@ -17,6 +17,7 @@
 #ifndef ANDROID_VINTF_MANIFEST_INSTANCE_H
 #define ANDROID_VINTF_MANIFEST_INSTANCE_H
 
+#include <optional>
 #include <string>
 
 #include <hidl-util/FqInstance.h>
@@ -37,8 +38,10 @@ class ManifestInstance {
     ManifestInstance& operator=(ManifestInstance&&) noexcept;
 
     using VersionType = Version;
-    ManifestInstance(FqInstance&& fqInstance, TransportArch&& ta, HalFormat fmt);
-    ManifestInstance(const FqInstance& fqInstance, const TransportArch& ta, HalFormat fmt);
+    ManifestInstance(FqInstance&& fqInstance, TransportArch&& ta, HalFormat fmt,
+                     std::optional<std::string>&& updatableViaApex);
+    ManifestInstance(const FqInstance& fqInstance, const TransportArch& ta, HalFormat fmt,
+                     const std::optional<std::string>& updatableViaApex);
     const std::string& package() const;
     Version version() const;
     const std::string& interface() const;
@@ -46,6 +49,7 @@ class ManifestInstance {
     Transport transport() const;
     Arch arch() const;
     HalFormat format() const;
+    const std::optional<std::string>& updatableViaApex() const;
 
     bool operator==(const ManifestInstance& other) const;
     bool operator<(const ManifestInstance& other) const;
@@ -75,6 +79,7 @@ class ManifestInstance {
     FqInstance mFqInstance;
     TransportArch mTransportArch;
     HalFormat mHalFormat;
+    std::optional<std::string> mUpdatableViaApex;
 };
 
 }  // namespace vintf
