@@ -861,16 +861,23 @@ int32_t VintfObject::checkDeprecation(const ListInstances& listInstances,
         return BAD_VALUE;
     }
 
-    const CompatibilityMatrix* targetMatrix = nullptr;
-    for (const auto& namedMatrix : matrixFragments) {
-        if (namedMatrix.level() == deviceLevel) {
-            targetMatrix = &namedMatrix;
-        }
-    }
-    if (targetMatrix == nullptr) {
+    std::vector<CompatibilityMatrix> targetMatrices;
+    // Partition matrixFragments into two groups, where the second group
+    // contains all matrices whose level == deviceLevel.
+    auto targetMatricesPartition = std::partition(
+        matrixFragments.begin(), matrixFragments.end(),
+        [&](const CompatibilityMatrix& matrix) { return matrix.level() != deviceLevel; });
+    // Move these matrices into the targetMatrices vector...
+    std::move(targetMatricesPartition, matrixFragments.end(), std::back_inserter(targetMatrices));
+    if (targetMatrices.empty()) {
         if (error)
             *error = "Cannot find framework matrix at FCM version " + to_string(deviceLevel) + ".";
         return NAME_NOT_FOUND;
+    }
+    // so that they can be combined into one matrix for deprecation checking.
+    auto targetMatrix = CompatibilityMatrix::combine(deviceLevel, &targetMatrices, error);
+    if (targetMatrix == nullptr) {
+        return BAD_VALUE;
     }
 
     std::multimap<std::string, std::string> childrenMap;
@@ -883,10 +890,10 @@ int32_t VintfObject::checkDeprecation(const ListInstances& listInstances,
     // Find a list of possibly deprecated HALs by comparing |listInstances| with older matrices.
     // Matrices with unspecified level are considered "current".
     bool isDeprecated = false;
-    for (const auto& namedMatrix : matrixFragments) {
+    for (auto it = matrixFragments.begin(); it < targetMatricesPartition; ++it) {
+        const auto& namedMatrix = *it;
         if (namedMatrix.level() == Level::UNSPECIFIED) continue;
-        if (namedMatrix.level() >= deviceLevel) continue;
-
+        if (namedMatrix.level() > deviceLevel) continue;
         for (const MatrixHal& hal : namedMatrix.getHals()) {
             if (IsHalDeprecated(hal, *targetMatrix, listInstances, childrenMap, error)) {
                 isDeprecated = true;
