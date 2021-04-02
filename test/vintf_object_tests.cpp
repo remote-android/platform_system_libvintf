@@ -246,6 +246,43 @@ const std::string systemMatrixLevel2 =
     "</compatibility-matrix>\n";
 
 //
+// Smaller product FCMs at different levels to test that framework and product
+// FCMs are combined when checking deprecation.
+//
+
+const std::string productMatrixLevel1 =
+    "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
+    "    <hal format=\"hidl\" optional=\"true\">\n"
+    "        <name>product.removed</name>\n"
+    "        <version>1.0</version>\n"
+    "        <interface>\n"
+    "            <name>IRemoved</name>\n"
+    "            <instance>default</instance>\n"
+    "        </interface>\n"
+    "    </hal>\n"
+    "    <hal format=\"hidl\" optional=\"true\">\n"
+    "        <name>product.minor</name>\n"
+    "        <version>1.0</version>\n"
+    "        <interface>\n"
+    "            <name>IMinor</name>\n"
+    "            <instance>default</instance>\n"
+    "        </interface>\n"
+    "    </hal>\n"
+    "</compatibility-matrix>\n";
+
+const std::string productMatrixLevel2 =
+    "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
+    "    <hal format=\"hidl\" optional=\"true\">\n"
+    "        <name>product.minor</name>\n"
+    "        <version>1.1</version>\n"
+    "        <interface>\n"
+    "            <name>IMinor</name>\n"
+    "            <instance>default</instance>\n"
+    "        </interface>\n"
+    "    </hal>\n"
+    "</compatibility-matrix>\n";
+
+//
 // Set of framework matrices of different FCM version with regex.
 //
 
@@ -917,6 +954,18 @@ class DeprecateTest : public VintfObjectTestBase {
             }));
         expectFetchRepeatedly(kSystemVintfDir + "compatibility_matrix.1.xml"s, systemMatrixLevel1);
         expectFetchRepeatedly(kSystemVintfDir + "compatibility_matrix.2.xml"s, systemMatrixLevel2);
+        EXPECT_CALL(fetcher(), listFiles(StrEq(kProductVintfDir), _, _))
+            .WillRepeatedly(Invoke([](const auto&, auto* out, auto*) {
+                *out = {
+                    "compatibility_matrix.1.xml",
+                    "compatibility_matrix.2.xml",
+                };
+                return ::android::OK;
+            }));
+        expectFetchRepeatedly(kProductVintfDir + "compatibility_matrix.1.xml"s,
+                              productMatrixLevel1);
+        expectFetchRepeatedly(kProductVintfDir + "compatibility_matrix.2.xml"s,
+                              productMatrixLevel2);
         expectFileNotExist(StrEq(kProductMatrix));
         expectNeverFetch(kSystemLegacyMatrix);
 
@@ -935,12 +984,13 @@ TEST_F(DeprecateTest, CheckNoDeprecate) {
     auto pred = getInstanceListFunc({
         "android.hardware.minor@1.1::IMinor/default",
         "android.hardware.major@2.0::IMajor/default",
+        "product.minor@1.1::IMinor/default",
     });
     std::string error;
     EXPECT_EQ(NO_DEPRECATED_HALS, vintfObject->checkDeprecation(pred, {}, &error)) << error;
 }
 
-TEST_F(DeprecateTest, CheckRemoved) {
+TEST_F(DeprecateTest, CheckRemovedSystem) {
     auto pred = getInstanceListFunc({
         "android.hardware.removed@1.0::IRemoved/default",
         "android.hardware.minor@1.1::IMinor/default",
@@ -951,10 +1001,29 @@ TEST_F(DeprecateTest, CheckRemoved) {
         << "removed@1.0 should be deprecated. " << error;
 }
 
-TEST_F(DeprecateTest, CheckMinor) {
+TEST_F(DeprecateTest, CheckRemovedProduct) {
+    auto pred = getInstanceListFunc({
+        "product.removed@1.0::IRemoved/default",
+        "product.minor@1.1::IMinor/default",
+    });
+    std::string error;
+    EXPECT_EQ(DEPRECATED, vintfObject->checkDeprecation(pred, {}, &error))
+        << "removed@1.0 should be deprecated. " << error;
+}
+
+TEST_F(DeprecateTest, CheckMinorSystem) {
     auto pred = getInstanceListFunc({
         "android.hardware.minor@1.0::IMinor/default",
         "android.hardware.major@2.0::IMajor/default",
+    });
+    std::string error;
+    EXPECT_EQ(DEPRECATED, vintfObject->checkDeprecation(pred, {}, &error))
+        << "minor@1.0 should be deprecated. " << error;
+}
+
+TEST_F(DeprecateTest, CheckMinorProduct) {
+    auto pred = getInstanceListFunc({
+        "product.minor@1.0::IMinor/default",
     });
     std::string error;
     EXPECT_EQ(DEPRECATED, vintfObject->checkDeprecation(pred, {}, &error))
