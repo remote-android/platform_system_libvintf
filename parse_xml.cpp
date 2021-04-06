@@ -171,14 +171,6 @@ struct XmlNodeConverter : public XmlConverter<Object> {
         deleteDocument(doc);
         return s;
     }
-    inline bool deserialize(Object* object, NodeType* root) {
-        bool ret = deserialize(object, root, &mLastError);
-        return ret;
-    }
-    inline bool deserialize(Object* o, const std::string& xml) override {
-        bool ret = (*this)(o, xml, &mLastError);
-        return ret;
-    }
     inline bool deserialize(Object* object, NodeType* root, std::string* error) const {
         if (nameOf(root) != this->elementName()) {
             return false;
@@ -203,10 +195,6 @@ struct XmlNodeConverter : public XmlConverter<Object> {
     }
     inline std::string operator()(const Object& o, SerializeFlags::Type flags) const override {
         return serialize(o, flags);
-    }
-    inline bool operator()(Object* o, NodeType* node) { return deserialize(o, node); }
-    inline bool operator()(Object* o, const std::string& xml) override {
-        return deserialize(o, xml);
     }
 
     // convenience methods for implementor.
@@ -413,9 +401,6 @@ struct XmlNodeConverter : public XmlConverter<Object> {
         }
         return ret;
     }
-
-   private:
-    mutable std::string mLastError;
 };
 
 template<typename Object>
