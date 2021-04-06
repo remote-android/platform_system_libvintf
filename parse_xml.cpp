@@ -158,7 +158,6 @@ struct XmlNodeConverter : public XmlConverter<Object> {
     virtual std::string elementName() const = 0;
 
     // convenience methods for user
-    inline const std::string& lastError() const override { return mLastError; }
     inline NodeType* serialize(const Object& o, DocType* d,
                                SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const {
         NodeType *root = createNode(this->elementName(), d);
