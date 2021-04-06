@@ -29,10 +29,6 @@ struct XmlConverter {
     XmlConverter() {}
     virtual ~XmlConverter() {}
 
-    // deprecated. Use operator() instead.
-    virtual std::string serialize(
-        const Object& o, SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const = 0;
-
     // Serialize an object to XML.
     virtual std::string operator()(
         const Object& o, SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const = 0;
