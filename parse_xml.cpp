@@ -164,7 +164,7 @@ struct XmlNodeConverter : public XmlConverter<Object> {
         this->mutateNode(o, root, d, flags);
         return root;
     }
-    inline std::string serialize(const Object& o, SerializeFlags::Type flags) const override {
+    inline std::string operator()(const Object& o, SerializeFlags::Type flags) const {
         DocType *doc = createDocument();
         appendChild(doc, serialize(o, doc, flags));
         std::string s = printDocument(doc);
@@ -192,9 +192,6 @@ struct XmlNodeConverter : public XmlConverter<Object> {
     }
     inline NodeType *operator()(const Object &o, DocType *d) const {
         return serialize(o, d);
-    }
-    inline std::string operator()(const Object& o, SerializeFlags::Type flags) const override {
-        return serialize(o, flags);
     }
 
     // convenience methods for implementor.
