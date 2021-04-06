@@ -158,20 +158,20 @@ struct XmlNodeConverter : public XmlConverter<Object> {
     virtual std::string elementName() const = 0;
 
     // convenience methods for user
-    inline NodeType* serialize(const Object& o, DocType* d,
-                               SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const {
+    inline NodeType* operator()(const Object& o, DocType* d,
+                                SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const {
         NodeType *root = createNode(this->elementName(), d);
         this->mutateNode(o, root, d, flags);
         return root;
     }
-    inline std::string operator()(const Object& o, SerializeFlags::Type flags) const {
+    inline std::string operator()(const Object& o, SerializeFlags::Type flags) const override {
         DocType *doc = createDocument();
-        appendChild(doc, serialize(o, doc, flags));
+        appendChild(doc, (*this)(o, doc, flags));
         std::string s = printDocument(doc);
         deleteDocument(doc);
         return s;
     }
-    inline bool deserialize(Object* object, NodeType* root, std::string* error) const {
+    inline bool operator()(Object* object, NodeType* root, std::string* error) const {
         if (nameOf(root) != this->elementName()) {
             return false;
         }
@@ -186,12 +186,9 @@ struct XmlNodeConverter : public XmlConverter<Object> {
             *error = "Not a valid XML";
             return false;
         }
-        bool ret = deserialize(o, getRootChild(doc), error);
+        bool ret = (*this)(o, getRootChild(doc), error);
         deleteDocument(doc);
         return ret;
-    }
-    inline NodeType *operator()(const Object &o, DocType *d) const {
-        return serialize(o, d);
     }
 
     // convenience methods for implementor.
@@ -230,7 +227,7 @@ struct XmlNodeConverter : public XmlConverter<Object> {
                                const Array& array, DocType* d,
                                SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const {
         for (const T &t : array) {
-            appendChild(parent, conv.serialize(t, d, flags));
+            appendChild(parent, conv(t, d, flags));
         }
     }
 
@@ -310,7 +307,7 @@ struct XmlNodeConverter : public XmlConverter<Object> {
                      this->elementName() + ">";
             return false;
         }
-        return conv.deserialize(t, child, error);
+        return conv(t, child, error);
     }
 
     template <typename T>
@@ -321,7 +318,7 @@ struct XmlNodeConverter : public XmlConverter<Object> {
             *t = std::move(defaultValue);
             return true;
         }
-        return conv.deserialize(t, child, error);
+        return conv(t, child, error);
     }
 
     template <typename T>
@@ -333,7 +330,7 @@ struct XmlNodeConverter : public XmlConverter<Object> {
             return true;
         }
         *t = std::make_optional<T>();
-        return conv.deserialize(&**t, child, error);
+        return conv(&**t, child, error);
     }
 
     template <typename T>
@@ -342,7 +339,7 @@ struct XmlNodeConverter : public XmlConverter<Object> {
         auto nodes = getChildren(root, conv.elementName());
         v->resize(nodes.size());
         for (size_t i = 0; i < nodes.size(); ++i) {
-            if (!conv.deserialize(&v->at(i), nodes[i], error)) {
+            if (!conv(&v->at(i), nodes[i], error)) {
                 *error = "Could not parse element with name <" + conv.elementName() +
                          "> in element <" + this->elementName() + ">: " + *error;
                 return false;
@@ -428,8 +425,8 @@ struct XmlPairConverter : public XmlNodeConverter<Pair> {
           mSecondConverter(std::move(secondConverter)) {}
 
     virtual void mutateNode(const Pair& pair, NodeType* root, DocType* d) const override {
-        appendChild(root, mFirstConverter->serialize(pair.first, d));
-        appendChild(root, mSecondConverter->serialize(pair.second, d));
+        appendChild(root, (*mFirstConverter)(pair.first, d));
+        appendChild(root, (*mSecondConverter)(pair.second, d));
     }
     virtual bool buildObject(Pair* pair, NodeType* root, std::string* error) const override {
         return this->parseChild(root, *mFirstConverter, &pair->first, error) &&
@@ -1059,7 +1056,7 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
 
             if (flags.isKernelEnabled()) {
                 if (!!m.kernel()) {
-                    appendChild(root, kernelInfoConverter.serialize(*m.kernel(), d, flags));
+                    appendChild(root, kernelInfoConverter(*m.kernel(), d, flags));
                 }
             }
         } else if (m.mType == SchemaType::FRAMEWORK) {
