@@ -29,8 +29,6 @@ struct XmlConverter {
     XmlConverter() {}
     virtual ~XmlConverter() {}
 
-    virtual const std::string &lastError() const = 0;
-
     // deprecated. Use operator() instead.
     virtual std::string serialize(
         const Object& o, SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const = 0;
