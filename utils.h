@@ -31,8 +31,8 @@ namespace vintf {
 namespace details {
 
 template <typename T>
-status_t fetchAllInformation(const FileSystem* fileSystem, const std::string& path,
-                             const XmlConverter<T>& converter, T* outObject, std::string* error) {
+status_t fetchAllInformation(const FileSystem* fileSystem, const std::string& path, T* outObject,
+                             std::string* error) {
     if (outObject->fileName().empty()) {
         outObject->setFileName(path);
     } else {
@@ -46,7 +46,7 @@ status_t fetchAllInformation(const FileSystem* fileSystem, const std::string& pa
         return result;
     }
 
-    bool success = converter(outObject, info, error);
+    bool success = fromXml(outObject, info, error);
     if (!success) {
         if (error) {
             *error = "Illformed file: " + path + ": " + *error;

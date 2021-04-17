@@ -414,16 +414,16 @@ class AssembleVintfImpl : public AssembleVintf {
                      "    Many entries other than HALs are zero-filled and\n"
                      "    require human attention. \n"
                      "-->\n"
-                  << gCompatibilityMatrixConverter(generatedMatrix, mSerializeFlags);
+                  << toXml(generatedMatrix, mSerializeFlags);
         } else {
-            out() << gHalManifestConverter(*halManifest, mSerializeFlags);
+            out() << toXml(*halManifest, mSerializeFlags);
         }
         out().flush();
 
         if (mCheckFile.hasStream()) {
             CompatibilityMatrix checkMatrix;
             checkMatrix.setFileName(mCheckFile.name());
-            if (!gCompatibilityMatrixConverter(&checkMatrix, read(mCheckFile.stream()), &error)) {
+            if (!fromXml(&checkMatrix, read(mCheckFile.stream()), &error)) {
                 std::cerr << "Cannot parse check file as a compatibility matrix: " << error
                           << std::endl;
                 return false;
@@ -523,7 +523,7 @@ class AssembleVintfImpl : public AssembleVintf {
         if (mCheckFile.hasStream()) {
             checkManifest = std::make_unique<HalManifest>();
             checkManifest->setFileName(mCheckFile.name());
-            if (!gHalManifestConverter(checkManifest.get(), read(mCheckFile.stream()), &error)) {
+            if (!fromXml(checkManifest.get(), read(mCheckFile.stream()), &error)) {
                 std::cerr << "Cannot parse check file as a HAL manifest: " << error << std::endl;
                 return false;
             }
@@ -616,7 +616,7 @@ class AssembleVintfImpl : public AssembleVintf {
                     false /* log */);
         }
         outputInputs(*matrices);
-        out() << gCompatibilityMatrixConverter(*matrix, mSerializeFlags);
+        out() << toXml(*matrix, mSerializeFlags);
         out().flush();
 
         if (checkManifest != nullptr && !checkDualFile(*checkManifest, *matrix)) {
@@ -628,12 +628,12 @@ class AssembleVintfImpl : public AssembleVintf {
 
     enum AssembleStatus { SUCCESS, FAIL_AND_EXIT, TRY_NEXT };
     template <typename Schema, typename AssembleFunc>
-    AssembleStatus tryAssemble(const XmlConverter<Schema>& converter, const std::string& schemaName,
-                               AssembleFunc assemble, std::string* error) {
+    AssembleStatus tryAssemble(const std::string& schemaName, AssembleFunc assemble,
+                               std::string* error) {
         std::vector<Schema> schemas;
         Schema schema;
         schema.setFileName(mInFiles.front().name());
-        if (!converter(&schema, read(mInFiles.front().stream()), error)) {
+        if (!fromXml(&schema, read(mInFiles.front().stream()), error)) {
             return TRY_NEXT;
         }
         auto firstType = schema.type();
@@ -643,7 +643,7 @@ class AssembleVintfImpl : public AssembleVintf {
             Schema additionalSchema;
             const std::string& fileName = it->name();
             additionalSchema.setFileName(fileName);
-            if (!converter(&additionalSchema, read(it->stream()), error)) {
+            if (!fromXml(&additionalSchema, read(it->stream()), error)) {
                 std::cerr << "File \"" << fileName << "\" is not a valid " << firstType << " "
                           << schemaName << " (but the first file is a valid " << firstType << " "
                           << schemaName << "). Error: " << *error << std::endl;
@@ -669,18 +669,18 @@ class AssembleVintfImpl : public AssembleVintf {
         }
 
         std::string manifestError;
-        auto status = tryAssemble(gHalManifestConverter, "manifest",
-                                  std::bind(&AssembleVintfImpl::assembleHalManifest, this, _1),
-                                  &manifestError);
+        auto status = tryAssemble<HalManifest>(
+            "manifest", std::bind(&AssembleVintfImpl::assembleHalManifest, this, _1),
+            &manifestError);
         if (status == SUCCESS) return true;
         if (status == FAIL_AND_EXIT) return false;
 
         resetInFiles();
 
         std::string matrixError;
-        status = tryAssemble(gCompatibilityMatrixConverter, "compatibility matrix",
-                             std::bind(&AssembleVintfImpl::assembleCompatibilityMatrix, this, _1),
-                             &matrixError);
+        status = tryAssemble<CompatibilityMatrix>(
+            "compatibility matrix",
+            std::bind(&AssembleVintfImpl::assembleCompatibilityMatrix, this, _1), &matrixError);
         if (status == SUCCESS) return true;
         if (status == FAIL_AND_EXIT) return false;
 
