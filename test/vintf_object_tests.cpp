@@ -31,6 +31,7 @@
 #include <vintf/parse_string.h>
 #include <vintf/parse_xml.h>
 #include "constants-private.h"
+#include "parse_xml_internal.h"
 #include "test_constants.h"
 #include "utils-fake.h"
 
@@ -48,9 +49,6 @@ static AssertionResult In(const std::string& sub, const std::string& str) {
 
 namespace android {
 namespace vintf {
-
-extern XmlConverter<KernelInfo>& gKernelInfoConverter;
-
 namespace testing {
 
 using namespace ::android::vintf::details;
@@ -1404,7 +1402,7 @@ TEST_F(KernelTest, Level1AndMore) {
 
 KernelInfo MakeKernelInfo(const std::string& version, const std::string& key) {
     KernelInfo info;
-    CHECK(gKernelInfoConverter(&info,
+    CHECK(fromXml(&info,
                                "    <kernel version=\"" + version + "\">\n"
                                "        <config>\n"
                                "            <key>CONFIG_" + key + "</key>\n"
