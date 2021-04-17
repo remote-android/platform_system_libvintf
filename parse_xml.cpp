@@ -1164,8 +1164,6 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
     }
 };
 
-HalManifestConverter halManifestConverter{};
-
 struct AvbVersionConverter : public XmlTextConverter<Version> {
     std::string elementName() const override { return "vbmeta-version"; }
 };
@@ -1355,12 +1353,6 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
         return true;
     }
 };
-
-CompatibilityMatrixConverter compatibilityMatrixConverter{};
-
-// Publicly available as in parse_xml.h
-XmlConverter<HalManifest>& gHalManifestConverter = halManifestConverter;
-XmlConverter<CompatibilityMatrix>& gCompatibilityMatrixConverter = compatibilityMatrixConverter;
 
 #define CREATE_CONVERT_FN(type)                                         \
     std::string toXml(const type& o, SerializeFlags::Type flags) {      \
