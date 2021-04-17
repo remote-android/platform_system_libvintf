@@ -143,7 +143,22 @@ static bool parse(const std::string& attrText, std::optional<std::string>* attr)
     return true;
 }
 
-// ---------------------- XmlNodeConverter definitions
+// ---------------------- XmlConverter definitions
+
+template <typename Object>
+struct XmlConverter {
+    XmlConverter() {}
+    virtual ~XmlConverter() {}
+
+    // Serialize an object to XML.
+    virtual std::string operator()(
+        const Object& o, SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const = 0;
+
+    // Deserialize an XML to object. Return whether it is successful.
+    // Sets error message to optional "error" out parameter (which can be null).
+    virtual bool operator()(Object* o, const std::string& xml,
+                            std::string* error = nullptr) const = 0;
+};
 
 template<typename Object>
 struct XmlNodeConverter : public XmlConverter<Object> {
