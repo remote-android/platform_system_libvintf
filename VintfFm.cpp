@@ -261,7 +261,7 @@ bool VintfFm::dumpMatrix(const HalManifest& frameworkManifest, const std::string
     auto matrix = frameworkManifest.generateCompatibleMatrix(false /*optional*/);
     std::string path = dir + "/" + to_string(level) + ".xml";
     std::string error;
-    if (OK != mFs->write(path, gCompatibilityMatrixConverter(matrix), &error)) {
+    if (OK != mFs->write(path, toXml(matrix), &error)) {
         LOG(ERROR) << "Unable to dump matrix to " << path << ": " << error;
         return false;
     }
@@ -288,7 +288,7 @@ std::optional<VintfFm::FrozenMatrices> VintfFm::loadMatrices(const std::string& 
             return std::nullopt;
         }
         CompatibilityMatrix matrix;
-        if (!gCompatibilityMatrixConverter(&matrix, xmlString, &error)) {
+        if (!fromXml(&matrix, xmlString, &error)) {
             LOG(ERROR) << "Unable to parse " << path << ": " << error;
             return std::nullopt;
         }

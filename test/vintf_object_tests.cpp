@@ -713,7 +713,7 @@ TEST_F(VintfObjectTest, ProductCompatibilityMatrix) {
         return !found;  // continue if not found
     });
     EXPECT_TRUE(found) << "android.hardware.foo@1.0::IFoo/default should be found in matrix:\n"
-                       << gCompatibilityMatrixConverter(*fcm);
+                       << toXml(*fcm);
 }
 
 const std::string vendorEtcManifest =
@@ -1148,7 +1148,7 @@ TEST_F(RegexTest, CombineLevel1) {
     expectTargetFcmVersion(1);
     auto matrix = vintfObject->getFrameworkCompatibilityMatrix();
     ASSERT_NE(nullptr, matrix);
-    std::string xml = gCompatibilityMatrixConverter(*matrix);
+    std::string xml = toXml(*matrix);
 
     EXPECT_IN(
         "    <hal format=\"hidl\" optional=\"false\">\n"
@@ -1203,7 +1203,7 @@ TEST_F(RegexTest, CombineLevel2) {
     expectTargetFcmVersion(2);
     auto matrix = vintfObject->getFrameworkCompatibilityMatrix();
     ASSERT_NE(nullptr, matrix);
-    std::string xml = gCompatibilityMatrixConverter(*matrix);
+    std::string xml = toXml(*matrix);
 
     EXPECT_IN(
         "    <hal format=\"hidl\" optional=\"false\">\n"
@@ -1370,7 +1370,7 @@ TEST_F(KernelTest, Level1AndLevel2) {
     expectTargetFcmVersion(1);
     auto matrix = vintfObject->getFrameworkCompatibilityMatrix();
     ASSERT_NE(nullptr, matrix);
-    std::string xml = gCompatibilityMatrixConverter(*matrix);
+    std::string xml = toXml(*matrix);
 
     EXPECT_IN(FAKE_KERNEL("1.0.0", "A1", 1), xml) << "\nOld requirements must not change.";
     EXPECT_IN(FAKE_KERNEL("2.0.0", "B1", 1), xml) << "\nOld requirements must not change.";
@@ -1388,7 +1388,7 @@ TEST_F(KernelTest, Level1AndMore) {
     expectTargetFcmVersion(1);
     auto matrix = vintfObject->getFrameworkCompatibilityMatrix();
     ASSERT_NE(nullptr, matrix);
-    std::string xml = gCompatibilityMatrixConverter(*matrix);
+    std::string xml = toXml(*matrix);
 
     EXPECT_IN(FAKE_KERNEL("1.0.0", "A1", 1), xml) << "\nOld requirements must not change.";
     EXPECT_IN(FAKE_KERNEL("2.0.0", "B1", 1), xml) << "\nOld requirements must not change.";
