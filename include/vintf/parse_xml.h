@@ -39,9 +39,18 @@ struct XmlConverter {
                             std::string* error = nullptr) const = 0;
 };
 
+// Deprecated; use toXml / fromXml instead.
 extern XmlConverter<HalManifest>& gHalManifestConverter;
 
+// Deprecated; use toXml / fromXml instead.
 extern XmlConverter<CompatibilityMatrix>& gCompatibilityMatrixConverter;
+
+std::string toXml(const HalManifest& o, SerializeFlags::Type flags = SerializeFlags::EVERYTHING);
+std::string toXml(const CompatibilityMatrix& o,
+                  SerializeFlags::Type flags = SerializeFlags::EVERYTHING);
+[[nodiscard]] bool fromXml(HalManifest* o, const std::string& xml, std::string* error = nullptr);
+[[nodiscard]] bool fromXml(CompatibilityMatrix* o, const std::string& xml,
+                           std::string* error = nullptr);
 
 } // namespace vintf
 } // namespace android
