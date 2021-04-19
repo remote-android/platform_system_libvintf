@@ -120,8 +120,7 @@ Level CompatibilityMatrix::level() const {
 
 status_t CompatibilityMatrix::fetchAllInformation(const FileSystem* fileSystem,
                                                   const std::string& path, std::string* error) {
-    return details::fetchAllInformation(fileSystem, path, gCompatibilityMatrixConverter, this,
-                                        error);
+    return details::fetchAllInformation(fileSystem, path, this, error);
 }
 
 std::string CompatibilityMatrix::getXmlSchemaPath(const std::string& xmlFileName,
