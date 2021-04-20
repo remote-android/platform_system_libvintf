@@ -441,8 +441,6 @@ struct AidlVersionConverter : public XmlNodeConverter<Version> {
     }
 };
 
-AidlVersionConverter aidlVersionConverter{};
-
 // <version>100</version> <=> VersionRange{kFakeAidlMajorVersion, 100, 100}
 // <version>100-105</version> <=> VersionRange{kFakeAidlMajorVersion, 100, 105}
 struct AidlVersionRangeConverter : public XmlNodeConverter<VersionRange> {
@@ -454,8 +452,6 @@ struct AidlVersionRangeConverter : public XmlNodeConverter<VersionRange> {
         return parseText(root, object, {parseAidlVersionRange}, error);
     }
 };
-
-AidlVersionRangeConverter aidlVersionRangeConverter{};
 
 struct TransportArchConverter : public XmlNodeConverter<TransportArch> {
     std::string elementName() const override { return "transport"; }
@@ -477,8 +473,6 @@ struct TransportArchConverter : public XmlNodeConverter<TransportArch> {
     }
 };
 
-TransportArchConverter transportArchConverter{};
-
 struct KernelConfigTypedValueConverter : public XmlNodeConverter<KernelConfigTypedValue> {
     std::string elementName() const override { return "value"; }
     void mutateNode(const KernelConfigTypedValue &object, NodeType *root, DocType *d) const override {
@@ -499,8 +493,6 @@ struct KernelConfigTypedValueConverter : public XmlNodeConverter<KernelConfigTyp
         return true;
     }
 };
-
-KernelConfigTypedValueConverter kernelConfigTypedValueConverter{};
 
 struct KernelConfigKeyConverter : public XmlTextConverter<KernelConfigKey> {
     std::string elementName() const override { return "key"; }
@@ -551,8 +543,6 @@ struct HalInterfaceConverter : public XmlNodeConverter<HalInterface> {
     }
 };
 
-HalInterfaceConverter halInterfaceConverter{};
-
 struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
     std::string elementName() const override { return "hal"; }
     void mutateNode(const MatrixHal &hal, NodeType *root, DocType *d) const override {
@@ -565,12 +555,12 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
             // tag.
             if (hal.versionRanges.size() != 1 ||
                 hal.versionRanges[0] != details::kDefaultAidlVersionRange) {
-                appendChildren(root, aidlVersionRangeConverter, hal.versionRanges, d);
+                appendChildren(root, AidlVersionRangeConverter{}, hal.versionRanges, d);
             }
         } else {
             appendChildren(root, VersionRangeConverter{}, hal.versionRanges, d);
         }
-        appendChildren(root, halInterfaceConverter, iterateValues(hal.interfaces), d);
+        appendChildren(root, HalInterfaceConverter{}, iterateValues(hal.interfaces), d);
     }
     bool buildObject(MatrixHal* object, NodeType* root, std::string* error) const override {
         std::vector<HalInterface> interfaces;
@@ -578,11 +568,11 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
             !parseOptionalAttr(root, "optional", false /* defaultValue */, &object->optional,
                                error) ||
             !parseTextElement(root, "name", &object->name, error) ||
-            !parseChildren(root, halInterfaceConverter, &interfaces, error)) {
+            !parseChildren(root, HalInterfaceConverter{}, &interfaces, error)) {
             return false;
         }
         if (object->format == HalFormat::AIDL) {
-            if (!parseChildren(root, aidlVersionRangeConverter, &object->versionRanges, error)) {
+            if (!parseChildren(root, AidlVersionRangeConverter{}, &object->versionRanges, error)) {
                 return false;
             }
             // Insert fake version for AIDL HALs so that compatibility check for AIDL and other
@@ -650,8 +640,6 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
 #endif
 };
 
-MatrixHalConverter matrixHalConverter{};
-
 struct MatrixKernelConditionsConverter : public XmlNodeConverter<std::vector<KernelConfig>> {
     std::string elementName() const override { return "conditions"; }
     void mutateNode(const std::vector<KernelConfig>& conds, NodeType* root,
@@ -663,8 +651,6 @@ struct MatrixKernelConditionsConverter : public XmlNodeConverter<std::vector<Ker
         return parseChildren(root, MatrixKernelConfigConverter{}, object, error);
     }
 };
-
-MatrixKernelConditionsConverter matrixKernelConditionsConverter{};
 
 struct MatrixKernelConverter : public XmlNodeConverter<MatrixKernel> {
     std::string elementName() const override { return "kernel"; }
@@ -684,7 +670,7 @@ struct MatrixKernelConverter : public XmlNodeConverter<MatrixKernel> {
         }
 
         if (!kernel.mConditions.empty()) {
-            appendChild(root, matrixKernelConditionsConverter(kernel.mConditions, d));
+            appendChild(root, MatrixKernelConditionsConverter{}(kernel.mConditions, d));
         }
         if (flags.isKernelConfigsEnabled()) {
             appendChildren(root, MatrixKernelConfigConverter{}, kernel.mConfigs, d);
@@ -694,7 +680,7 @@ struct MatrixKernelConverter : public XmlNodeConverter<MatrixKernel> {
         Level sourceMatrixLevel = Level::UNSPECIFIED;
         if (!parseAttr(root, "version", &object->mMinLts, error) ||
             !parseOptionalAttr(root, "level", Level::UNSPECIFIED, &sourceMatrixLevel, error) ||
-            !parseOptionalChild(root, matrixKernelConditionsConverter, {}, &object->mConditions,
+            !parseOptionalChild(root, MatrixKernelConditionsConverter{}, {}, &object->mConditions,
                                 error) ||
             !parseChildren(root, MatrixKernelConfigConverter{}, &object->mConfigs, error)) {
             return false;
@@ -704,12 +690,12 @@ struct MatrixKernelConverter : public XmlNodeConverter<MatrixKernel> {
     }
 };
 
-MatrixKernelConverter matrixKernelConverter{};
-
 struct FqInstanceConverter : public XmlTextConverter<FqInstance> {
     std::string elementName() const override { return "fqname"; }
 };
 
+// Convert ManifestHal from and to XML. Returned object is guaranteed to have
+// .isValid() == true.
 struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
     std::string elementName() const override { return "hal"; }
     void mutateNode(const ManifestHal& m, NodeType* root, DocType* d) const override {
@@ -720,19 +706,19 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         appendAttr(root, "format", hal.format);
         appendTextElement(root, "name", hal.name, d);
         if (!hal.transportArch.empty()) {
-            appendChild(root, transportArchConverter(hal.transportArch, d));
+            appendChild(root, TransportArchConverter{}(hal.transportArch, d));
         }
         if (hal.format == HalFormat::AIDL) {
             // By default, buildObject() assumes a <version>0</version> tag if no <version> tag
             // is specified. Don't output any <version> tag if there's only one <version>0</version>
             // tag.
             if (hal.versions.size() != 1 || hal.versions[0] != details::kDefaultAidlVersion) {
-                appendChildren(root, aidlVersionConverter, hal.versions, d);
+                appendChildren(root, AidlVersionConverter{}, hal.versions, d);
             }
         } else {
             appendChildren(root, VersionConverter{}, hal.versions, d);
         }
-        appendChildren(root, halInterfaceConverter, iterateValues(hal.interfaces), d);
+        appendChildren(root, HalInterfaceConverter{}, iterateValues(hal.interfaces), d);
         if (hal.isOverride()) {
             appendAttr(root, "override", hal.isOverride());
         }
@@ -757,8 +743,9 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             !parseOptionalAttr(root, "override", false, &object->mIsOverride, error) ||
             !parseOptionalAttr(root, "updatable-via-apex", {}, &object->mUpdatableViaApex, error) ||
             !parseTextElement(root, "name", &object->name, error) ||
-            !parseOptionalChild(root, transportArchConverter, {}, &object->transportArch, error) ||
-            !parseChildren(root, halInterfaceConverter, &interfaces, error) ||
+            !parseOptionalChild(root, TransportArchConverter{}, {}, &object->transportArch,
+                                error) ||
+            !parseChildren(root, HalInterfaceConverter{}, &interfaces, error) ||
             !parseOptionalAttr(root, "max-level", Level::UNSPECIFIED, &object->mMaxLevel, error)) {
             return false;
         }
@@ -787,7 +774,7 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                                  << object->name;
                     object->transportArch = {};
                 }
-                if (!parseChildren(root, aidlVersionConverter, &object->versions, error)) {
+                if (!parseChildren(root, AidlVersionConverter{}, &object->versions, error)) {
                     return false;
                 }
                 // Insert fake version for AIDL HALs so that forEachInstance works.
@@ -881,10 +868,6 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
 #endif
 };
 
-// Convert ManifestHal from and to XML. Returned object is guaranteed to have
-// .isValid() == true.
-ManifestHalConverter manifestHalConverter{};
-
 struct KernelSepolicyVersionConverter : public XmlTextConverter<KernelSepolicyVersion> {
     std::string elementName() const override { return "kernel-sepolicy-version"; }
 };
@@ -909,7 +892,6 @@ struct SepolicyConverter : public XmlNodeConverter<Sepolicy> {
         return true;
     }
 };
-SepolicyConverter sepolicyConverter{};
 
 struct [[deprecated]] VndkVersionRangeConverter : public XmlTextConverter<VndkVersionRange> {
     std::string elementName() const override { return "version"; }
@@ -938,8 +920,6 @@ struct [[deprecated]] VndkConverter : public XmlNodeConverter<Vndk> {
     }
 };
 
-[[deprecated]] VndkConverter vndkConverter{};
-
 struct VendorNdkConverter : public XmlNodeConverter<VendorNdk> {
     std::string elementName() const override { return "vendor-ndk"; }
     void mutateNode(const VendorNdk& object, NodeType* root, DocType* d) const override {
@@ -955,8 +935,6 @@ struct VendorNdkConverter : public XmlNodeConverter<VendorNdk> {
     }
 };
 
-VendorNdkConverter vendorNdkConverter{};
-
 struct SystemSdkVersionConverter : public XmlTextConverter<std::string> {
     std::string elementName() const override { return "version"; }
 };
@@ -971,8 +949,6 @@ struct SystemSdkConverter : public XmlNodeConverter<SystemSdk> {
     }
 };
 
-SystemSdkConverter systemSdkConverter{};
-
 struct HalManifestSepolicyConverter : public XmlNodeConverter<Version> {
     std::string elementName() const override { return "sepolicy"; }
     void mutateNode(const Version &m, NodeType *root, DocType *d) const override {
@@ -982,7 +958,6 @@ struct HalManifestSepolicyConverter : public XmlNodeConverter<Version> {
         return parseChild(root, VersionConverter{}, object, error);
     }
 };
-HalManifestSepolicyConverter halManifestSepolicyConverter{};
 
 struct ManifestXmlFileConverter : public XmlNodeConverter<ManifestXmlFile> {
     std::string elementName() const override { return "xmlfile"; }
@@ -1002,7 +977,6 @@ struct ManifestXmlFileConverter : public XmlNodeConverter<ManifestXmlFile> {
         return true;
     }
 };
-ManifestXmlFileConverter manifestXmlFileConverter{};
 
 struct StringKernelConfigKeyConverter : public XmlTextConverter<std::string> {
     std::string elementName() const override { return "key"; }
@@ -1042,8 +1016,6 @@ struct KernelInfoConverter : public XmlNodeConverter<KernelInfo> {
     }
 };
 
-KernelInfoConverter kernelInfoConverter{};
-
 struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
     std::string elementName() const override { return "manifest"; }
     void mutateNode(const HalManifest &m, NodeType *root, DocType *d) const override {
@@ -1059,12 +1031,12 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
         }
 
         if (flags.isHalsEnabled()) {
-            appendChildren(root, manifestHalConverter, m.getHals(), d, flags);
+            appendChildren(root, ManifestHalConverter{}, m.getHals(), d, flags);
         }
         if (m.mType == SchemaType::DEVICE) {
             if (flags.isSepolicyEnabled()) {
                 if (m.device.mSepolicyVersion != Version{}) {
-                    appendChild(root, halManifestSepolicyConverter(m.device.mSepolicyVersion, d));
+                    appendChild(root, HalManifestSepolicyConverter{}(m.device.mSepolicyVersion, d));
                 }
             }
             if (m.mLevel != Level::UNSPECIFIED) {
@@ -1073,27 +1045,27 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
 
             if (flags.isKernelEnabled()) {
                 if (!!m.kernel()) {
-                    appendChild(root, kernelInfoConverter(*m.kernel(), d, flags));
+                    appendChild(root, KernelInfoConverter{}(*m.kernel(), d, flags));
                 }
             }
         } else if (m.mType == SchemaType::FRAMEWORK) {
             if (flags.isVndkEnabled()) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-                appendChildren(root, vndkConverter, m.framework.mVndks, d);
+                appendChildren(root, VndkConverter{}, m.framework.mVndks, d);
 #pragma clang diagnostic pop
 
-                appendChildren(root, vendorNdkConverter, m.framework.mVendorNdks, d);
+                appendChildren(root, VendorNdkConverter{}, m.framework.mVendorNdks, d);
             }
             if (flags.isSsdkEnabled()) {
                 if (!m.framework.mSystemSdk.empty()) {
-                    appendChild(root, systemSdkConverter(m.framework.mSystemSdk, d));
+                    appendChild(root, SystemSdkConverter{}(m.framework.mSystemSdk, d));
                 }
             }
         }
 
         if (flags.isXmlFilesEnabled()) {
-            appendChildren(root, manifestXmlFileConverter, m.getXmlFiles(), d);
+            appendChildren(root, ManifestXmlFileConverter{}, m.getXmlFiles(), d);
         }
     }
     bool buildObject(HalManifest* object, NodeType* root, std::string* error) const override {
@@ -1110,7 +1082,7 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
         }
 
         std::vector<ManifestHal> hals;
-        if (!parseChildren(root, manifestHalConverter, &hals, error)) {
+        if (!parseChildren(root, ManifestHalConverter{}, &hals, error)) {
             return false;
         }
         for (auto&& hal : hals) {
@@ -1121,7 +1093,7 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
             // tags for device hal manifest only.
             // <sepolicy> can be missing because it can be determined at build time, not hard-coded
             // in the XML file.
-            if (!parseOptionalChild(root, halManifestSepolicyConverter, {},
+            if (!parseOptionalChild(root, HalManifestSepolicyConverter{}, {},
                                     &object->device.mSepolicyVersion, error)) {
                 return false;
             }
@@ -1131,13 +1103,13 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
                 return false;
             }
 
-            if (!parseOptionalChild(root, kernelInfoConverter, &object->device.mKernel, error)) {
+            if (!parseOptionalChild(root, KernelInfoConverter{}, &object->device.mKernel, error)) {
                 return false;
             }
         } else if (object->mType == SchemaType::FRAMEWORK) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            if (!parseChildren(root, vndkConverter, &object->framework.mVndks, error)) {
+            if (!parseChildren(root, VndkConverter{}, &object->framework.mVndks, error)) {
                 return false;
             }
             for (const auto &vndk : object->framework.mVndks) {
@@ -1149,7 +1121,7 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
             }
 #pragma clang diagnostic pop
 
-            if (!parseChildren(root, vendorNdkConverter, &object->framework.mVendorNdks, error)) {
+            if (!parseChildren(root, VendorNdkConverter{}, &object->framework.mVendorNdks, error)) {
                 return false;
             }
 
@@ -1162,7 +1134,7 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
                 vendorNdkVersions.insert(vendorNdk.version());
             }
 
-            if (!parseOptionalChild(root, systemSdkConverter, {}, &object->framework.mSystemSdk,
+            if (!parseOptionalChild(root, SystemSdkConverter{}, {}, &object->framework.mSystemSdk,
                                     error)) {
                 return false;
             }
@@ -1176,7 +1148,7 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
         }
 
         std::vector<ManifestXmlFile> xmlFiles;
-        if (!parseChildren(root, manifestXmlFileConverter, &xmlFiles, error)) {
+        if (!parseChildren(root, ManifestXmlFileConverter{}, &xmlFiles, error)) {
             return false;
         }
         for (auto&& xmlFile : xmlFiles) {
@@ -1207,7 +1179,6 @@ struct AvbConverter : public XmlNodeConverter<Version> {
         return parseChild(root, AvbVersionConverter{}, object, error);
     }
 };
-AvbConverter avbConverter{};
 
 struct MatrixXmlFileConverter : public XmlNodeConverter<MatrixXmlFile> {
     std::string elementName() const override { return "xmlfile"; }
@@ -1231,7 +1202,6 @@ struct MatrixXmlFileConverter : public XmlNodeConverter<MatrixXmlFile> {
         return true;
     }
 };
-MatrixXmlFileConverter matrixXmlFileConverter{};
 
 struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatrix> {
     std::string elementName() const override { return "compatibility-matrix"; }
@@ -1248,20 +1218,20 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
         }
 
         if (flags.isHalsEnabled()) {
-            appendChildren(root, matrixHalConverter, iterateValues(m.mHals), d);
+            appendChildren(root, MatrixHalConverter{}, iterateValues(m.mHals), d);
         }
         if (m.mType == SchemaType::FRAMEWORK) {
             if (flags.isKernelEnabled()) {
-                appendChildren(root, matrixKernelConverter, m.framework.mKernels, d, flags);
+                appendChildren(root, MatrixKernelConverter{}, m.framework.mKernels, d, flags);
             }
             if (flags.isSepolicyEnabled()) {
                 if (!(m.framework.mSepolicy == Sepolicy{})) {
-                    appendChild(root, sepolicyConverter(m.framework.mSepolicy, d));
+                    appendChild(root, SepolicyConverter{}(m.framework.mSepolicy, d));
                 }
             }
             if (flags.isAvbEnabled()) {
                 if (!(m.framework.mAvbMetaVersion == Version{})) {
-                    appendChild(root, avbConverter(m.framework.mAvbMetaVersion, d));
+                    appendChild(root, AvbConverter{}(m.framework.mAvbMetaVersion, d));
                 }
             }
             if (m.mLevel != Level::UNSPECIFIED) {
@@ -1272,24 +1242,24 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
                 if (!(m.device.mVndk == Vndk{})) {
-                    appendChild(root, vndkConverter(m.device.mVndk, d));
+                    appendChild(root, VndkConverter{}(m.device.mVndk, d));
                 }
 #pragma clang diagnostic pop
 
                 if (!(m.device.mVendorNdk == VendorNdk{})) {
-                    appendChild(root, vendorNdkConverter(m.device.mVendorNdk, d));
+                    appendChild(root, VendorNdkConverter{}(m.device.mVendorNdk, d));
                 }
             }
 
             if (flags.isSsdkEnabled()) {
                 if (!m.device.mSystemSdk.empty()) {
-                    appendChild(root, systemSdkConverter(m.device.mSystemSdk, d));
+                    appendChild(root, SystemSdkConverter{}(m.device.mSystemSdk, d));
                 }
             }
         }
 
         if (flags.isXmlFilesEnabled()) {
-            appendChildren(root, matrixXmlFileConverter, m.getXmlFiles(), d);
+            appendChildren(root, MatrixXmlFileConverter{}, m.getXmlFiles(), d);
         }
     }
     bool buildObject(CompatibilityMatrix* object, NodeType* root,
@@ -1304,17 +1274,17 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
 
         std::vector<MatrixHal> hals;
         if (!parseAttr(root, "type", &object->mType, error) ||
-            !parseChildren(root, matrixHalConverter, &hals, error)) {
+            !parseChildren(root, MatrixHalConverter{}, &hals, error)) {
             return false;
         }
 
         if (object->mType == SchemaType::FRAMEWORK) {
             // <avb> and <sepolicy> can be missing because it can be determined at build time, not
             // hard-coded in the XML file.
-            if (!parseChildren(root, matrixKernelConverter, &object->framework.mKernels, error) ||
-                !parseOptionalChild(root, sepolicyConverter, {}, &object->framework.mSepolicy,
+            if (!parseChildren(root, MatrixKernelConverter{}, &object->framework.mKernels, error) ||
+                !parseOptionalChild(root, SepolicyConverter{}, {}, &object->framework.mSepolicy,
                                     error) ||
-                !parseOptionalChild(root, avbConverter, {}, &object->framework.mAvbMetaVersion,
+                !parseOptionalChild(root, AvbConverter{}, {}, &object->framework.mAvbMetaVersion,
                                     error)) {
                 return false;
             }
@@ -1342,17 +1312,17 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
             // in the XML file.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            if (!parseOptionalChild(root, vndkConverter, {}, &object->device.mVndk, error)) {
+            if (!parseOptionalChild(root, VndkConverter{}, {}, &object->device.mVndk, error)) {
                 return false;
             }
 #pragma clang diagnostic pop
 
-            if (!parseOptionalChild(root, vendorNdkConverter, {}, &object->device.mVendorNdk,
+            if (!parseOptionalChild(root, VendorNdkConverter{}, {}, &object->device.mVendorNdk,
                                     error)) {
                 return false;
             }
 
-            if (!parseOptionalChild(root, systemSdkConverter, {}, &object->device.mSystemSdk,
+            if (!parseOptionalChild(root, SystemSdkConverter{}, {}, &object->device.mSystemSdk,
                                     error)) {
                 return false;
             }
@@ -1366,7 +1336,7 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
         }
 
         std::vector<MatrixXmlFile> xmlFiles;
-        if (!parseChildren(root, matrixXmlFileConverter, &xmlFiles, error)) {
+        if (!parseChildren(root, MatrixXmlFileConverter{}, &xmlFiles, error)) {
             return false;
         }
         for (auto&& xmlFile : xmlFiles) {
@@ -1392,13 +1362,6 @@ CompatibilityMatrixConverter compatibilityMatrixConverter{};
 XmlConverter<HalManifest>& gHalManifestConverter = halManifestConverter;
 XmlConverter<CompatibilityMatrix>& gCompatibilityMatrixConverter = compatibilityMatrixConverter;
 
-// For testing in LibVintfTest
-XmlConverter<KernelConfigTypedValue>& gKernelConfigTypedValueConverter =
-    kernelConfigTypedValueConverter;
-XmlConverter<MatrixHal>& gMatrixHalConverter = matrixHalConverter;
-XmlConverter<ManifestHal>& gManifestHalConverter = manifestHalConverter;
-XmlConverter<KernelInfo>& gKernelInfoConverter = kernelInfoConverter;
-
 #define CREATE_CONVERT_FN(type)                                         \
     std::string toXml(const type& o, SerializeFlags::Type flags) {      \
         return type##Converter{}(o, flags);                             \
@@ -1407,8 +1370,14 @@ XmlConverter<KernelInfo>& gKernelInfoConverter = kernelInfoConverter;
         return type##Converter{}(o, xml, error);                        \
     }
 
+// Create convert functions for internal usage.
+CREATE_CONVERT_FN(KernelInfo)
+
 // Create convert functions for testing.
 CREATE_CONVERT_FN(Version)
+CREATE_CONVERT_FN(KernelConfigTypedValue)
+CREATE_CONVERT_FN(MatrixHal)
+CREATE_CONVERT_FN(ManifestHal)
 
 #undef CREATE_CONVERT_FN
 
