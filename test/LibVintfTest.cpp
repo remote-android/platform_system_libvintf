@@ -32,6 +32,7 @@
 #include <vintf/parse_xml.h>
 #include "constants-private.h"
 #include "parse_xml_for_test.h"
+#include "parse_xml_internal.h"
 #include "test_constants.h"
 
 using ::testing::ElementsAre;
@@ -43,10 +44,6 @@ using ::testing::SizeIs;
 namespace android {
 namespace vintf {
 
-extern XmlConverter<ManifestHal>& gManifestHalConverter;
-extern XmlConverter<MatrixHal>& gMatrixHalConverter;
-extern XmlConverter<KernelConfigTypedValue>& gKernelConfigTypedValueConverter;
-extern XmlConverter<KernelInfo>& gKernelInfoConverter;
 extern XmlConverter<HalManifest>& gHalManifestConverter;
 extern XmlConverter<CompatibilityMatrix>& gCompatibilityMatrixConverter;
 
@@ -496,7 +493,7 @@ TEST_F(LibVintfTest, MatrixHalConverter) {
             false /* optional */, {}};
     EXPECT_TRUE(insert(&mh.interfaces, {"IBetterCamera", {"default", "great"}}));
     EXPECT_TRUE(insert(&mh.interfaces, {"ICamera", {"default"}}));
-    std::string xml = gMatrixHalConverter(mh);
+    std::string xml = toXml(mh);
     EXPECT_EQ(xml,
         "<hal format=\"native\" optional=\"false\">\n"
         "    <name>android.hardware.camera</name>\n"
@@ -513,7 +510,7 @@ TEST_F(LibVintfTest, MatrixHalConverter) {
         "    </interface>\n"
         "</hal>\n");
     MatrixHal mh2;
-    EXPECT_TRUE(gMatrixHalConverter(&mh2, xml));
+    EXPECT_TRUE(fromXml(&mh2, xml));
     EXPECT_EQ(mh, mh2);
 }
 
@@ -525,16 +522,16 @@ TEST_F(LibVintfTest, KernelConfigTypedValueConverter) {
                     const std::string &expectXml) {
         std::string xml;
         KernelConfigTypedValue converted;
-        xml = gKernelConfigTypedValueConverter(original);
+        xml = toXml(original);
         EXPECT_EQ(xml, expectXml);
-        EXPECT_TRUE(gKernelConfigTypedValueConverter(&converted, xml));
+        EXPECT_TRUE(fromXml(&converted, xml));
         EXPECT_EQ(original, converted);
     };
 
     auto testParse = [] (const KernelConfigTypedValue &original,
                     const std::string &xml) {
         KernelConfigTypedValue converted;
-        EXPECT_TRUE(gKernelConfigTypedValueConverter(&converted, xml));
+        EXPECT_TRUE(fromXml(&converted, xml));
         EXPECT_EQ(original, converted);
     };
 
@@ -549,7 +546,7 @@ TEST_F(LibVintfTest, KernelConfigTypedValueConverter) {
         "<value type=\"tristate\">n</value>\n");
     testOne(KernelConfigTypedValue(Tristate::MODULE),
         "<value type=\"tristate\">m</value>\n");
-    EXPECT_FALSE(gKernelConfigTypedValueConverter(&converted,
+    EXPECT_FALSE(fromXml(&converted,
         "<value type=\"tristate\">q</value>\n"));
 
     testOne(KernelConfigTypedValue(KernelConfigRangeValue{4, 20}),
@@ -559,7 +556,7 @@ TEST_F(LibVintfTest, KernelConfigTypedValueConverter) {
     testParse(KernelConfigTypedValue(KernelConfigRangeValue{0, UINT64_MAX}),
             "<value type=\"range\">0x0-0xffffffffffffffff</value>\n");
 
-    EXPECT_FALSE(gKernelConfigTypedValueConverter(&converted,
+    EXPECT_FALSE(fromXml(&converted,
             "<value type=\"int\">-18446744073709551616</value>\n"));
 
     testOne(KernelConfigTypedValue(INT64_MIN),
@@ -597,7 +594,7 @@ TEST_F(LibVintfTest, KernelConfigTypedValueConverter) {
     testParse(KernelConfigTypedValue(-1),
             "<value type=\"int\">0xffffffffffffffff</value>\n");
 
-    EXPECT_FALSE(gKernelConfigTypedValueConverter(&converted,
+    EXPECT_FALSE(fromXml(&converted,
             "<value type=\"int\">18446744073709551616</value>\n"));
 }
 
@@ -3250,14 +3247,14 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>@1.1::IFoo/custom</fqname>\n"
         "</hal>\n";
-    EXPECT_TRUE(gManifestHalConverter(&hal, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&hal, xml, &error)) << error;
     xml =
         "<hal format=\"hidl\">\n"
         "    <name>android.hardware.foo</name>\n"
         "    <transport>hwbinder</transport>\n"
         "    <fqname>1.1::IFoo/custom</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Could not parse text \"1.1::IFoo/custom\" in element <fqname>", error);
     xml =
         "<hal format=\"hidl\">\n"
@@ -3265,7 +3262,7 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>android.hardware.foo@1.1::IFoo/custom</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Should not specify package", error);
     xml =
         "<hal format=\"hidl\">\n"
@@ -3273,7 +3270,7 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>IFoo/custom</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Should specify version", error);
     xml =
         "<hal format=\"hidl\">\n"
@@ -3281,7 +3278,7 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>@1.0::IFoo</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Should specify instance", error);
     xml =
         "<hal format=\"hidl\">\n"
@@ -3289,7 +3286,7 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>@1.0::IFoo/custom</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Cannot create FqInstance", error);
     EXPECT_IN("n07 4 v4l1d 1n73rf4c3", error);
 }
@@ -3463,7 +3460,7 @@ TEST_F(LibVintfTest, KernelInfo) {
         "        <value>0xdead000000000000</value>\n"
         "    </config>\n"
         "</kernel>\n",
-        gKernelInfoConverter(ki, SerializeFlags::NO_TAGS.enableKernelConfigs()));
+        toXml(ki, SerializeFlags::NO_TAGS.enableKernelConfigs()));
 }
 
 TEST_F(LibVintfTest, ManifestAddAllDeviceManifest) {
@@ -4160,9 +4157,9 @@ TEST_F(LibVintfTest, KernelInfoLevel) {
     std::string error;
     std::string xml = "<kernel version=\"3.18.31\" target-level=\"1\"/>\n";
     KernelInfo ki;
-    ASSERT_TRUE(gKernelInfoConverter(&ki, xml, &error)) << error;
+    ASSERT_TRUE(fromXml(&ki, xml, &error)) << error;
     EXPECT_EQ(Level{1}, getLevel(ki));
-    EXPECT_EQ(xml, gKernelInfoConverter(ki));
+    EXPECT_EQ(xml, toXml(ki));
 }
 
 // Test merge of <kernel target-level=""> with autogenerated <kernel> by parsing

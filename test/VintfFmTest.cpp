@@ -31,11 +31,10 @@
 #include <vintf/VintfFm.h>
 #include <vintf/parse_xml.h>
 
+#include "parse_xml_for_test.h"
 #include "test_constants.h"
 
 namespace android::vintf {
-
-extern XmlConverter<MatrixHal>& gMatrixHalConverter;
 
 namespace {
 
@@ -242,7 +241,7 @@ std::string createMatrixHal(HalFormat format, const std::string& package) {
                         .versionRanges = versionRanges,
                         .optional = false,
                         .interfaces = {{interface, HalInterface{interface, {"default"}}}}};
-    return gMatrixHalConverter(matrixHal);
+    return toXml(matrixHal);
 }
 
 class VintfFmCheckTest : public VintfFmTest, public WithParamInterface<Level> {
