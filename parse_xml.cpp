@@ -1370,6 +1370,10 @@ XmlConverter<CompatibilityMatrix>& gCompatibilityMatrixConverter = compatibility
         return type##Converter{}(o, xml, error);                        \
     }
 
+// Create convert functions for public usage.
+CREATE_CONVERT_FN(HalManifest)
+CREATE_CONVERT_FN(CompatibilityMatrix)
+
 // Create convert functions for internal usage.
 CREATE_CONVERT_FN(KernelInfo)
 
