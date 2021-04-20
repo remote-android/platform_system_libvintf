@@ -469,7 +469,7 @@ status_t VintfObject::getOneMatrix(const std::string& path, CompatibilityMatrix*
     if (status != OK) {
         return status;
     }
-    if (!gCompatibilityMatrixConverter(out, content, error)) {
+    if (!fromXml(out, content, error)) {
         if (error) {
             error->insert(0, "Cannot parse " + path + ": ");
         }
