@@ -151,7 +151,7 @@ class MatrixInstanceMatcher : public MatcherInterface<const std::string&> {
     bool MatchAndExplain(const std::string& actual, MatchResultListener* listener) const override {
         CompatibilityMatrix actualMatrix;
         std::string error;
-        if (!gCompatibilityMatrixConverter(&actualMatrix, actual, &error)) {
+        if (!fromXml(&actualMatrix, actual, &error)) {
             *listener << "is not a valid compatibility matrix: " << error;
             return false;
         }
