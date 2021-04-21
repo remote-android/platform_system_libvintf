@@ -31,11 +31,10 @@
 #include <vintf/VintfFm.h>
 #include <vintf/parse_xml.h>
 
+#include "parse_xml_for_test.h"
 #include "test_constants.h"
 
 namespace android::vintf {
-
-extern XmlConverter<MatrixHal>& gMatrixHalConverter;
 
 namespace {
 
@@ -152,7 +151,7 @@ class MatrixInstanceMatcher : public MatcherInterface<const std::string&> {
     bool MatchAndExplain(const std::string& actual, MatchResultListener* listener) const override {
         CompatibilityMatrix actualMatrix;
         std::string error;
-        if (!gCompatibilityMatrixConverter(&actualMatrix, actual, &error)) {
+        if (!fromXml(&actualMatrix, actual, &error)) {
             *listener << "is not a valid compatibility matrix: " << error;
             return false;
         }
@@ -242,7 +241,7 @@ std::string createMatrixHal(HalFormat format, const std::string& package) {
                         .versionRanges = versionRanges,
                         .optional = false,
                         .interfaces = {{interface, HalInterface{interface, {"default"}}}}};
-    return gMatrixHalConverter(matrixHal);
+    return toXml(matrixHal);
 }
 
 class VintfFmCheckTest : public VintfFmTest, public WithParamInterface<Level> {

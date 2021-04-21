@@ -31,6 +31,8 @@
 #include <vintf/parse_string.h>
 #include <vintf/parse_xml.h>
 #include "constants-private.h"
+#include "parse_xml_for_test.h"
+#include "parse_xml_internal.h"
 #include "test_constants.h"
 
 using ::testing::ElementsAre;
@@ -41,14 +43,6 @@ using ::testing::SizeIs;
 
 namespace android {
 namespace vintf {
-
-extern XmlConverter<Version>& gVersionConverter;
-extern XmlConverter<ManifestHal>& gManifestHalConverter;
-extern XmlConverter<MatrixHal>& gMatrixHalConverter;
-extern XmlConverter<KernelConfigTypedValue>& gKernelConfigTypedValueConverter;
-extern XmlConverter<KernelInfo>& gKernelInfoConverter;
-extern XmlConverter<HalManifest>& gHalManifestConverter;
-extern XmlConverter<CompatibilityMatrix>& gCompatibilityMatrixConverter;
 
 static bool In(const std::string& sub, const std::string& str) {
     return str.find(sub) != std::string::npos;
@@ -277,14 +271,14 @@ TEST_F(LibVintfTest, FutureManifestCompatible) {
         "    <tag_might_be_added/>\n"
         "</manifest>\n";
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml));
+    EXPECT_TRUE(fromXml(&manifest, manifestXml));
     EXPECT_EQ(expectedManifest, manifest);
 }
 
 TEST_F(LibVintfTest, HalManifestConverter) {
     HalManifest vm = testDeviceManifest();
     std::string xml =
-        gHalManifestConverter(vm, SerializeFlags::NO_TAGS.enableHals().enableSepolicy());
+        toXml(vm, SerializeFlags::NO_TAGS.enableHals().enableSepolicy());
     EXPECT_EQ(xml,
         "<manifest " + kMetaVersionStr + " type=\"device\">\n"
         "    <hal format=\"hidl\">\n"
@@ -315,13 +309,13 @@ TEST_F(LibVintfTest, HalManifestConverter) {
         "    </sepolicy>\n"
         "</manifest>\n");
     HalManifest vm2;
-    EXPECT_TRUE(gHalManifestConverter(&vm2, xml));
+    EXPECT_TRUE(fromXml(&vm2, xml));
     EXPECT_EQ(vm, vm2);
 }
 
 TEST_F(LibVintfTest, HalManifestConverterFramework) {
     HalManifest vm = testFrameworkManfiest();
-    std::string xml = gHalManifestConverter(vm, SerializeFlags::NO_TAGS.enableHals().enableVndk());
+    std::string xml = toXml(vm, SerializeFlags::NO_TAGS.enableHals().enableVndk());
     EXPECT_EQ(xml,
         "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
         "    <hal format=\"hidl\">\n"
@@ -346,15 +340,15 @@ TEST_F(LibVintfTest, HalManifestConverterFramework) {
         "    </vndk>\n"
         "</manifest>\n");
     HalManifest vm2;
-    EXPECT_TRUE(gHalManifestConverter(&vm2, xml));
+    EXPECT_TRUE(fromXml(&vm2, xml));
     EXPECT_EQ(vm, vm2);
 }
 
 TEST_F(LibVintfTest, HalManifestOptional) {
     HalManifest vm;
-    EXPECT_TRUE(gHalManifestConverter(&vm,
+    EXPECT_TRUE(fromXml(&vm,
             "<manifest " + kMetaVersionStr + " type=\"device\"></manifest>"));
-    EXPECT_TRUE(gHalManifestConverter(&vm,
+    EXPECT_TRUE(fromXml(&vm,
             "<manifest " + kMetaVersionStr + " type=\"device\">"
             "    <hal>"
             "        <name>android.hidl.manager</name>"
@@ -362,7 +356,7 @@ TEST_F(LibVintfTest, HalManifestOptional) {
             "        <version>1.0</version>"
             "    </hal>"
             "</manifest>"));
-    EXPECT_FALSE(gHalManifestConverter(&vm,
+    EXPECT_FALSE(fromXml(&vm,
             "<manifest " + kMetaVersionStr + " type=\"device\">"
             "    <hal>"
             "        <name>android.hidl.manager</name>"
@@ -374,14 +368,14 @@ TEST_F(LibVintfTest, HalManifestOptional) {
 TEST_F(LibVintfTest, HalManifestNative) {
     std::string error;
     HalManifest vm;
-    EXPECT_TRUE(gHalManifestConverter(&vm,
+    EXPECT_TRUE(fromXml(&vm,
                                       "<manifest " + kMetaVersionStr + " type=\"device\">"
                                       "    <hal format=\"native\">"
                                       "        <name>foo</name>"
                                       "        <version>1.0</version>"
                                       "    </hal>"
                                       "</manifest>", &error)) << error;
-    EXPECT_FALSE(gHalManifestConverter(&vm,
+    EXPECT_FALSE(fromXml(&vm,
                                        "<manifest " + kMetaVersionStr + " type=\"device\">"
                                        "    <hal format=\"native\">"
                                        "        <name>foo</name>"
@@ -394,7 +388,7 @@ TEST_F(LibVintfTest, HalManifestNative) {
 
 TEST_F(LibVintfTest, HalManifestDuplicate) {
     HalManifest vm;
-    EXPECT_FALSE(gHalManifestConverter(&vm,
+    EXPECT_FALSE(fromXml(&vm,
                                        "<manifest " + kMetaVersionStr + " type=\"device\">"
                                        "    <hal>"
                                        "        <name>android.hidl.manager</name>"
@@ -404,7 +398,7 @@ TEST_F(LibVintfTest, HalManifestDuplicate) {
                                        "    </hal>"
                                        "</manifest>"))
         << "Should not allow duplicated major version in <hal>";
-    EXPECT_FALSE(gHalManifestConverter(&vm,
+    EXPECT_FALSE(fromXml(&vm,
                                        "<manifest " + kMetaVersionStr + " type=\"device\">"
                                        "    <hal>"
                                        "        <name>android.hidl.manager</name>"
@@ -422,7 +416,7 @@ TEST_F(LibVintfTest, HalManifestDuplicate) {
 
 TEST_F(LibVintfTest, HalManifestGetTransport) {
     HalManifest vm;
-    EXPECT_TRUE(gHalManifestConverter(&vm,
+    EXPECT_TRUE(fromXml(&vm,
                                       "<manifest " + kMetaVersionStr + " type=\"device\">"
                                       "    <hal>"
                                       "        <name>android.hidl.manager</name>"
@@ -478,10 +472,10 @@ TEST_F(LibVintfTest, HalManifestInstances) {
 
 TEST_F(LibVintfTest, VersionConverter) {
     Version v(3, 6);
-    std::string xml = gVersionConverter(v);
+    std::string xml = toXml(v);
     EXPECT_EQ(xml, "<version>3.6</version>\n");
     Version v2;
-    EXPECT_TRUE(gVersionConverter(&v2, xml));
+    EXPECT_TRUE(fromXml(&v2, xml));
     EXPECT_EQ(v, v2);
 }
 
@@ -496,7 +490,7 @@ TEST_F(LibVintfTest, MatrixHalConverter) {
             false /* optional */, {}};
     EXPECT_TRUE(insert(&mh.interfaces, {"IBetterCamera", {"default", "great"}}));
     EXPECT_TRUE(insert(&mh.interfaces, {"ICamera", {"default"}}));
-    std::string xml = gMatrixHalConverter(mh);
+    std::string xml = toXml(mh);
     EXPECT_EQ(xml,
         "<hal format=\"native\" optional=\"false\">\n"
         "    <name>android.hardware.camera</name>\n"
@@ -513,7 +507,7 @@ TEST_F(LibVintfTest, MatrixHalConverter) {
         "    </interface>\n"
         "</hal>\n");
     MatrixHal mh2;
-    EXPECT_TRUE(gMatrixHalConverter(&mh2, xml));
+    EXPECT_TRUE(fromXml(&mh2, xml));
     EXPECT_EQ(mh, mh2);
 }
 
@@ -525,16 +519,16 @@ TEST_F(LibVintfTest, KernelConfigTypedValueConverter) {
                     const std::string &expectXml) {
         std::string xml;
         KernelConfigTypedValue converted;
-        xml = gKernelConfigTypedValueConverter(original);
+        xml = toXml(original);
         EXPECT_EQ(xml, expectXml);
-        EXPECT_TRUE(gKernelConfigTypedValueConverter(&converted, xml));
+        EXPECT_TRUE(fromXml(&converted, xml));
         EXPECT_EQ(original, converted);
     };
 
     auto testParse = [] (const KernelConfigTypedValue &original,
                     const std::string &xml) {
         KernelConfigTypedValue converted;
-        EXPECT_TRUE(gKernelConfigTypedValueConverter(&converted, xml));
+        EXPECT_TRUE(fromXml(&converted, xml));
         EXPECT_EQ(original, converted);
     };
 
@@ -549,7 +543,7 @@ TEST_F(LibVintfTest, KernelConfigTypedValueConverter) {
         "<value type=\"tristate\">n</value>\n");
     testOne(KernelConfigTypedValue(Tristate::MODULE),
         "<value type=\"tristate\">m</value>\n");
-    EXPECT_FALSE(gKernelConfigTypedValueConverter(&converted,
+    EXPECT_FALSE(fromXml(&converted,
         "<value type=\"tristate\">q</value>\n"));
 
     testOne(KernelConfigTypedValue(KernelConfigRangeValue{4, 20}),
@@ -559,7 +553,7 @@ TEST_F(LibVintfTest, KernelConfigTypedValueConverter) {
     testParse(KernelConfigTypedValue(KernelConfigRangeValue{0, UINT64_MAX}),
             "<value type=\"range\">0x0-0xffffffffffffffff</value>\n");
 
-    EXPECT_FALSE(gKernelConfigTypedValueConverter(&converted,
+    EXPECT_FALSE(fromXml(&converted,
             "<value type=\"int\">-18446744073709551616</value>\n"));
 
     testOne(KernelConfigTypedValue(INT64_MIN),
@@ -597,7 +591,7 @@ TEST_F(LibVintfTest, KernelConfigTypedValueConverter) {
     testParse(KernelConfigTypedValue(-1),
             "<value type=\"int\">0xffffffffffffffff</value>\n");
 
-    EXPECT_FALSE(gKernelConfigTypedValueConverter(&converted,
+    EXPECT_FALSE(fromXml(&converted,
             "<value type=\"int\">18446744073709551616</value>\n"));
 }
 
@@ -615,7 +609,7 @@ TEST_F(LibVintfTest, CompatibilityMatrixConverter) {
             {KernelConfig{"CONFIG_BAZ", 20}, KernelConfig{"CONFIG_BAR", KernelConfigRangeValue{3, 5} }}}));
     set(cm, Sepolicy(30, {{25, 0}, {26, 0, 3}}));
     setAvb(cm, Version{2, 1});
-    std::string xml = gCompatibilityMatrixConverter(cm);
+    std::string xml = toXml(cm);
     EXPECT_EQ(xml,
             "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\">\n"
             "    <hal format=\"native\" optional=\"false\">\n"
@@ -666,7 +660,7 @@ TEST_F(LibVintfTest, CompatibilityMatrixConverter) {
             "    </avb>\n"
             "</compatibility-matrix>\n");
     CompatibilityMatrix cm2;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml));
+    EXPECT_TRUE(fromXml(&cm2, xml));
     EXPECT_EQ(cm, cm2);
 }
 
@@ -677,7 +671,7 @@ TEST_F(LibVintfTest, DeviceCompatibilityMatrixCoverter) {
             false /* optional */, testHalInterfaces()}));
     set(cm, SchemaType::DEVICE);
     set(cm, VndkVersionRange{25,0,1,5}, {"libjpeg.so", "libbase.so"});
-    std::string xml = gCompatibilityMatrixConverter(cm);
+    std::string xml = toXml(cm);
     EXPECT_EQ(xml,
         "<compatibility-matrix " + kMetaVersionStr + " type=\"device\">\n"
         "    <hal format=\"native\" optional=\"false\">\n"
@@ -695,7 +689,7 @@ TEST_F(LibVintfTest, DeviceCompatibilityMatrixCoverter) {
         "    </vndk>\n"
         "</compatibility-matrix>\n");
     CompatibilityMatrix cm2;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml));
+    EXPECT_TRUE(fromXml(&cm2, xml));
     EXPECT_EQ(cm, cm2);
 }
 
@@ -933,7 +927,7 @@ TEST_F(LibVintfTest, MissingAvb) {
         "    </sepolicy>\n"
         "</compatibility-matrix>\n";
     CompatibilityMatrix cm;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml));
+    EXPECT_TRUE(fromXml(&cm, xml));
     EXPECT_EQ(getAvb(cm), Version(0, 0));
 }
 
@@ -950,7 +944,7 @@ TEST_F(LibVintfTest, DisableAvb) {
         "    </avb>\n"
         "</compatibility-matrix>\n";
     CompatibilityMatrix cm;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml));
+    EXPECT_TRUE(fromXml(&cm, xml));
     RuntimeInfo ki = testRuntimeInfo();
     std::string error;
     EXPECT_FALSE(ki.checkCompatibility(cm, &error, CheckFlags::ENABLE_ALL_CHECKS));
@@ -988,7 +982,7 @@ TEST_F(LibVintfTest, HalCompat) {
             "        <sepolicy-version>25.5</sepolicy-version>\n"
             "    </sepolicy>\n"
             "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml, &error)) << error;
+    EXPECT_TRUE(fromXml(&matrix, matrixXml, &error)) << error;
 
     {
         std::string manifestXml =
@@ -1018,7 +1012,7 @@ TEST_F(LibVintfTest, HalCompat) {
                 "</manifest>\n";
 
         HalManifest manifest;
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
     }
 
@@ -1040,7 +1034,7 @@ TEST_F(LibVintfTest, HalCompat) {
                 "    </sepolicy>\n"
                 "</manifest>\n";
         HalManifest manifest;
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
                 << "should not be compatible because IBar is missing";
     }
@@ -1071,7 +1065,7 @@ TEST_F(LibVintfTest, HalCompat) {
                 "    </sepolicy>\n"
                 "</manifest>\n";
         HalManifest manifest;
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "should not be compatible because IFoo/specific is missing";
     }
@@ -1103,7 +1097,7 @@ TEST_F(LibVintfTest, HalCompat) {
                 "    </sepolicy>\n"
                 "</manifest>\n";
         HalManifest manifest;
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
     }
 
@@ -1142,7 +1136,7 @@ TEST_F(LibVintfTest, HalCompat) {
                 "    </sepolicy>\n"
                 "</manifest>\n";
         HalManifest manifest;
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
                 << "should not be compatible even though @1.0::IFoo/default "
                 << "and @3.2::IFoo/specific present";
@@ -1175,7 +1169,7 @@ TEST_F(LibVintfTest, HalCompat) {
                 "    </sepolicy>\n"
                 "</manifest>\n";
         HalManifest manifest;
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
     }
 }
@@ -1263,8 +1257,8 @@ TEST_F(LibVintfTest, Compat) {
     HalManifest manifest;
     CompatibilityMatrix matrix;
     std::string error;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml));
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml));
+    EXPECT_TRUE(fromXml(&manifest, manifestXml));
+    EXPECT_TRUE(fromXml(&matrix, matrixXml));
     EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
 
     // some smaller test cases
@@ -1281,7 +1275,7 @@ TEST_F(LibVintfTest, Compat) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
     matrix = {};
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml));
+    EXPECT_TRUE(fromXml(&matrix, matrixXml));
     EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
     MatrixHal *camera = getAnyHal(matrix, "android.hardware.camera");
     EXPECT_NE(camera, nullptr);
@@ -1292,7 +1286,7 @@ TEST_F(LibVintfTest, Compat) {
 
     // reset it
     matrix = {};
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml));
+    EXPECT_TRUE(fromXml(&matrix, matrixXml));
     set(matrix, Sepolicy{30, {{26, 0}}});
     EXPECT_FALSE(manifest.checkCompatibility(matrix));
     set(matrix, Sepolicy{30, {{25, 6}}});
@@ -1305,7 +1299,7 @@ TEST_F(LibVintfTest, Compat) {
 
 TEST_F(LibVintfTest, HalManifestConverterXmlFile) {
     HalManifest vm = testDeviceManifestWithXmlFile();
-    std::string xml = gHalManifestConverter(
+    std::string xml = toXml(
         vm, SerializeFlags::NO_TAGS.enableHals().enableSepolicy().enableXmlFiles());
     EXPECT_EQ(xml,
               "<manifest " + kMetaVersionStr + " type=\"device\">\n"
@@ -1341,14 +1335,14 @@ TEST_F(LibVintfTest, HalManifestConverterXmlFile) {
               "    </xmlfile>\n"
               "</manifest>\n");
     HalManifest vm2;
-    EXPECT_TRUE(gHalManifestConverter(&vm2, xml));
+    EXPECT_TRUE(fromXml(&vm2, xml));
     EXPECT_EQ(vm, vm2);
 }
 
 TEST_F(LibVintfTest, CompatibilityMatrixConverterXmlFile) {
     CompatibilityMatrix cm;
     addXmlFile(cm, "media_profile", {1, 0});
-    std::string xml = gCompatibilityMatrixConverter(cm, SerializeFlags::XMLFILES_ONLY);
+    std::string xml = toXml(cm, SerializeFlags::XMLFILES_ONLY);
     EXPECT_EQ(xml,
               "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\">\n"
               "    <xmlfile format=\"dtd\" optional=\"true\">\n"
@@ -1357,7 +1351,7 @@ TEST_F(LibVintfTest, CompatibilityMatrixConverterXmlFile) {
               "    </xmlfile>\n"
               "</compatibility-matrix>\n");
     CompatibilityMatrix cm2;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml));
+    EXPECT_TRUE(fromXml(&cm2, xml));
     EXPECT_EQ(cm, cm2);
 }
 
@@ -1371,7 +1365,7 @@ TEST_F(LibVintfTest, CompatibilityMatrixConverterXmlFile2) {
         "    </xmlfile>\n"
         "</compatibility-matrix>\n";
     CompatibilityMatrix cm;
-    EXPECT_FALSE(gCompatibilityMatrixConverter(&cm, xml, &error));
+    EXPECT_FALSE(fromXml(&cm, xml, &error));
     EXPECT_EQ("compatibility-matrix.xmlfile entry media_profile has to be optional for "
               "compatibility matrix version 1.0", error);
 }
@@ -1385,7 +1379,7 @@ TEST_F(LibVintfTest, ManifestXmlFilePathDevice) {
         "    </xmlfile>"
         "</manifest>";
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml));
+    EXPECT_TRUE(fromXml(&manifest, manifestXml));
     EXPECT_EQ(manifest.getXmlFilePath("media_profile", {1, 0}),
               "/vendor/etc/media_profile_V1_0.xml");
 }
@@ -1399,7 +1393,7 @@ TEST_F(LibVintfTest, ManifestXmlFilePathFramework) {
         "    </xmlfile>"
         "</manifest>";
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml));
+    EXPECT_TRUE(fromXml(&manifest, manifestXml));
     EXPECT_EQ(manifest.getXmlFilePath("media_profile", {1, 0}),
               "/system/etc/media_profile_V1_0.xml");
 }
@@ -1414,7 +1408,7 @@ TEST_F(LibVintfTest, ManifestXmlFilePathOverride) {
         "    </xmlfile>"
         "</manifest>";
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml));
+    EXPECT_TRUE(fromXml(&manifest, manifestXml));
     EXPECT_EQ(manifest.getXmlFilePath("media_profile", {1, 0}), "/vendor/etc/foo.xml");
 }
 
@@ -1427,7 +1421,7 @@ TEST_F(LibVintfTest, ManifestXmlFilePathMissing) {
         "    </xmlfile>"
         "</manifest>";
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml));
+    EXPECT_TRUE(fromXml(&manifest, manifestXml));
     EXPECT_EQ(manifest.getXmlFilePath("media_profile", {1, 0}), "");
 }
 
@@ -1440,7 +1434,7 @@ TEST_F(LibVintfTest, MatrixXmlFilePathFramework) {
         "    </xmlfile>"
         "</compatibility-matrix>";
     CompatibilityMatrix matrix;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml));
+    EXPECT_TRUE(fromXml(&matrix, matrixXml));
     EXPECT_EQ(matrix.getXmlSchemaPath("media_profile", {2, 1}),
               "/system/etc/media_profile_V2_1.dtd");
 }
@@ -1454,7 +1448,7 @@ TEST_F(LibVintfTest, MatrixXmlFilePathDevice) {
         "    </xmlfile>"
         "</compatibility-matrix>";
     CompatibilityMatrix matrix;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml));
+    EXPECT_TRUE(fromXml(&matrix, matrixXml));
     EXPECT_EQ(matrix.getXmlSchemaPath("media_profile", {2, 0}),
               "/vendor/etc/media_profile_V2_1.xsd");
 }
@@ -1469,7 +1463,7 @@ TEST_F(LibVintfTest, MatrixXmlFilePathOverride) {
         "    </xmlfile>"
         "</compatibility-matrix>";
     CompatibilityMatrix matrix;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml));
+    EXPECT_TRUE(fromXml(&matrix, matrixXml));
     EXPECT_EQ(matrix.getXmlSchemaPath("media_profile", {2, 0}), "/system/etc/foo.xsd");
 }
 
@@ -1482,7 +1476,7 @@ TEST_F(LibVintfTest, MatrixXmlFilePathMissing) {
         "    </xmlfile>"
         "</compatibility-matrix>";
     CompatibilityMatrix matrix;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml));
+    EXPECT_TRUE(fromXml(&matrix, matrixXml));
     EXPECT_EQ(matrix.getXmlSchemaPath("media_profile", {2, 0}), "");
 }
 
@@ -1587,7 +1581,7 @@ TEST_F(LibVintfTest, NetutilsWrapperMatrix) {
         "        <version>1.0</version>"
         "    </hal>"
         "</compatibility-matrix>";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml, &error)) << error;
+    EXPECT_TRUE(fromXml(&matrix, matrixXml, &error)) << error;
 
 // only host libvintf hardcodes netutils-wrapper version requirements
 #ifndef LIBVINTF_TARGET
@@ -1599,7 +1593,7 @@ TEST_F(LibVintfTest, NetutilsWrapperMatrix) {
         "        <version>1.0-1</version>"
         "    </hal>"
         "</compatibility-matrix>";
-    EXPECT_FALSE(gCompatibilityMatrixConverter(&matrix, matrixXml, &error));
+    EXPECT_FALSE(fromXml(&matrix, matrixXml, &error));
     EXPECT_THAT(error, HasSubstr(
         "netutils-wrapper HAL must specify exactly one version x.0, but a range is provided. "
         "Perhaps you mean '1.0'?"));
@@ -1611,7 +1605,7 @@ TEST_F(LibVintfTest, NetutilsWrapperMatrix) {
         "        <version>1.1</version>"
         "    </hal>"
         "</compatibility-matrix>";
-    EXPECT_FALSE(gCompatibilityMatrixConverter(&matrix, matrixXml, &error));
+    EXPECT_FALSE(fromXml(&matrix, matrixXml, &error));
     EXPECT_THAT(error, HasSubstr(
         "netutils-wrapper HAL must specify exactly one version x.0, but minor version is not 0. "
         "Perhaps you mean '1.0'?"));
@@ -1624,7 +1618,7 @@ TEST_F(LibVintfTest, NetutilsWrapperMatrix) {
         "        <version>2.0</version>"
         "    </hal>"
         "</compatibility-matrix>";
-    EXPECT_FALSE(gCompatibilityMatrixConverter(&matrix, matrixXml, &error));
+    EXPECT_FALSE(fromXml(&matrix, matrixXml, &error));
     EXPECT_THAT(error, HasSubstr(
         "netutils-wrapper HAL must specify exactly one version x.0, but multiple <version> element "
         "is specified."));
@@ -1645,7 +1639,7 @@ TEST_F(LibVintfTest, NetutilsWrapperManifest) {
         "        <version>2.0</version>"
         "    </hal>"
         "</manifest>";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
 
 // only host libvintf hardcodes netutils-wrapper version requirements
 #ifndef LIBVINTF_TARGET
@@ -1657,7 +1651,7 @@ TEST_F(LibVintfTest, NetutilsWrapperManifest) {
         "        <version>1.1</version>"
         "    </hal>"
         "</manifest>";
-    EXPECT_FALSE(gHalManifestConverter(&manifest, manifestXml, &error));
+    EXPECT_FALSE(fromXml(&manifest, manifestXml, &error));
     EXPECT_THAT(error, HasSubstr(
         "netutils-wrapper HAL must specify exactly one version x.0, but minor version is not 0."));
 
@@ -1669,7 +1663,7 @@ TEST_F(LibVintfTest, NetutilsWrapperManifest) {
         "        <version>2.1</version>"
         "    </hal>"
         "</manifest>";
-    EXPECT_FALSE(gHalManifestConverter(&manifest, manifestXml, &error));
+    EXPECT_FALSE(fromXml(&manifest, manifestXml, &error));
     EXPECT_THAT(error, HasSubstr(
         "netutils-wrapper HAL must specify exactly one version x.0, but minor version is not 0."));
 
@@ -1703,7 +1697,7 @@ TEST_F(LibVintfTest, KernelConfigConditionTest) {
         "</compatibility-matrix>\n";
 
     CompatibilityMatrix cm;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     const auto& kernels = getKernels(cm);
     ASSERT_GE(kernels.size(), 2u);
     ASSERT_TRUE(kernels[0].conditions().empty());
@@ -1714,7 +1708,7 @@ TEST_F(LibVintfTest, KernelConfigConditionTest) {
     EXPECT_EQ(KernelConfigTypedValue(Tristate::YES), cond.begin()->second);
     EXPECT_FALSE(kernel.configs().empty());
 
-    EXPECT_EQ(xml, gCompatibilityMatrixConverter(cm));
+    EXPECT_EQ(xml, toXml(cm));
 }
 
 TEST_F(LibVintfTest, KernelConfigConditionEmptyTest) {
@@ -1733,7 +1727,7 @@ TEST_F(LibVintfTest, KernelConfigConditionEmptyTest) {
         "</compatibility-matrix>\n";
 
     CompatibilityMatrix cm;
-    EXPECT_FALSE(gCompatibilityMatrixConverter(&cm, xml, &error))
+    EXPECT_FALSE(fromXml(&cm, xml, &error))
         << "Should not accept first kernel version with non-empty conditions";
     EXPECT_EQ(
         "First <kernel> for version 3.18 must have empty <conditions> "
@@ -1767,7 +1761,7 @@ TEST_F(LibVintfTest, KernelConfigConditionMatch) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
 
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_TRUE(runtime.checkCompatibility(cm, &error)) << error;
 
     xml =
@@ -1791,7 +1785,7 @@ TEST_F(LibVintfTest, KernelConfigConditionMatch) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
 
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_FALSE(runtime.checkCompatibility(cm, &error))
         << "conditions met, so CONFIG_ARCH_MMAP_RND_BITS should not match";
 
@@ -1816,7 +1810,7 @@ TEST_F(LibVintfTest, KernelConfigConditionMatch) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
 
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_TRUE(runtime.checkCompatibility(cm, &error)) << error;
     xml =
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\">\n"
@@ -1843,7 +1837,7 @@ TEST_F(LibVintfTest, KernelConfigConditionMatch) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
 
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_TRUE(runtime.checkCompatibility(cm, &error));
 
     xml =
@@ -1871,7 +1865,7 @@ TEST_F(LibVintfTest, KernelConfigConditionMatch) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
 
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_FALSE(runtime.checkCompatibility(cm, &error))
         << "conditions have 'and' relationship, so CONFIG_ILLEGAL_POINTER_VALUE should not match";
 
@@ -1900,7 +1894,7 @@ TEST_F(LibVintfTest, KernelConfigConditionMatch) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
 
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_TRUE(runtime.checkCompatibility(cm, &error)) << error;
 
     xml =
@@ -1941,7 +1935,7 @@ TEST_F(LibVintfTest, KernelConfigConditionMatch) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
 
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_TRUE(runtime.checkCompatibility(cm, &error)) << error;
 
     xml =
@@ -1982,7 +1976,7 @@ TEST_F(LibVintfTest, KernelConfigConditionMatch) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
 
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_FALSE(runtime.checkCompatibility(cm, &error)) << "all fragments should be used.";
 
     xml =
@@ -2023,7 +2017,7 @@ TEST_F(LibVintfTest, KernelConfigConditionMatch) {
         "    <avb><vbmeta-version>2.1</vbmeta-version></avb>\n"
         "</compatibility-matrix>\n";
 
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_FALSE(runtime.checkCompatibility(cm, &error)) << "all fragments should be used";
 }
 
@@ -2059,15 +2053,15 @@ TEST_F(LibVintfTest, MatrixLevel) {
     std::string xml;
 
     xml = "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\"/>";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_EQ(Level::UNSPECIFIED, cm.level());
 
     xml = "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"legacy\"/>";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_EQ(Level::LEGACY, cm.level());
 
     xml = "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\"/>";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
     EXPECT_EQ(1u, cm.level());
 }
 
@@ -2077,15 +2071,15 @@ TEST_F(LibVintfTest, ManifestLevel) {
     std::string xml;
 
     xml = "<manifest " + kMetaVersionStr + " type=\"device\"/>";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
     EXPECT_EQ(Level::UNSPECIFIED, manifest.level());
 
     xml = "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"legacy\"/>";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
     EXPECT_EQ(Level::LEGACY, manifest.level());
 
     xml = "<manifest " + kMetaVersionStr + " type=\"device\" target-level=\"1\"/>";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
     EXPECT_EQ(1u, manifest.level());
 }
 
@@ -2096,7 +2090,7 @@ TEST_F(LibVintfTest, AddOptionalHal) {
     std::string xml;
 
     xml = "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\"/>";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm1, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm1, xml, &error)) << error;
 
     xml =
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
@@ -2109,10 +2103,10 @@ TEST_F(LibVintfTest, AddOptionalHal) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm2, xml, &error)) << error;
 
     EXPECT_TRUE(addAllHalsAsOptional(&cm1, &cm2, &error)) << error;
-    xml = gCompatibilityMatrixConverter(cm1, SerializeFlags::HALS_ONLY);
+    xml = toXml(cm1, SerializeFlags::HALS_ONLY);
     EXPECT_EQ(xml,
               "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
               "    <hal format=\"hidl\" optional=\"true\">\n"
@@ -2143,7 +2137,7 @@ TEST_F(LibVintfTest, AddOptionalHalMinorVersion) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm1, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm1, xml, &error)) << error;
 
     xml =
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
@@ -2156,10 +2150,10 @@ TEST_F(LibVintfTest, AddOptionalHalMinorVersion) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm2, xml, &error)) << error;
 
     EXPECT_TRUE(addAllHalsAsOptional(&cm1, &cm2, &error)) << error;
-    xml = gCompatibilityMatrixConverter(cm1, SerializeFlags::HALS_ONLY);
+    xml = toXml(cm1, SerializeFlags::HALS_ONLY);
     EXPECT_EQ(xml,
               "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
               "    <hal format=\"hidl\" optional=\"false\">\n"
@@ -2190,7 +2184,7 @@ TEST_F(LibVintfTest, AddOptionalHalMajorVersion) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm1, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm1, xml, &error)) << error;
 
     xml =
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
@@ -2204,10 +2198,10 @@ TEST_F(LibVintfTest, AddOptionalHalMajorVersion) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm2, xml, &error)) << error;
 
     EXPECT_TRUE(addAllHalsAsOptional(&cm1, &cm2, &error)) << error;
-    xml = gCompatibilityMatrixConverter(cm1, SerializeFlags::HALS_ONLY);
+    xml = toXml(cm1, SerializeFlags::HALS_ONLY);
     EXPECT_EQ(xml,
               "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
               "    <hal format=\"hidl\" optional=\"false\">\n"
@@ -2239,7 +2233,7 @@ TEST_F(LibVintfTest, AddOptionalHalMinorVersionDiffInstance) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm1, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm1, xml, &error)) << error;
 
     xml =
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
@@ -2252,10 +2246,10 @@ TEST_F(LibVintfTest, AddOptionalHalMinorVersionDiffInstance) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm2, xml, &error)) << error;
 
     EXPECT_TRUE(addAllHalsAsOptional(&cm1, &cm2, &error)) << error;
-    xml = gCompatibilityMatrixConverter(cm1, SerializeFlags::HALS_ONLY);
+    xml = toXml(cm1, SerializeFlags::HALS_ONLY);
     EXPECT_EQ(xml,
               "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
               "    <hal format=\"hidl\" optional=\"false\">\n"
@@ -2294,7 +2288,7 @@ TEST_F(LibVintfTest, AddRequiredHalOverlapInstance) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm1, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm1, xml, &error)) << error;
 
     {
         // Test that 2.0 should be added to IFoo/default, so 1.0::IFoo/custom
@@ -2311,11 +2305,11 @@ TEST_F(LibVintfTest, AddRequiredHalOverlapInstance) {
             "        </interface>\n"
             "    </hal>\n"
             "</compatibility-matrix>\n";
-        EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml, &error)) << error;
+        EXPECT_TRUE(fromXml(&cm2, xml, &error)) << error;
 
         EXPECT_TRUE(addAllHalsAsOptional(&cm1, &cm2, &error)) << error;
 
-        xml = gCompatibilityMatrixConverter(cm1, SerializeFlags::HALS_ONLY);
+        xml = toXml(cm1, SerializeFlags::HALS_ONLY);
         EXPECT_EQ(xml,
                   "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
                   "    <hal format=\"hidl\" optional=\"false\">\n"
@@ -2353,11 +2347,11 @@ TEST_F(LibVintfTest, AddRequiredHalOverlapInstance) {
             "        </interface>\n"
             "    </hal>\n"
             "</compatibility-matrix>\n";
-        EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml, &error)) << error;
+        EXPECT_TRUE(fromXml(&cm2, xml, &error)) << error;
 
         EXPECT_TRUE(addAllHalsAsOptional(&cm1, &cm2, &error)) << error;
 
-        xml = gCompatibilityMatrixConverter(cm1, SerializeFlags::HALS_ONLY);
+        xml = toXml(cm1, SerializeFlags::HALS_ONLY);
         EXPECT_EQ(xml,
                   "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
                   "    <hal format=\"hidl\" optional=\"false\">\n"
@@ -2414,7 +2408,7 @@ TEST_F(LibVintfTest, AddRequiredHalOverlapInstanceSplit) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm1, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm1, xml, &error)) << error;
 
     xml =
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
@@ -2435,10 +2429,10 @@ TEST_F(LibVintfTest, AddRequiredHalOverlapInstanceSplit) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm2, xml, &error)) << error;
 
     EXPECT_TRUE(addAllHalsAsOptional(&cm1, &cm2, &error)) << error;
-    xml = gCompatibilityMatrixConverter(cm1, SerializeFlags::HALS_ONLY);
+    xml = toXml(cm1, SerializeFlags::HALS_ONLY);
     EXPECT_EQ(
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <hal format=\"hidl\" optional=\"false\">\n"
@@ -2483,7 +2477,7 @@ TEST_F(LibVintfTest, AddOptionalXmlFile) {
         "        <path>/foo/bar/baz.xsd</path>\n"
         "    </xmlfile>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm1, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm1, xml, &error)) << error;
 
     xml =
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
@@ -2493,10 +2487,10 @@ TEST_F(LibVintfTest, AddOptionalXmlFile) {
         "        <path>/foo/bar/quux.xsd</path>\n"
         "    </xmlfile>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm2, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm2, xml, &error)) << error;
 
     EXPECT_TRUE(addAllXmlFilesAsOptional(&cm1, &cm2, &error)) << error;
-    xml = gCompatibilityMatrixConverter(cm1, SerializeFlags::XMLFILES_ONLY);
+    xml = toXml(cm1, SerializeFlags::XMLFILES_ONLY);
     EXPECT_EQ(xml,
               "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
               "    <xmlfile format=\"xsd\" optional=\"true\">\n"
@@ -2525,8 +2519,8 @@ TEST_F(LibVintfTest, VendorNdk) {
         "        <library>libjpeg.so</library>\n"
         "    </vendor-ndk>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
-    EXPECT_EQ(xml, gCompatibilityMatrixConverter(cm));
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
+    EXPECT_EQ(xml, toXml(cm));
 
     EXPECT_EQ("P", cm.getVendorNdkVersion());
 
@@ -2547,8 +2541,8 @@ TEST_F(LibVintfTest, VendorNdk) {
             "    </vendor-ndk>\n"
             "</manifest>\n";
 
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
-        EXPECT_EQ(xml, gHalManifestConverter(manifest));
+        EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+        EXPECT_EQ(xml, toXml(manifest));
         EXPECT_TRUE(manifest.checkCompatibility(cm, &error)) << error;
     }
 
@@ -2563,8 +2557,8 @@ TEST_F(LibVintfTest, VendorNdk) {
             "    </vendor-ndk>\n"
             "</manifest>\n";
 
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
-        EXPECT_EQ(xml, gHalManifestConverter(manifest));
+        EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+        EXPECT_EQ(xml, toXml(manifest));
         EXPECT_FALSE(manifest.checkCompatibility(cm, &error));
         EXPECT_IN("Vndk version P is not supported.", error);
     }
@@ -2579,8 +2573,8 @@ TEST_F(LibVintfTest, VendorNdk) {
             "    </vendor-ndk>\n"
             "</manifest>\n";
 
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
-        EXPECT_EQ(xml, gHalManifestConverter(manifest));
+        EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+        EXPECT_EQ(xml, toXml(manifest));
         EXPECT_FALSE(manifest.checkCompatibility(cm, &error));
         EXPECT_IN("Vndk libs incompatible for version P.", error);
         EXPECT_IN("libjpeg.so", error);
@@ -2593,12 +2587,12 @@ TEST_F(LibVintfTest, MissingVendorNdkInMatrix) {
     std::string error;
 
     xml = "<compatibility-matrix " + kMetaVersionStr + " type=\"device\"/>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
 
     {
         HalManifest manifest;
         xml = "<manifest " + kMetaVersionStr + " type=\"framework\"/>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
         EXPECT_TRUE(manifest.checkCompatibility(cm, &error)) << error;
     }
@@ -2612,7 +2606,7 @@ TEST_F(LibVintfTest, MissingVendorNdkInMatrix) {
             "        <library>libbase.so</library>\n"
             "    </vendor-ndk>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
         EXPECT_TRUE(manifest.checkCompatibility(cm, &error)) << error;
     }
@@ -2631,7 +2625,7 @@ TEST_F(LibVintfTest, DuplicatedVendorNdkVersion) {
         "    </vendor-ndk>\n"
         "</manifest>\n";
 
-    EXPECT_FALSE(gHalManifestConverter(&manifest, xml, &error));
+    EXPECT_FALSE(fromXml(&manifest, xml, &error));
     EXPECT_EQ("Duplicated manifest.vendor-ndk.version 27", error);
 }
 
@@ -2651,7 +2645,7 @@ TEST_F(LibVintfTest, ManifestHalOverride) {
         "        <version>1.0</version>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
     const auto& foo = getHals(manifest, "android.hardware.foo");
     ASSERT_FALSE(foo.empty());
     EXPECT_TRUE(foo.front()->isOverride());
@@ -2665,7 +2659,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalSimple) {
     std::string error;
     HalManifest manifest;
     std::string xml = "<manifest " + kMetaVersionStr + " type=\"device\"/>\n";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
     HalManifest newManifest;
     xml =
@@ -2680,10 +2674,10 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalSimple) {
         "        </interface>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_TRUE(gHalManifestConverter(&newManifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&newManifest, xml, &error)) << error;
 
     manifest.addAllHals(&newManifest);
-    EXPECT_EQ(xml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+    EXPECT_EQ(xml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
 }
 
 TEST_F(LibVintfTest, ManifestAddOverrideHalSimpleOverride) {
@@ -2697,7 +2691,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalSimpleOverride) {
         "        <version>1.0</version>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
     HalManifest newManifest;
     xml =
@@ -2712,10 +2706,10 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalSimpleOverride) {
         "        </interface>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_TRUE(gHalManifestConverter(&newManifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&newManifest, xml, &error)) << error;
 
     manifest.addAllHals(&newManifest);
-    EXPECT_EQ(xml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+    EXPECT_EQ(xml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
 }
 
 // Existing major versions should be removed.
@@ -2740,7 +2734,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalMultiVersion) {
         "        <version>1.3</version>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
     HalManifest newManifest;
     xml =
@@ -2756,7 +2750,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalMultiVersion) {
         "        </interface>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_TRUE(gHalManifestConverter(&newManifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&newManifest, xml, &error)) << error;
 
     manifest.addAllHals(&newManifest);
     EXPECT_EQ(
@@ -2786,7 +2780,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalMultiVersion) {
         "        </interface>\n"
         "    </hal>\n"
         "</manifest>\n",
-        gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
 }
 
 TEST_F(LibVintfTest, ManifestAddOverrideHalMultiVersion2) {
@@ -2805,7 +2799,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalMultiVersion2) {
         "        </interface>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
     HalManifest newManifest;
     xml =
@@ -2822,10 +2816,10 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalMultiVersion2) {
         "    </hal>\n"
         "</manifest>\n";
 
-    EXPECT_TRUE(gHalManifestConverter(&newManifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&newManifest, xml, &error)) << error;
 
     manifest.addAllHals(&newManifest);
-    EXPECT_EQ(xml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+    EXPECT_EQ(xml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
 }
 
 // if no <versions>, remove all existing <hal> with given <name>.
@@ -2860,7 +2854,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalRemoveAll) {
         "        <version>1.3</version>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
     HalManifest newManifest;
     xml =
@@ -2871,7 +2865,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalRemoveAll) {
         "    </hal>\n"
         "</manifest>\n";
 
-    EXPECT_TRUE(gHalManifestConverter(&newManifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&newManifest, xml, &error)) << error;
 
     manifest.addAllHals(&newManifest);
     EXPECT_EQ(
@@ -2886,7 +2880,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalRemoveAll) {
         "        <transport>hwbinder</transport>\n"
         "    </hal>\n"
         "</manifest>\n",
-        gHalManifestConverter(manifest, SerializeFlags::HALS_ONLY));
+        toXml(manifest, SerializeFlags::HALS_ONLY));
 }
 
 // Make sure missing tags in old VINTF files does not cause incompatibilities.
@@ -2897,10 +2891,10 @@ TEST_F(LibVintfTest, Empty) {
     std::string error;
 
     xml = "<compatibility-matrix " + kMetaVersionStr + " type=\"device\"/>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
 
     xml = "<manifest " + kMetaVersionStr + " type=\"framework\"/>\n";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
     EXPECT_TRUE(manifest.checkCompatibility(cm, &error)) << error;
 }
@@ -2919,8 +2913,8 @@ TEST_F(LibVintfTest, ParsingUpdatableHals) {
         "        </interface>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-    EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+    EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+    EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
 }
 
 TEST_F(LibVintfTest, SystemSdk) {
@@ -2935,8 +2929,8 @@ TEST_F(LibVintfTest, SystemSdk) {
         "        <version>P</version>\n"
         "    </system-sdk>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
-    EXPECT_EQ(xml, gCompatibilityMatrixConverter(cm, SerializeFlags::SSDK_ONLY));
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
+    EXPECT_EQ(xml, toXml(cm, SerializeFlags::SSDK_ONLY));
 
     {
         HalManifest manifest;
@@ -2947,8 +2941,8 @@ TEST_F(LibVintfTest, SystemSdk) {
             "        <version>P</version>\n"
             "    </system-sdk>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
-        EXPECT_EQ(xml, gHalManifestConverter(manifest, SerializeFlags::SSDK_ONLY));
+        EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+        EXPECT_EQ(xml, toXml(manifest, SerializeFlags::SSDK_ONLY));
 
         EXPECT_TRUE(manifest.checkCompatibility(cm, &error)) << error;
     }
@@ -2963,7 +2957,7 @@ TEST_F(LibVintfTest, SystemSdk) {
             "        <version>P</version>\n"
             "    </system-sdk>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
         EXPECT_TRUE(manifest.checkCompatibility(cm, &error));
     }
 
@@ -2975,7 +2969,7 @@ TEST_F(LibVintfTest, SystemSdk) {
             "        <version>1</version>\n"
             "    </system-sdk>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+        EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(cm, &error));
         EXPECT_TRUE(error.find("System SDK") != std::string::npos) << error;
     }
@@ -2984,22 +2978,22 @@ TEST_F(LibVintfTest, SystemSdk) {
 TEST_F(LibVintfTest, ManifestEmpty) {
     std::string error;
     HalManifest e;
-    EXPECT_FALSE(gHalManifestConverter(&e, "<manifest/>", &error));
+    EXPECT_FALSE(fromXml(&e, "<manifest/>", &error));
     EXPECT_NE("Not a valid XML", error);
 
     std::string prevError = error;
-    EXPECT_FALSE(gHalManifestConverter(&e, "", &error));
+    EXPECT_FALSE(fromXml(&e, "", &error));
     EXPECT_EQ("Not a valid XML", error);
 }
 
 TEST_F(LibVintfTest, MatrixEmpty) {
     std::string error;
     CompatibilityMatrix e;
-    EXPECT_FALSE(gCompatibilityMatrixConverter(&e, "<compatibility-matrix/>", &error));
+    EXPECT_FALSE(fromXml(&e, "<compatibility-matrix/>", &error));
     EXPECT_NE("Not a valid XML", error);
 
     std::string prevError = error;
-    EXPECT_FALSE(gCompatibilityMatrixConverter(&e, "", &error));
+    EXPECT_FALSE(fromXml(&e, "", &error));
     EXPECT_EQ("Not a valid XML", error);
 }
 
@@ -3020,7 +3014,7 @@ TEST_F(LibVintfTest, MatrixDetailErrorMsg) {
         "        </interface>\n"
         "    </hal>\n"
         "</manifest>\n";
-    ASSERT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
     {
         CompatibilityMatrix cm;
@@ -3041,7 +3035,7 @@ TEST_F(LibVintfTest, MatrixDetailErrorMsg) {
             "        </interface>\n"
             "    </hal>\n"
             "</compatibility-matrix>\n";
-        EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+        EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(cm, &error));
         EXPECT_IN("Manifest level = 103", error)
         EXPECT_IN("Matrix level = 100", error)
@@ -3068,7 +3062,7 @@ TEST_F(LibVintfTest, MatrixDetailErrorMsg) {
             "        </interface>\n"
             "    </hal>\n"
             "</compatibility-matrix>\n";
-        EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+        EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(cm, &error));
         EXPECT_IN(
             "android.hardware.foo:\n"
@@ -3091,7 +3085,7 @@ TEST_F(LibVintfTest, MatrixDetailErrorMsg) {
             "        </interface>\n"
             "    </hal>\n"
             "</compatibility-matrix>\n";
-        EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+        EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(cm, &error));
         EXPECT_IN(
             "android.hardware.foo:\n"
@@ -3122,7 +3116,7 @@ TEST_F(LibVintfTest, DisabledHal) {
         "        <transport>hwbinder</transport>\n"
         "    </hal>\n"
         "</manifest>\n";
-    ASSERT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
     auto foo = getHals(manifest, "android.hardware.foo");
     ASSERT_EQ(1u, foo.size());
@@ -3159,7 +3153,7 @@ TEST_F(LibVintfTest, FqNameValid) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&cm, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
 
     {
         HalManifest manifest;
@@ -3177,7 +3171,7 @@ TEST_F(LibVintfTest, FqNameValid) {
             "        <fqname>@1.1::IFoo/custom</fqname>\n"
             "    </hal>\n"
             "</manifest>\n";
-        ASSERT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+        ASSERT_TRUE(fromXml(&manifest, xml, &error)) << error;
         EXPECT_TRUE(manifest.checkCompatibility(cm, &error)) << error;
 
         EXPECT_EQ(Transport::HWBINDER,
@@ -3195,7 +3189,7 @@ TEST_F(LibVintfTest, FqNameValid) {
             "        <fqname>@1.1::IFoo/custom</fqname>\n"
             "    </hal>\n"
             "</manifest>\n";
-        ASSERT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+        ASSERT_TRUE(fromXml(&manifest, xml, &error)) << error;
         EXPECT_TRUE(manifest.checkCompatibility(cm, &error)) << error;
     }
 
@@ -3214,7 +3208,7 @@ TEST_F(LibVintfTest, FqNameValid) {
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
-        ASSERT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+        ASSERT_TRUE(fromXml(&manifest, xml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(cm, &error));
         EXPECT_IN(
             "android.hardware.foo:\n"
@@ -3236,7 +3230,7 @@ TEST_F(LibVintfTest, FqNameValid) {
             "        <fqname>@1.0::IFoo/custom</fqname>\n"
             "    </hal>\n"
             "</manifest>\n";
-        ASSERT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+        ASSERT_TRUE(fromXml(&manifest, xml, &error)) << error;
     }
 }
 
@@ -3250,14 +3244,14 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>@1.1::IFoo/custom</fqname>\n"
         "</hal>\n";
-    EXPECT_TRUE(gManifestHalConverter(&hal, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&hal, xml, &error)) << error;
     xml =
         "<hal format=\"hidl\">\n"
         "    <name>android.hardware.foo</name>\n"
         "    <transport>hwbinder</transport>\n"
         "    <fqname>1.1::IFoo/custom</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Could not parse text \"1.1::IFoo/custom\" in element <fqname>", error);
     xml =
         "<hal format=\"hidl\">\n"
@@ -3265,7 +3259,7 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>android.hardware.foo@1.1::IFoo/custom</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Should not specify package", error);
     xml =
         "<hal format=\"hidl\">\n"
@@ -3273,7 +3267,7 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>IFoo/custom</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Should specify version", error);
     xml =
         "<hal format=\"hidl\">\n"
@@ -3281,7 +3275,7 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>@1.0::IFoo</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Should specify instance", error);
     xml =
         "<hal format=\"hidl\">\n"
@@ -3289,7 +3283,7 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <transport>hwbinder</transport>\n"
         "    <fqname>@1.0::IFoo/custom</fqname>\n"
         "</hal>\n";
-    ASSERT_FALSE(gManifestHalConverter(&hal, xml, &error));
+    ASSERT_FALSE(fromXml(&hal, xml, &error));
     EXPECT_IN("Cannot create FqInstance", error);
     EXPECT_IN("n07 4 v4l1d 1n73rf4c3", error);
 }
@@ -3311,7 +3305,7 @@ TEST_F(LibVintfTest, RegexInstanceValid) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&matrix, xml, &error)) << error;
 }
 
 TEST_F(LibVintfTest, RegexInstanceInvalid) {
@@ -3332,7 +3326,7 @@ TEST_F(LibVintfTest, RegexInstanceInvalid) {
         "        </interface>\n"
         "    </hal>\n"
         "</compatibility-matrix>\n";
-    EXPECT_FALSE(gCompatibilityMatrixConverter(&matrix, xml, &error));
+    EXPECT_FALSE(fromXml(&matrix, xml, &error));
     EXPECT_IN("Invalid regular expression 'e{1,2,3}'", error);
     EXPECT_IN("Invalid regular expression '*'", error);
     EXPECT_IN("Invalid regular expression '+'", error);
@@ -3360,7 +3354,7 @@ TEST_F(LibVintfTest, RegexInstanceCompat) {
         "        <sepolicy-version>0.0</sepolicy-version>\n"
         "    </sepolicy>\n"
         "</compatibility-matrix>\n";
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml, &error)) << error;
+    EXPECT_TRUE(fromXml(&matrix, matrixXml, &error)) << error;
 
     {
         std::string xml =
@@ -3379,7 +3373,7 @@ TEST_F(LibVintfTest, RegexInstanceCompat) {
             "</manifest>\n";
 
         HalManifest manifest;
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml));
+        EXPECT_TRUE(fromXml(&manifest, xml));
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
 
         auto unused = checkUnusedHals(manifest, matrix);
@@ -3405,7 +3399,7 @@ TEST_F(LibVintfTest, RegexInstanceCompat) {
             "</manifest>\n";
 
         HalManifest manifest;
-        EXPECT_TRUE(gHalManifestConverter(&manifest, xml));
+        EXPECT_TRUE(fromXml(&manifest, xml));
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "Should not be compatible because no legacy/[0-9]+ is provided.";
 
@@ -3463,7 +3457,7 @@ TEST_F(LibVintfTest, KernelInfo) {
         "        <value>0xdead000000000000</value>\n"
         "    </config>\n"
         "</kernel>\n",
-        gKernelInfoConverter(ki, SerializeFlags::NO_TAGS.enableKernelConfigs()));
+        toXml(ki, SerializeFlags::NO_TAGS.enableKernelConfigs()));
 }
 
 TEST_F(LibVintfTest, ManifestAddAllDeviceManifest) {
@@ -3492,13 +3486,13 @@ TEST_F(LibVintfTest, ManifestAddAllDeviceManifest) {
 
     std::string error;
     HalManifest manifest1;
-    ASSERT_TRUE(gHalManifestConverter(&manifest1, xml1, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest1, xml1, &error)) << error;
     HalManifest manifest2;
-    ASSERT_TRUE(gHalManifestConverter(&manifest2, xml2, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest2, xml2, &error)) << error;
 
     ASSERT_TRUE(manifest1.addAll(&manifest2, &error)) << error;
 
-    EXPECT_EQ(xml2, gHalManifestConverter(manifest1));
+    EXPECT_EQ(xml2, toXml(manifest1));
 }
 
 TEST_F(LibVintfTest, ManifestAddAllFrameworkManifest) {
@@ -3525,13 +3519,13 @@ TEST_F(LibVintfTest, ManifestAddAllFrameworkManifest) {
 
     std::string error;
     HalManifest manifest1;
-    ASSERT_TRUE(gHalManifestConverter(&manifest1, xml1, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest1, xml1, &error)) << error;
     HalManifest manifest2;
-    ASSERT_TRUE(gHalManifestConverter(&manifest2, xml2, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest2, xml2, &error)) << error;
 
     ASSERT_TRUE(manifest1.addAll(&manifest2, &error)) << error;
 
-    EXPECT_EQ(xml2, gHalManifestConverter(manifest1));
+    EXPECT_EQ(xml2, toXml(manifest1));
 }
 
 TEST_F(LibVintfTest, ManifestAddAllConflictMajorVersion) {
@@ -3555,10 +3549,10 @@ TEST_F(LibVintfTest, ManifestAddAllConflictMajorVersion) {
     std::string error;
     HalManifest manifest1;
     manifest1.setFileName("1.xml");
-    ASSERT_TRUE(gHalManifestConverter(&manifest1, xml1, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest1, xml1, &error)) << error;
     HalManifest manifest2;
     manifest2.setFileName("2.xml");
-    ASSERT_TRUE(gHalManifestConverter(&manifest2, xml2, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest2, xml2, &error)) << error;
 
     ASSERT_FALSE(manifest1.addAll(&manifest2, &error));
 
@@ -3573,9 +3567,9 @@ TEST_F(LibVintfTest, ManifestAddAllConflictLevel) {
 
     std::string error;
     HalManifest manifest1;
-    ASSERT_TRUE(gHalManifestConverter(&manifest1, xml1, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest1, xml1, &error)) << error;
     HalManifest manifest2;
-    ASSERT_TRUE(gHalManifestConverter(&manifest2, xml2, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest2, xml2, &error)) << error;
 
     ASSERT_FALSE(manifest1.addAll(&manifest2, &error));
     EXPECT_IN("Conflicting target-level", error);
@@ -3597,9 +3591,9 @@ TEST_F(LibVintfTest, ManifestAddAllConflictSepolicy) {
 
     std::string error;
     HalManifest manifest1;
-    ASSERT_TRUE(gHalManifestConverter(&manifest1, xml1, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest1, xml1, &error)) << error;
     HalManifest manifest2;
-    ASSERT_TRUE(gHalManifestConverter(&manifest2, xml2, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest2, xml2, &error)) << error;
 
     ASSERT_FALSE(manifest1.addAll(&manifest2, &error));
     EXPECT_IN("Conflicting sepolicy version", error);
@@ -3617,9 +3611,9 @@ TEST_F(LibVintfTest, ManifestAddAllConflictKernel) {
 
     std::string error;
     HalManifest manifest1;
-    ASSERT_TRUE(gHalManifestConverter(&manifest1, xml1, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest1, xml1, &error)) << error;
     HalManifest manifest2;
-    ASSERT_TRUE(gHalManifestConverter(&manifest2, xml2, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest2, xml2, &error)) << error;
 
     ASSERT_FALSE(manifest1.addAll(&manifest2, &error));
     EXPECT_IN("Conflicting kernel", error);
@@ -3629,14 +3623,14 @@ TEST_F(LibVintfTest, ManifestMetaVersionCompat) {
     std::string xml = "<manifest version=\"2.0\" type=\"device\" />";
     std::string error;
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
 }
 
 TEST_F(LibVintfTest, ManifestMetaVersionIncompat) {
     std::string xml = "<manifest version=\"10000.0\" type=\"device\" />";
     std::string error;
     HalManifest manifest;
-    EXPECT_FALSE(gHalManifestConverter(&manifest, xml, &error))
+    EXPECT_FALSE(fromXml(&manifest, xml, &error))
         << "Should not parse metaversion 10000.0";
 }
 
@@ -3644,22 +3638,22 @@ TEST_F(LibVintfTest, ManifestMetaVersionWriteLatest) {
     std::string xml = "<manifest version=\"1.0\" type=\"device\" />";
     std::string error;
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
-    EXPECT_IN(kMetaVersionStr, gHalManifestConverter(manifest, SerializeFlags::NO_TAGS));
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+    EXPECT_IN(kMetaVersionStr, toXml(manifest, SerializeFlags::NO_TAGS));
 }
 
 TEST_F(LibVintfTest, MatrixMetaVersionCompat) {
     std::string xml = "<compatibility-matrix version=\"2.0\" type=\"framework\" />";
     std::string error;
     CompatibilityMatrix matrix;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&matrix, xml, &error)) << error;
 }
 
 TEST_F(LibVintfTest, MatrixMetaVersionIncompat) {
     std::string xml = "<compatibility-matrix version=\"10000.0\" type=\"framework\" />";
     std::string error;
     CompatibilityMatrix matrix;
-    EXPECT_FALSE(gCompatibilityMatrixConverter(&matrix, xml, &error))
+    EXPECT_FALSE(fromXml(&matrix, xml, &error))
         << "Should not parse metaversion 10000.0";
 }
 
@@ -3667,8 +3661,8 @@ TEST_F(LibVintfTest, MatrixMetaVersionWriteLatest) {
     std::string xml = "<compatibility-matrix version=\"1.0\" type=\"framework\" />";
     std::string error;
     CompatibilityMatrix matrix;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << error;
-    EXPECT_IN(kMetaVersionStr, gCompatibilityMatrixConverter(matrix, SerializeFlags::NO_TAGS));
+    EXPECT_TRUE(fromXml(&matrix, xml, &error)) << error;
+    EXPECT_IN(kMetaVersionStr, toXml(matrix, SerializeFlags::NO_TAGS));
 }
 
 TEST_F(LibVintfTest, Aidl) {
@@ -3685,8 +3679,8 @@ TEST_F(LibVintfTest, Aidl) {
         "</compatibility-matrix>\n";
     std::string error;
     CompatibilityMatrix matrix;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << error;
-    EXPECT_EQ(xml, gCompatibilityMatrixConverter(matrix, SerializeFlags::HALS_NO_FQNAME));
+    EXPECT_TRUE(fromXml(&matrix, xml, &error)) << error;
+    EXPECT_EQ(xml, toXml(matrix, SerializeFlags::HALS_NO_FQNAME));
 
     {
         HalManifest manifest;
@@ -3701,8 +3695,8 @@ TEST_F(LibVintfTest, Aidl) {
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
@@ -3725,8 +3719,8 @@ TEST_F(LibVintfTest, Aidl) {
             "        <fqname>IFoo/test0</fqname>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_ONLY));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_ONLY));
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
@@ -3752,8 +3746,8 @@ TEST_F(LibVintfTest, Aidl) {
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "Should not be compatible because default instance is missing";
         EXPECT_IN("required: (IFoo/default (@1) AND IFoo/test.* (@1))", error);
@@ -3775,8 +3769,8 @@ TEST_F(LibVintfTest, Aidl) {
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "Should not be compatible because test.* instance is missing";
         EXPECT_IN("required: (IFoo/default (@1) AND IFoo/test.* (@1))", error);
@@ -3808,8 +3802,8 @@ TEST_F(LibVintfTest, AidlAndHidlNamesMatrix) {
         "</compatibility-matrix>\n";
     std::string error;
     CompatibilityMatrix matrix;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << error;
-    EXPECT_EQ(xml, gCompatibilityMatrixConverter(matrix, SerializeFlags::HALS_ONLY));
+    EXPECT_TRUE(fromXml(&matrix, xml, &error)) << error;
+    EXPECT_EQ(xml, toXml(matrix, SerializeFlags::HALS_ONLY));
 }
 
 TEST_F(LibVintfTest, AidlAndHidlNamesManifest) {
@@ -3827,8 +3821,8 @@ TEST_F(LibVintfTest, AidlAndHidlNamesManifest) {
         "</manifest>\n";
     std::string error;
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
-    EXPECT_EQ(xml, gHalManifestConverter(manifest, SerializeFlags::HALS_ONLY));
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+    EXPECT_EQ(xml, toXml(manifest, SerializeFlags::HALS_ONLY));
 }
 
 TEST_F(LibVintfTest, AidlAndHidlCheckUnused) {
@@ -3866,8 +3860,8 @@ TEST_F(LibVintfTest, AidlAndHidlCheckUnused) {
     HalManifest manifest;
     CompatibilityMatrix matrix;
 
-    EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, matrixXml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+    EXPECT_TRUE(fromXml(&matrix, matrixXml, &error)) << error;
     auto unused = checkUnusedHals(manifest, matrix);
     EXPECT_TRUE(unused.empty()) << android::base::Join(unused, "\n");
 }
@@ -3887,8 +3881,8 @@ TEST_F(LibVintfTest, AidlVersion) {
         "</compatibility-matrix>\n";
     std::string error;
     CompatibilityMatrix matrix;
-    EXPECT_TRUE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << error;
-    EXPECT_EQ(xml, gCompatibilityMatrixConverter(matrix, SerializeFlags::HALS_NO_FQNAME));
+    EXPECT_TRUE(fromXml(&matrix, xml, &error)) << error;
+    EXPECT_EQ(xml, toXml(matrix, SerializeFlags::HALS_NO_FQNAME));
 
     {
         std::vector<std::string> matrixInstances;
@@ -3916,8 +3910,8 @@ TEST_F(LibVintfTest, AidlVersion) {
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
@@ -3945,8 +3939,8 @@ TEST_F(LibVintfTest, AidlVersion) {
             "        <fqname>IFoo/test0</fqname>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_ONLY));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_ONLY));
         EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "default"));
         EXPECT_TRUE(manifest.hasAidlInstance("android.system.foo", "IFoo", "test0"));
@@ -3977,8 +3971,8 @@ TEST_F(LibVintfTest, AidlVersion) {
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "Should not be compatible because default instance is missing";
         EXPECT_IN("required: (IFoo/default (@4-100) AND IFoo/test.* (@4-100))", error);
@@ -4002,8 +3996,8 @@ TEST_F(LibVintfTest, AidlVersion) {
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "Should not be compatible because test.* instance is missing";
         EXPECT_IN("required: (IFoo/default (@4-100) AND IFoo/test.* (@4-100))", error);
@@ -4027,8 +4021,8 @@ TEST_F(LibVintfTest, AidlVersion) {
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "Should not be compatible because version 3 cannot satisfy version 4-100";
         EXPECT_IN("required: (IFoo/default (@4-100) AND IFoo/test.* (@4-100))", error);
@@ -4053,8 +4047,8 @@ TEST_F(LibVintfTest, AidlVersion) {
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
-        EXPECT_TRUE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
-        EXPECT_EQ(manifestXml, gHalManifestConverter(manifest, SerializeFlags::HALS_NO_FQNAME));
+        EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+        EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
         EXPECT_FALSE(manifest.checkCompatibility(matrix, &error))
             << "Should not be compatible because version 3 cannot satisfy version 4-100";
         EXPECT_IN("required: (IFoo/default (@4-100) AND IFoo/test.* (@4-100))", error);
@@ -4075,7 +4069,7 @@ TEST_F(LibVintfTest, AidlFqnameNoVersion) {
         "        <fqname>@1.0::IFoo/default</fqname>\n"
         "    </hal>\n"
         "</manifest>\n";
-    EXPECT_FALSE(gHalManifestConverter(&manifest, manifestXml, &error)) << error;
+    EXPECT_FALSE(fromXml(&manifest, manifestXml, &error)) << error;
     EXPECT_IN("Should not specify version in <fqname> for AIDL HAL: \"@1.0::IFoo/default\"", error);
 }
 
@@ -4090,7 +4084,7 @@ TEST_F(LibVintfTest, GetTransportHidlHalWithFakeAidlVersion) {
         "</manifest>\n";
     std::string error;
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
     EXPECT_EQ(Transport::HWBINDER,
               manifest.getHidlTransport("android.system.foo", details::kDefaultAidlVersion, "IFoo",
                                         "default"));
@@ -4109,7 +4103,7 @@ TEST_F(LibVintfTest, GetTransportAidlHalWithDummyTransport) {
         "</manifest>\n";
     std::string error;
     HalManifest manifest;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
     EXPECT_EQ(Transport::EMPTY,
               manifest.getHidlTransport("android.system.foo", details::kDefaultAidlVersion, "IFoo",
                                         "default"));
@@ -4125,7 +4119,7 @@ TEST_F(LibVintfTest, AidlGetHalNamesAndVersions) {
         "    </hal>\n"
         "</manifest>\n";
     std::string error;
-    EXPECT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
     auto names = manifest.getHalNamesAndVersions();
     ASSERT_EQ(1u, names.size());
     EXPECT_EQ("android.system.foo", *names.begin());
@@ -4148,10 +4142,10 @@ TEST_F(LibVintfTest, ManifestAddAidl) {
     std::string error;
     HalManifest manifest1;
     manifest1.setFileName("1.xml");
-    ASSERT_TRUE(gHalManifestConverter(&manifest1, xml1, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest1, xml1, &error)) << error;
     HalManifest manifest2;
     manifest2.setFileName("2.xml");
-    ASSERT_TRUE(gHalManifestConverter(&manifest2, xml2, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest2, xml2, &error)) << error;
 
     ASSERT_TRUE(manifest1.addAll(&manifest2, &error)) << error;
 }
@@ -4160,9 +4154,9 @@ TEST_F(LibVintfTest, KernelInfoLevel) {
     std::string error;
     std::string xml = "<kernel version=\"3.18.31\" target-level=\"1\"/>\n";
     KernelInfo ki;
-    ASSERT_TRUE(gKernelInfoConverter(&ki, xml, &error)) << error;
+    ASSERT_TRUE(fromXml(&ki, xml, &error)) << error;
     EXPECT_EQ(Level{1}, getLevel(ki));
-    EXPECT_EQ(xml, gKernelInfoConverter(ki));
+    EXPECT_EQ(xml, toXml(ki));
 }
 
 // Test merge of <kernel target-level=""> with autogenerated <kernel> by parsing
@@ -4185,10 +4179,10 @@ TEST_F(LibVintfTest, HalManifestMergeKernel) {
     std::string error;
     HalManifest manifest1;
     HalManifest manifest2;
-    ASSERT_TRUE(gHalManifestConverter(&manifest1, head + xml1 + tail, &error)) << error;
-    ASSERT_TRUE(gHalManifestConverter(&manifest2, head + xml2 + tail, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest1, head + xml1 + tail, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest2, head + xml2 + tail, &error)) << error;
     ASSERT_TRUE(manifest1.addAll(&manifest2, &error)) << error;
-    std::string merged_xml = gHalManifestConverter(manifest1);
+    std::string merged_xml = toXml(manifest1);
     EXPECT_IN(head, merged_xml);
     EXPECT_IN("target-level=\"2\"", merged_xml);
     EXPECT_IN("version=\"3.18.31\"", merged_xml);
@@ -4216,7 +4210,7 @@ TEST_F(LibVintfTest, FrameworkManifestHalMaxLevel) {
 
     std::string error;
     HalManifest manifest;
-    ASSERT_TRUE(gHalManifestConverter(&manifest, xml, &error)) << error;
+    ASSERT_TRUE(fromXml(&manifest, xml, &error)) << error;
 
     auto hals = getHals(manifest, "android.frameworks.schedulerservice");
     EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMaxLevel, Eq(static_cast<Level>(3)))));
@@ -4280,7 +4274,7 @@ TEST_F(LibVintfTest, HalManifestMissingI) {
                        </manifest>)";
     HalManifest manifest;
     std::string error;
-    ASSERT_FALSE(gHalManifestConverter(&manifest, xml, &error)) << "Should not be valid:\n" << xml;
+    ASSERT_FALSE(fromXml(&manifest, xml, &error)) << "Should not be valid:\n" << xml;
     EXPECT_THAT(error, HasSubstr("Interface 'MyFoo' should have the format I[a-zA-Z0-9_]*"));
 }
 
@@ -4299,7 +4293,7 @@ TEST_F(LibVintfTest, HalManifestInvalidPackage) {
                        </manifest>)";
     HalManifest manifest;
     std::string error;
-    ASSERT_FALSE(gHalManifestConverter(&manifest, xml, &error)) << "Should not be valid:\n" << xml;
+    ASSERT_FALSE(fromXml(&manifest, xml, &error)) << "Should not be valid:\n" << xml;
     EXPECT_THAT(error, HasSubstr("not_a_valid_package!"));
 }
 
@@ -4318,8 +4312,7 @@ TEST_F(LibVintfTest, CompatibilityMatrixMissingI) {
                        </compatibility-matrix>)";
     CompatibilityMatrix matrix;
     std::string error;
-    ASSERT_FALSE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << "Should not be valid:\n"
-                                                                      << xml;
+    ASSERT_FALSE(fromXml(&matrix, xml, &error)) << "Should not be valid:\n" << xml;
     EXPECT_THAT(error, HasSubstr("Interface 'MyFoo' should have the format I[a-zA-Z0-9_]*"));
 }
 
@@ -4338,8 +4331,7 @@ TEST_F(LibVintfTest, CompatibilityMatrixInvalidPackage) {
                        </compatibility-matrix>)";
     CompatibilityMatrix matrix;
     std::string error;
-    ASSERT_FALSE(gCompatibilityMatrixConverter(&matrix, xml, &error)) << "Should not be valid:\n"
-                                                                      << xml;
+    ASSERT_FALSE(fromXml(&matrix, xml, &error)) << "Should not be valid:\n" << xml;
     EXPECT_THAT(error, HasSubstr("not_a_valid_package!"));
 }
 
@@ -4364,14 +4356,14 @@ struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
 
 // Combining framework compatibility matrix with conflicting minlts fails
 TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictMinlts) {
-    ASSERT_TRUE(gCompatibilityMatrixConverter(
+    ASSERT_TRUE(fromXml(
         &matrices[0],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <kernel version=\"3.18.5\" />\n"
         "</compatibility-matrix>\n",
         &error))
         << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(
+    ASSERT_TRUE(fromXml(
         &matrices[1],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <kernel version=\"3.18.6\" />\n"
@@ -4380,7 +4372,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictMinlts) {
         << error;
 
     auto combined = combine(Level{1}, &matrices, &error);
-    ASSERT_EQ(nullptr, combined) << gCompatibilityMatrixConverter(*combined);
+    ASSERT_EQ(nullptr, combined) << toXml(*combined);
     EXPECT_IN("Kernel version mismatch", error);
 }
 
@@ -4407,14 +4399,14 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, KernelNoConditions) {
         "        </config>\n"
         "    </kernel>\n";
 
-    ASSERT_TRUE(gCompatibilityMatrixConverter(
+    ASSERT_TRUE(fromXml(
         &matrices[0],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <kernel version=\"3.18.5\" />\n" +
             conditionedKernel + "</compatibility-matrix>\n",
         &error))
         << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(
+    ASSERT_TRUE(fromXml(
         &matrices[1],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n" + simpleKernel +
             "</compatibility-matrix>\n",
@@ -4426,12 +4418,12 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, KernelNoConditions) {
     EXPECT_EQ("", error);
     EXPECT_EQ("<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n" +
                   simpleKernel + conditionedKernel + "</compatibility-matrix>\n",
-              gCompatibilityMatrixConverter(*combined));
+              toXml(*combined));
 }
 
 // Combining framework compatibility matrix with conflicting sepolicy fails
 TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictSepolicy) {
-    ASSERT_TRUE(gCompatibilityMatrixConverter(
+    ASSERT_TRUE(fromXml(
         &matrices[0],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <sepolicy>\n"
@@ -4440,7 +4432,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictSepolicy) {
         "</compatibility-matrix>\n",
         &error))
         << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(
+    ASSERT_TRUE(fromXml(
         &matrices[1],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <sepolicy>\n"
@@ -4451,13 +4443,13 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictSepolicy) {
         << error;
 
     auto combined = combine(Level{1}, &matrices, &error);
-    ASSERT_EQ(nullptr, combined) << gCompatibilityMatrixConverter(*combined);
+    ASSERT_EQ(nullptr, combined) << toXml(*combined);
     EXPECT_IN("<sepolicy> is already defined", error);
 }
 
 // Combining framework compatibility matrix with conflicting avb fails
 TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictAvb) {
-    ASSERT_TRUE(gCompatibilityMatrixConverter(
+    ASSERT_TRUE(fromXml(
         &matrices[0],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <avb>\n"
@@ -4466,7 +4458,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictAvb) {
         "</compatibility-matrix>\n",
         &error))
         << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(
+    ASSERT_TRUE(fromXml(
         &matrices[1],
         "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
         "    <avb>\n"
@@ -4477,7 +4469,7 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, ConflictAvb) {
         << error;
 
     auto combined = combine(Level{1}, &matrices, &error);
-    ASSERT_EQ(nullptr, combined) << gCompatibilityMatrixConverter(*combined);
+    ASSERT_EQ(nullptr, combined) << toXml(*combined);
     EXPECT_IN("<avb><vbmeta-version> is already defined", error);
 }
 
@@ -4506,41 +4498,41 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, AidlAndHidlNames) {
     std::string hidlOptional = std::string(hidl).replace(hidl.find("false"), 5, "true");
     std::string error;
     {
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head1 + aidl + tail, &error))
+        ASSERT_TRUE(fromXml(&matrices[0], head1 + aidl + tail, &error))
             << error;
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head1 + hidl + tail, &error))
+        ASSERT_TRUE(fromXml(&matrices[1], head1 + hidl + tail, &error))
             << error;
 
         auto combined = combine(Level{1}, &matrices, &error);
         ASSERT_NE(nullptr, combined) << error;
 
-        auto combinedXml = gCompatibilityMatrixConverter(*combined);
+        auto combinedXml = toXml(*combined);
         EXPECT_IN(aidl, combinedXml);
         EXPECT_IN(hidl, combinedXml);
     }
     {
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head1 + aidl + tail, &error))
+        ASSERT_TRUE(fromXml(&matrices[0], head1 + aidl + tail, &error))
             << error;
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head2 + hidl + tail, &error))
+        ASSERT_TRUE(fromXml(&matrices[1], head2 + hidl + tail, &error))
             << error;
 
         auto combined = combine(Level{1}, &matrices, &error);
         ASSERT_NE(nullptr, combined) << error;
 
-        auto combinedXml = gCompatibilityMatrixConverter(*combined);
+        auto combinedXml = toXml(*combined);
         EXPECT_IN(aidl, combinedXml);
         EXPECT_IN(hidlOptional, combinedXml);
     }
     {
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head2 + aidl + tail, &error))
+        ASSERT_TRUE(fromXml(&matrices[0], head2 + aidl + tail, &error))
             << error;
-        ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head1 + hidl + tail, &error))
+        ASSERT_TRUE(fromXml(&matrices[1], head1 + hidl + tail, &error))
             << error;
 
         auto combined = combine(Level{1}, &matrices, &error);
         ASSERT_NE(nullptr, combined) << error;
 
-        auto combinedXml = gCompatibilityMatrixConverter(*combined);
+        auto combinedXml = toXml(*combined);
         EXPECT_IN(aidlOptional, combinedXml);
         EXPECT_IN(hidl, combinedXml);
     }
@@ -4583,15 +4575,15 @@ TEST_F(DeviceCompatibilityMatrixCombineTest, Success) {
         "            <instance>default</instance>\n"
         "        </interface>\n"
         "    </hal>\n"};
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head + halFoo + tail, &error))
+    ASSERT_TRUE(fromXml(&matrices[0], head + halFoo + tail, &error))
         << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head + halBar + tail, &error))
+    ASSERT_TRUE(fromXml(&matrices[1], head + halBar + tail, &error))
         << error;
 
     auto combined = combine(&matrices, &error);
     ASSERT_NE(nullptr, combined) << error;
     EXPECT_EQ("", error);
-    auto combinedXml = gCompatibilityMatrixConverter(*combined);
+    auto combinedXml = toXml(*combined);
     EXPECT_IN(halFoo, combinedXml);
     EXPECT_IN(halBar, combinedXml);
 }
@@ -4609,11 +4601,11 @@ TEST_F(DeviceCompatibilityMatrixCombineTest, ConflictVendorNdk) {
         "        <version>Q</version>\n"
         "    </vendor-ndk>\n"
         "</compatibility-matrix>\n"};
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], vendorNdkP, &error)) << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], vendorNdkQ, &error)) << error;
+    ASSERT_TRUE(fromXml(&matrices[0], vendorNdkP, &error)) << error;
+    ASSERT_TRUE(fromXml(&matrices[1], vendorNdkQ, &error)) << error;
 
     auto combined = combine(&matrices, &error);
-    ASSERT_EQ(nullptr, combined) << gCompatibilityMatrixConverter(*combined);
+    ASSERT_EQ(nullptr, combined) << toXml(*combined);
     EXPECT_IN("<vendor-ndk> is already defined", error);
 }
 
@@ -4637,15 +4629,15 @@ TEST_F(DeviceCompatibilityMatrixCombineTest, AidlAndHidlNames) {
         "            <instance>default</instance>\n"
         "        </interface>\n"
         "    </hal>\n";
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[0], head + aidl + tail, &error))
+    ASSERT_TRUE(fromXml(&matrices[0], head + aidl + tail, &error))
         << error;
-    ASSERT_TRUE(gCompatibilityMatrixConverter(&matrices[1], head + hidl + tail, &error))
+    ASSERT_TRUE(fromXml(&matrices[1], head + hidl + tail, &error))
         << error;
 
     auto combined = combine(&matrices, &error);
     ASSERT_NE(nullptr, combined) << error;
 
-    auto combinedXml = gCompatibilityMatrixConverter(*combined);
+    auto combinedXml = toXml(*combined);
     EXPECT_IN(aidl, combinedXml);
     EXPECT_IN(hidl, combinedXml);
 }
