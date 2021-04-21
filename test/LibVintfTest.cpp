@@ -38,6 +38,7 @@
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::HasSubstr;
+using ::testing::Optional;
 using ::testing::Property;
 using ::testing::SizeIs;
 
@@ -2915,6 +2916,11 @@ TEST_F(LibVintfTest, ParsingUpdatableHals) {
         "</manifest>\n";
     EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
     EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
+
+    // check by calling the API: updatableViaApex()
+    auto foo = getHals(manifest, "android.hardware.foo");
+    ASSERT_EQ(1u, foo.size());
+    EXPECT_THAT(foo.front()->updatableViaApex(), Optional(Eq("com.android.foo")));
 }
 
 TEST_F(LibVintfTest, SystemSdk) {
