@@ -24,6 +24,21 @@
 namespace android {
 namespace vintf {
 
+template<typename Object>
+struct XmlConverter {
+    XmlConverter() {}
+    virtual ~XmlConverter() {}
+
+    // Serialize an object to XML.
+    virtual std::string operator()(
+        const Object& o, SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const = 0;
+
+    // Deserialize an XML to object. Return whether it is successful.
+    // Sets error message to optional "error" out parameter (which can be null).
+    virtual bool operator()(Object* o, const std::string& xml,
+                            std::string* error = nullptr) const = 0;
+};
+
 std::string toXml(const HalManifest& o, SerializeFlags::Type flags = SerializeFlags::EVERYTHING);
 std::string toXml(const CompatibilityMatrix& o,
                   SerializeFlags::Type flags = SerializeFlags::EVERYTHING);
