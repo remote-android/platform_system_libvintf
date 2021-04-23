@@ -145,8 +145,8 @@ static bool parse(const std::string& attrText, std::optional<std::string>* attr)
 
 // ---------------------- XmlNodeConverter definitions
 
-template<typename Object>
-struct XmlNodeConverter : public XmlConverter<Object> {
+template <typename Object>
+struct XmlNodeConverter {
     XmlNodeConverter() {}
     virtual ~XmlNodeConverter() {}
 
@@ -165,7 +165,7 @@ struct XmlNodeConverter : public XmlConverter<Object> {
         this->mutateNode(o, root, d, flags);
         return root;
     }
-    inline std::string operator()(const Object& o, SerializeFlags::Type flags) const override {
+    inline std::string operator()(const Object& o, SerializeFlags::Type flags) const {
         DocType *doc = createDocument();
         appendChild(doc, (*this)(o, doc, flags));
         std::string s = printDocument(doc);
@@ -178,7 +178,7 @@ struct XmlNodeConverter : public XmlConverter<Object> {
         }
         return this->buildObject(object, root, error);
     }
-    inline bool operator()(Object* o, const std::string& xml, std::string* error) const override {
+    inline bool operator()(Object* o, const std::string& xml, std::string* error) const {
         std::string errorBuffer;
         if (error == nullptr) error = &errorBuffer;
 
@@ -1164,8 +1164,6 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
     }
 };
 
-HalManifestConverter halManifestConverter{};
-
 struct AvbVersionConverter : public XmlTextConverter<Version> {
     std::string elementName() const override { return "vbmeta-version"; }
 };
@@ -1355,12 +1353,6 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
         return true;
     }
 };
-
-CompatibilityMatrixConverter compatibilityMatrixConverter{};
-
-// Publicly available as in parse_xml.h
-XmlConverter<HalManifest>& gHalManifestConverter = halManifestConverter;
-XmlConverter<CompatibilityMatrix>& gCompatibilityMatrixConverter = compatibilityMatrixConverter;
 
 #define CREATE_CONVERT_FN(type)                                         \
     std::string toXml(const type& o, SerializeFlags::Type flags) {      \
