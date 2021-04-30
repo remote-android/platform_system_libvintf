@@ -460,6 +460,11 @@ bool CompatibilityMatrix::matchInstance(HalFormat format, const std::string& hal
     return found;
 }
 
+std::vector<VersionRange> CompatibilityMatrix::getSepolicyVersions() const {
+    if (type() == SchemaType::FRAMEWORK) return framework.mSepolicy.sepolicyVersions();
+    return {};
+}
+
 std::string CompatibilityMatrix::getVendorNdkVersion() const {
     return type() == SchemaType::DEVICE ? device.mVendorNdk.version() : "";
 }
