@@ -85,6 +85,8 @@ std::string GetDescription(Level level) {
             return "Android 11 (R)";
         case Level::S:
             return "Android 12 (S)";
+        case Level::T:
+            return "Android 13 (T)";
         case Level::UNSPECIFIED:
             return "Level unspecified";
         default:
