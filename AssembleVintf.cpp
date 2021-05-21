@@ -568,7 +568,9 @@ class AssembleVintfImpl : public AssembleVintf {
                               << std::endl;
                 }
             }
-            builtMatrix = CompatibilityMatrix::combine(deviceLevel, matrices, &error);
+            // No <kernel> tags to assemble at this point
+            const auto kernelLevel = Level::UNSPECIFIED;
+            builtMatrix = CompatibilityMatrix::combine(deviceLevel, kernelLevel, matrices, &error);
             matrix = builtMatrix.get();
 
             if (matrix == nullptr) {

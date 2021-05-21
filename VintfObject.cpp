@@ -136,11 +136,17 @@ std::shared_ptr<const CompatibilityMatrix> VintfObject::getFrameworkCompatibilit
     // To avoid deadlock, get device manifest before any locks.
     auto deviceManifest = getDeviceHalManifest();
 
+    std::string error;
+    auto kernelLevel = getKernelLevel(&error);
+    if (kernelLevel == Level::UNSPECIFIED) {
+        LOG(WARNING) << "getKernelLevel: " << error;
+    }
+
     std::unique_lock<std::mutex> _lock(mFrameworkCompatibilityMatrixMutex);
 
-    auto combined =
-        Get(__func__, &mCombinedFrameworkMatrix,
-            std::bind(&VintfObject::getCombinedFrameworkMatrix, this, deviceManifest, _1, _2));
+    auto combined = Get(__func__, &mCombinedFrameworkMatrix,
+                        std::bind(&VintfObject::getCombinedFrameworkMatrix, this, deviceManifest,
+                                  kernelLevel, _1, _2));
     if (combined != nullptr) {
         return combined;
     }
@@ -151,8 +157,8 @@ std::shared_ptr<const CompatibilityMatrix> VintfObject::getFrameworkCompatibilit
 }
 
 status_t VintfObject::getCombinedFrameworkMatrix(
-    const std::shared_ptr<const HalManifest>& deviceManifest, CompatibilityMatrix* out,
-    std::string* error) {
+    const std::shared_ptr<const HalManifest>& deviceManifest, Level kernelLevel,
+    CompatibilityMatrix* out, std::string* error) {
     std::vector<CompatibilityMatrix> matrixFragments;
     auto matrixFragmentsStatus = getAllFrameworkMatrixLevels(&matrixFragments, error);
     if (matrixFragmentsStatus != OK) {
@@ -200,7 +206,7 @@ status_t VintfObject::getCombinedFrameworkMatrix(
         return NAME_NOT_FOUND;
     }
 
-    auto combined = CompatibilityMatrix::combine(deviceLevel, &matrixFragments, error);
+    auto combined = CompatibilityMatrix::combine(deviceLevel, kernelLevel, &matrixFragments, error);
     if (combined == nullptr) {
         return BAD_VALUE;
     }
@@ -860,6 +866,11 @@ int32_t VintfObject::checkDeprecation(const ListInstances& listInstances,
         if (error) *error = "Device manifest does not specify Shipping FCM Version.";
         return BAD_VALUE;
     }
+    std::string kernelLevelError;
+    Level kernelLevel = getKernelLevel(&kernelLevelError);
+    if (kernelLevel == Level::UNSPECIFIED) {
+        LOG(WARNING) << kernelLevelError;
+    }
 
     std::vector<CompatibilityMatrix> targetMatrices;
     // Partition matrixFragments into two groups, where the second group
@@ -875,7 +886,8 @@ int32_t VintfObject::checkDeprecation(const ListInstances& listInstances,
         return NAME_NOT_FOUND;
     }
     // so that they can be combined into one matrix for deprecation checking.
-    auto targetMatrix = CompatibilityMatrix::combine(deviceLevel, &targetMatrices, error);
+    auto targetMatrix =
+        CompatibilityMatrix::combine(deviceLevel, kernelLevel, &targetMatrices, error);
     if (targetMatrix == nullptr) {
         return BAD_VALUE;
     }

@@ -313,7 +313,8 @@ class VintfObject {
 
    private:
     status_t getCombinedFrameworkMatrix(const std::shared_ptr<const HalManifest>& deviceManifest,
-                                        CompatibilityMatrix* out, std::string* error = nullptr);
+                                        Level kernelLevel, CompatibilityMatrix* out,
+                                        std::string* error = nullptr);
     status_t getAllFrameworkMatrixLevels(std::vector<CompatibilityMatrix>* out,
                                          std::string* error = nullptr);
     status_t getOneMatrix(const std::string& path, CompatibilityMatrix* out,
