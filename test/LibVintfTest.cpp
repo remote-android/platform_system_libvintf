@@ -45,10 +45,7 @@ using ::testing::SizeIs;
 namespace android {
 namespace vintf {
 
-static bool In(const std::string& sub, const std::string& str) {
-    return str.find(sub) != std::string::npos;
-}
-#define EXPECT_IN(sub, str) EXPECT_TRUE(In((sub), (str))) << (str);
+#define EXPECT_IN(sub, str) EXPECT_THAT(str, HasSubstr(sub))
 
 struct LibVintfTest : public ::testing::Test {
 public:
@@ -3039,8 +3036,8 @@ TEST_F(LibVintfTest, MatrixDetailErrorMsg) {
             "</compatibility-matrix>\n";
         EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(cm, &error));
-        EXPECT_IN("Manifest level = 103", error)
-        EXPECT_IN("Matrix level = 100", error)
+        EXPECT_IN("Manifest level = 103", error);
+        EXPECT_IN("Matrix level = 100", error);
         EXPECT_IN(
             "android.hardware.foo:\n"
             "    required: \n"
