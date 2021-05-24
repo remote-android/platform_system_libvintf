@@ -50,10 +50,6 @@ static bool In(const std::string& sub, const std::string& str) {
 }
 #define EXPECT_IN(sub, str) EXPECT_TRUE(In((sub), (str))) << (str);
 
-#ifndef LIBVINTF_TARGET
-#define EXPECT_CONTAINS(str, sub) EXPECT_IN(sub, str);
-#endif
-
 struct LibVintfTest : public ::testing::Test {
 public:
     virtual void SetUp() override {
