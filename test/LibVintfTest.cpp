@@ -4344,9 +4344,9 @@ struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
     }
     // Access to private methods.
     std::unique_ptr<CompatibilityMatrix> combine(Level deviceLevel,
-                                                 std::vector<CompatibilityMatrix>* matrices,
-                                                 std::string* error) {
-        return CompatibilityMatrix::combine(deviceLevel, matrices, error);
+                                                 std::vector<CompatibilityMatrix>* theMatrices,
+                                                 std::string* errorPtr) {
+        return CompatibilityMatrix::combine(deviceLevel, theMatrices, errorPtr);
     }
 
     std::vector<CompatibilityMatrix> matrices;
@@ -4544,9 +4544,9 @@ struct DeviceCompatibilityMatrixCombineTest : public LibVintfTest {
         matrices[1].setFileName("compatibility_matrix.2.xml");
     }
     // Access to private methods.
-    std::unique_ptr<CompatibilityMatrix> combine(std::vector<CompatibilityMatrix>* matrices,
-                                                 std::string* error) {
-        return CompatibilityMatrix::combineDeviceMatrices(matrices, error);
+    std::unique_ptr<CompatibilityMatrix> combine(std::vector<CompatibilityMatrix>* theMatrices,
+                                                 std::string* errorPtr) {
+        return CompatibilityMatrix::combineDeviceMatrices(theMatrices, errorPtr);
     }
 
     std::vector<CompatibilityMatrix> matrices;
