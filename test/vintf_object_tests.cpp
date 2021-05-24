@@ -18,7 +18,6 @@
 #include "gmock-logging-compat.h"
 
 #include <stdio.h>
-#include <unistd.h>
 
 #include <android-base/file.h>
 #include <android-base/logging.h>
@@ -40,12 +39,8 @@ using namespace std::literals;
 
 using android::FqInstance;
 
-static AssertionResult In(const std::string& sub, const std::string& str) {
-    return (str.find(sub) != std::string::npos ? AssertionSuccess() : AssertionFailure())
-           << "Value is " << str;
-}
-#define EXPECT_IN(sub, str) EXPECT_TRUE(In((sub), (str)))
-#define EXPECT_NOT_IN(sub, str) EXPECT_FALSE(In((sub), (str)))
+#define EXPECT_IN(sub, str) EXPECT_THAT(str, HasSubstr(sub))
+#define EXPECT_NOT_IN(sub, str) EXPECT_THAT(str, Not(HasSubstr(sub)))
 
 namespace android {
 namespace vintf {
