@@ -45,14 +45,7 @@ using ::testing::SizeIs;
 namespace android {
 namespace vintf {
 
-static bool In(const std::string& sub, const std::string& str) {
-    return str.find(sub) != std::string::npos;
-}
-#define EXPECT_IN(sub, str) EXPECT_TRUE(In((sub), (str))) << (str);
-
-#ifndef LIBVINTF_TARGET
-#define EXPECT_CONTAINS(str, sub) EXPECT_IN(sub, str);
-#endif
+#define EXPECT_IN(sub, str) EXPECT_THAT(str, HasSubstr(sub))
 
 struct LibVintfTest : public ::testing::Test {
 public:
@@ -3043,8 +3036,8 @@ TEST_F(LibVintfTest, MatrixDetailErrorMsg) {
             "</compatibility-matrix>\n";
         EXPECT_TRUE(fromXml(&cm, xml, &error)) << error;
         EXPECT_FALSE(manifest.checkCompatibility(cm, &error));
-        EXPECT_IN("Manifest level = 103", error)
-        EXPECT_IN("Matrix level = 100", error)
+        EXPECT_IN("Manifest level = 103", error);
+        EXPECT_IN("Matrix level = 100", error);
         EXPECT_IN(
             "android.hardware.foo:\n"
             "    required: \n"
@@ -4351,9 +4344,9 @@ struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
     }
     // Access to private methods.
     std::unique_ptr<CompatibilityMatrix> combine(Level deviceLevel,
-                                                 std::vector<CompatibilityMatrix>* matrices,
-                                                 std::string* error) {
-        return CompatibilityMatrix::combine(deviceLevel, matrices, error);
+                                                 std::vector<CompatibilityMatrix>* theMatrices,
+                                                 std::string* errorPtr) {
+        return CompatibilityMatrix::combine(deviceLevel, theMatrices, errorPtr);
     }
 
     std::vector<CompatibilityMatrix> matrices;
@@ -4551,9 +4544,9 @@ struct DeviceCompatibilityMatrixCombineTest : public LibVintfTest {
         matrices[1].setFileName("compatibility_matrix.2.xml");
     }
     // Access to private methods.
-    std::unique_ptr<CompatibilityMatrix> combine(std::vector<CompatibilityMatrix>* matrices,
-                                                 std::string* error) {
-        return CompatibilityMatrix::combineDeviceMatrices(matrices, error);
+    std::unique_ptr<CompatibilityMatrix> combine(std::vector<CompatibilityMatrix>* theMatrices,
+                                                 std::string* errorPtr) {
+        return CompatibilityMatrix::combineDeviceMatrices(theMatrices, errorPtr);
     }
 
     std::vector<CompatibilityMatrix> matrices;
