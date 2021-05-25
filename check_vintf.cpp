@@ -358,6 +358,11 @@ class CheckVintfUtils {
             LOG(WARNING) << "Unable to print HALs from new FCMs: no device HAL manifest.";
             return;
         }
+        std::string kernelLevelError;
+        auto kernelLevel = vintfObject->getKernelLevel(&kernelLevelError);
+        if (kernelLevel == Level::UNSPECIFIED) {
+            LOG(WARNING) << "getKernelLevel: " << kernelLevel;
+        }
         std::vector<CompatibilityMatrix> matrixFragments;
         std::string error;
         auto status = vintfObject->getAllFrameworkMatrixLevels(&matrixFragments, &error);
@@ -372,8 +377,8 @@ class CheckVintfUtils {
                                             matrix.level() > deviceManifest->level();
                                  });
         matrixFragments.erase(it, matrixFragments.end());
-        auto combined =
-            CompatibilityMatrix::combine(deviceManifest->level(), &matrixFragments, &error);
+        auto combined = CompatibilityMatrix::combine(deviceManifest->level(), kernelLevel,
+                                                     &matrixFragments, &error);
         if (combined == nullptr) {
             LOG(WARNING) << "Unable to print HALs from new FCMs: unable to combine matrix "
                             "fragments <= level "

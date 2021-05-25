@@ -18,9 +18,11 @@
 
 #include <algorithm>
 #include <functional>
+#include <vector>
 
 #include <android-base/logging.h>
 #include <android-base/parseint.h>
+#include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -35,12 +37,16 @@
 #include "parse_xml_internal.h"
 #include "test_constants.h"
 
+using android::base::StringPrintf;
+using ::testing::Combine;
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::HasSubstr;
 using ::testing::Optional;
 using ::testing::Property;
+using ::testing::Range;
 using ::testing::SizeIs;
+using ::testing::TestParamInfo;
 
 namespace android {
 namespace vintf {
@@ -4346,7 +4352,12 @@ struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
     std::unique_ptr<CompatibilityMatrix> combine(Level deviceLevel,
                                                  std::vector<CompatibilityMatrix>* theMatrices,
                                                  std::string* errorPtr) {
-        return CompatibilityMatrix::combine(deviceLevel, theMatrices, errorPtr);
+        return CompatibilityMatrix::combine(deviceLevel, Level::UNSPECIFIED, theMatrices, errorPtr);
+    }
+    std::unique_ptr<CompatibilityMatrix> combine(Level deviceLevel, Level kernellevel,
+                                                 std::vector<CompatibilityMatrix>* theMatrices,
+                                                 std::string* errorPtr) {
+        return CompatibilityMatrix::combine(deviceLevel, kernellevel, theMatrices, errorPtr);
     }
 
     std::vector<CompatibilityMatrix> matrices;
@@ -4536,6 +4547,94 @@ TEST_F(FrameworkCompatibilityMatrixCombineTest, AidlAndHidlNames) {
         EXPECT_IN(hidl, combinedXml);
     }
 }
+
+// clang-format on
+
+class FcmCombineKernelTest : public FrameworkCompatibilityMatrixCombineTest,
+                             public ::testing::WithParamInterface<std::tuple<size_t, size_t>> {
+   public:
+    static std::string PrintTestParams(const TestParamInfo<FcmCombineKernelTest::ParamType>& info) {
+        auto [deviceLevelNum, kernelLevelNum] = info.param;
+        return "device_" + std::to_string(deviceLevelNum) + "_kernel_" +
+               std::to_string(kernelLevelNum);
+    }
+    static constexpr size_t kMinLevel = 1;
+    static constexpr size_t kMaxLevel = 5;
+};
+
+TEST_P(FcmCombineKernelTest, OlderKernel) {
+    auto [deviceLevelNum, kernelLevelNum] = GetParam();
+
+    std::vector<size_t> levelNums;
+    for (size_t i = kMinLevel; i <= kMaxLevel; ++i) levelNums.push_back(i);
+
+    constexpr auto fmt = R"(
+        <compatibility-matrix %s type="framework" level="%s">
+            <hal format="hidl" optional="false">
+                <name>android.system.foo</name>
+                <version>%zu.0</version>
+                <interface>
+                    <name>IFoo</name>
+                    <instance>default</instance>
+                </interface>
+            </hal>
+            <kernel version="%zu.0.0">
+                <config>
+                    <key>CONFIG_%zu</key>
+                    <value type="tristate">y</value>
+                </config>
+            </kernel>
+        </compatibility-matrix>
+    )";
+    std::string error;
+    std::vector<CompatibilityMatrix> matrices;
+    for (size_t levelNum : levelNums) {
+        auto levelStr = android::vintf::to_string((Level)levelNum);
+        auto xml = StringPrintf(fmt, kMetaVersionStr.c_str(), levelStr.c_str(), levelNum, levelNum,
+                                levelNum);
+        CompatibilityMatrix& matrix = matrices.emplace_back();
+        ASSERT_TRUE(fromXml(&matrix, xml, &error)) << error;
+    }
+    ASSERT_FALSE(matrices.empty());
+
+    auto combined = combine(Level(deviceLevelNum), Level(kernelLevelNum), &matrices, &error);
+    ASSERT_NE(nullptr, combined);
+    auto combinedXml = toXml(*combined);
+
+    // Check that HALs are combined correctly.
+    for (size_t i = kMinLevel; i < deviceLevelNum; ++i)
+        EXPECT_THAT(combinedXml, Not(HasSubstr(StringPrintf("<version>%zu.0</version>", i))));
+
+    for (size_t i = deviceLevelNum; i <= kMaxLevel; ++i)
+        EXPECT_THAT(combinedXml, HasSubstr(StringPrintf("<version>%zu.0</version>", i)));
+
+    // Check that kernels are combined correctly. <kernel> tags from
+    // matrices with level >= min(kernelLevel, deviceLevel) are added.
+    // The "level" tag on <kernel> must also be set properly so that old kernel requirements from
+    // deviceLevel <= x < kernelLevel won't be used.
+    auto hasKernelFrom = std::min(kernelLevelNum, deviceLevelNum);
+    for (size_t i = kMinLevel; i < hasKernelFrom; ++i) {
+        EXPECT_THAT(combinedXml,
+                    Not(HasSubstr(StringPrintf(R"(<kernel version="%zu.0.0" level="%zu")", i, i))));
+        EXPECT_THAT(combinedXml, Not(HasSubstr(StringPrintf("CONFIG_%zu", i))));
+    }
+
+    for (size_t i = hasKernelFrom; i <= kMaxLevel; ++i) {
+        EXPECT_THAT(combinedXml,
+                    HasSubstr(StringPrintf(R"(<kernel version="%zu.0.0" level="%zu")", i, i)));
+        EXPECT_THAT(combinedXml, HasSubstr(StringPrintf("CONFIG_%zu", i)));
+    }
+
+    if (::testing::Test::HasFailure()) ADD_FAILURE() << "Resulting matrix is \n" << combinedXml;
+}
+
+INSTANTIATE_TEST_CASE_P(
+    FrameworkCompatibilityMatrixCombineTest, FcmCombineKernelTest,
+    Combine(Range(FcmCombineKernelTest::kMinLevel, FcmCombineKernelTest::kMaxLevel + 1),
+            Range(FcmCombineKernelTest::kMinLevel, FcmCombineKernelTest::kMaxLevel + 1)),
+    FcmCombineKernelTest::PrintTestParams);
+
+// clang-format off
 
 struct DeviceCompatibilityMatrixCombineTest : public LibVintfTest {
     virtual void SetUp() override {
