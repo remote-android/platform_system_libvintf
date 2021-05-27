@@ -1453,9 +1453,8 @@ TEST_P(KernelTestP, Test) {
     auto runtime = vintfObject->getRuntimeInfo();
     ASSERT_NE(nullptr, matrix);
     ASSERT_NE(nullptr, runtime);
-    std::string fallbackError = kernelFcm == Level::UNSPECIFIED
-        ? "\nOld requirements must not change"
-        : "\nMust not pull unnecessary requirements from new matrices";
+    std::string fallbackError = "Matrix is compatible with kernel info, but it shouldn't. Matrix:\n"
+        + toXml(*matrix) + "\nKernelInfo:\n" + toXml(info);
     std::string error;
     ASSERT_EQ(pass, runtime->checkCompatibility(*matrix, &error))
             << (pass ? error : fallbackError);
@@ -1476,6 +1475,11 @@ std::vector<KernelTestP::ParamType> KernelTestParamValues() {
     ret.emplace_back(matrices, MakeKernelInfo("3.0.0", "C2"), Level{1}, Level{1}, false);
     ret.emplace_back(matrices, MakeKernelInfo("4.0.0", "D2"), Level{1}, Level{1}, false);
     ret.emplace_back(matrices, MakeKernelInfo("2.0.0", "B2"), Level{1}, Level{1}, true);
+
+    // Kernel FCM lower than target FCM
+    ret.emplace_back(matrices, MakeKernelInfo("1.0.0", "A1"), Level{2}, Level{1}, true);
+    ret.emplace_back(matrices, MakeKernelInfo("2.0.0", "B1"), Level{2}, Level{1}, true);
+    ret.emplace_back(matrices, MakeKernelInfo("2.0.0", "B2"), Level{2}, Level{1}, true);
 
     matrices = systemMatrixKernelXmls;
     ret.emplace_back(matrices, MakeKernelInfo("1.0.0", "A1"), Level{1}, Level::UNSPECIFIED, true);
@@ -1511,6 +1515,25 @@ std::vector<KernelTestP::ParamType> KernelTestParamValues() {
     ret.emplace_back(matrices, MakeKernelInfo("6.0.0", "F4"), Level{3}, Level{3}, false);
     ret.emplace_back(matrices, MakeKernelInfo("6.0.0", "F4"), Level{4}, Level{4}, true);
     ret.emplace_back(matrices, MakeKernelInfo("6.0.0", "F4"), Level{5}, Level{5}, false);
+
+    // Kernel FCM lower than target FCM
+    ret.emplace_back(matrices, MakeKernelInfo("1.0.0", "A1"), Level{2}, Level{1}, true);
+    ret.emplace_back(matrices, MakeKernelInfo("2.0.0", "B1"), Level{2}, Level{1}, true);
+    ret.emplace_back(matrices, MakeKernelInfo("2.0.0", "B2"), Level{2}, Level{1}, true);
+    ret.emplace_back(matrices, MakeKernelInfo("3.0.0", "C2"), Level{2}, Level{1}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("3.0.0", "C3"), Level{2}, Level{1}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("4.0.0", "D2"), Level{2}, Level{1}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("4.0.0", "D3"), Level{2}, Level{1}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("5.0.0", "E3"), Level{2}, Level{1}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("5.0.0", "E4"), Level{2}, Level{1}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("6.0.0", "F4"), Level{2}, Level{1}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("6.0.0", "F5"), Level{2}, Level{1}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("7.0.0", "G5"), Level{2}, Level{1}, false);
+
+    ret.emplace_back(matrices, MakeKernelInfo("6.0.0", "F4"), Level{3}, Level{2}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("6.0.0", "F4"), Level{4}, Level{3}, false);
+    ret.emplace_back(matrices, MakeKernelInfo("6.0.0", "F4"), Level{5}, Level{4}, true);
+    // We don't have device FCM 6 in systemMatrixKernelXmls, skip
 
     return ret;
 }
