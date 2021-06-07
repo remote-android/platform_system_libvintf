@@ -21,6 +21,7 @@
 
 #include <android-base/file.h>
 #include <android-base/logging.h>
+#include <android-base/result-gmock.h>
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <gtest/gtest.h>
@@ -38,6 +39,9 @@ using namespace ::testing;
 using namespace std::literals;
 
 using android::FqInstance;
+using android::base::testing::HasError;
+using android::base::testing::Ok;
+using android::base::testing::WithMessage;
 
 #define EXPECT_IN(sub, str) EXPECT_THAT(str, HasSubstr(sub))
 #define EXPECT_NOT_IN(sub, str) EXPECT_THAT(str, Not(HasSubstr(sub)))
@@ -1888,35 +1892,6 @@ INSTANTIATE_TEST_SUITE_P(OemFcmLevel, OemFcmLevelTest, Combine(Values(1, 2), Boo
     OemFcmLevelTestParamToString);
 // clang-format on
 
-// A matcher that checks if a Result object contains an error message, and the error message
-// contains the given substring.
-class ErrorMessageMatcher {
-   public:
-    ErrorMessageMatcher(const std::string& message) : mMessage(message) {}
-    template <class T>
-    bool MatchAndExplain(const android::base::Result<T>& result,
-                         MatchResultListener* listener) const {
-        if (result.ok()) {
-            *listener << "result is ok";
-            return false;
-        }
-        *listener << "result has error message \"" << result.error().message() << "\"";
-        return result.error().message().find(mMessage) != std::string::npos;
-    }
-    void DescribeTo(std::ostream* os) const {
-        *os << "error message contains \"" << mMessage << "\"";
-    }
-    void DescribeNegationTo(std::ostream* os) const {
-        *os << "error message does not contain \"" << mMessage << "\"";
-    }
-
-   private:
-    std::string mMessage;
-};
-PolymorphicMatcher<ErrorMessageMatcher> HasErrorMessage(const std::string& message) {
-    return MakePolymorphicMatcher(ErrorMessageMatcher(message));
-}
-
 // Common test set up for checking matrices against lib*idlmetadata.
 class CheckMatricesWithHalDefTestBase : public MultiMatrixTest {
     void SetUp() override {
@@ -1952,15 +1927,15 @@ class CheckMatricesWithHalDefTestBase : public MultiMatrixTest {
 class CheckMissingHalsTest : public CheckMatricesWithHalDefTestBase {};
 
 TEST_F(CheckMissingHalsTest, Empty) {
-    EXPECT_RESULT_OK(vintfObject->checkMissingHalsInMatrices({}, {}));
+    EXPECT_THAT(vintfObject->checkMissingHalsInMatrices({}, {}), Ok());
 }
 
 TEST_F(CheckMissingHalsTest, Pass) {
     std::vector<HidlInterfaceMetadata> hidl{{.name = "android.hardware.hidl@1.0::IHidl"}};
     std::vector<AidlInterfaceMetadata> aidl{{.types = {"android.hardware.aidl.IAidl"}}};
-    EXPECT_RESULT_OK(vintfObject->checkMissingHalsInMatrices(hidl, {}));
-    EXPECT_RESULT_OK(vintfObject->checkMissingHalsInMatrices({}, aidl));
-    EXPECT_RESULT_OK(vintfObject->checkMissingHalsInMatrices(hidl, aidl));
+    EXPECT_THAT(vintfObject->checkMissingHalsInMatrices(hidl, {}), Ok());
+    EXPECT_THAT(vintfObject->checkMissingHalsInMatrices({}, aidl), Ok());
+    EXPECT_THAT(vintfObject->checkMissingHalsInMatrices(hidl, aidl), Ok());
 }
 
 TEST_F(CheckMissingHalsTest, FailVendor) {
@@ -1968,21 +1943,21 @@ TEST_F(CheckMissingHalsTest, FailVendor) {
     std::vector<AidlInterfaceMetadata> aidl{{.types = {"vendor.foo.aidl.IAidl"}}};
 
     auto res = vintfObject->checkMissingHalsInMatrices(hidl, {});
-    EXPECT_THAT(res, HasErrorMessage("vendor.foo.hidl@1.0"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("vendor.foo.hidl@1.0"))));
 
     res = vintfObject->checkMissingHalsInMatrices({}, aidl);
-    EXPECT_THAT(res, HasErrorMessage("vendor.foo.aidl"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("vendor.foo.aidl"))));
 
     res = vintfObject->checkMissingHalsInMatrices(hidl, aidl);
-    EXPECT_THAT(res, HasErrorMessage("vendor.foo.hidl@1.0"));
-    EXPECT_THAT(res, HasErrorMessage("vendor.foo.aidl"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("vendor.foo.hidl@1.0"))));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("vendor.foo.aidl"))));
 
     auto predicate = [](const auto& interfaceName) {
         return android::base::StartsWith(interfaceName, "android.hardware");
     };
-    EXPECT_RESULT_OK(vintfObject->checkMissingHalsInMatrices(hidl, {}, predicate));
-    EXPECT_RESULT_OK(vintfObject->checkMissingHalsInMatrices({}, aidl, predicate));
-    EXPECT_RESULT_OK(vintfObject->checkMissingHalsInMatrices(hidl, aidl, predicate));
+    EXPECT_THAT(vintfObject->checkMissingHalsInMatrices(hidl, {}, predicate), Ok());
+    EXPECT_THAT(vintfObject->checkMissingHalsInMatrices({}, aidl, predicate), Ok());
+    EXPECT_THAT(vintfObject->checkMissingHalsInMatrices(hidl, aidl, predicate), Ok());
 }
 
 TEST_F(CheckMissingHalsTest, FailVersion) {
@@ -1990,28 +1965,28 @@ TEST_F(CheckMissingHalsTest, FailVersion) {
     std::vector<AidlInterfaceMetadata> aidl{{.types = {"android.hardware.aidl2.IAidl"}}};
 
     auto res = vintfObject->checkMissingHalsInMatrices(hidl, {});
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.hidl@2.0"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.hidl@2.0"))));
 
     res = vintfObject->checkMissingHalsInMatrices({}, aidl);
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.aidl2"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.aidl2"))));
 
     res = vintfObject->checkMissingHalsInMatrices(hidl, aidl);
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.hidl@2.0"));
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.aidl2"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.hidl@2.0"))));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.aidl2"))));
 
     auto predicate = [](const auto& interfaceName) {
         return android::base::StartsWith(interfaceName, "android.hardware");
     };
 
     res = vintfObject->checkMissingHalsInMatrices(hidl, {}, predicate);
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.hidl@2.0"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.hidl@2.0"))));
 
     res = vintfObject->checkMissingHalsInMatrices({}, aidl, predicate);
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.aidl2"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.aidl2"))));
 
     res = vintfObject->checkMissingHalsInMatrices(hidl, aidl, predicate);
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.hidl@2.0"));
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.aidl2"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.hidl@2.0"))));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.aidl2"))));
 }
 
 // A set of tests on VintfObject::checkMatrixHalsHasDefinition
@@ -2020,25 +1995,25 @@ class CheckMatrixHalsHasDefinitionTest : public CheckMatricesWithHalDefTestBase 
 TEST_F(CheckMatrixHalsHasDefinitionTest, Pass) {
     std::vector<HidlInterfaceMetadata> hidl{{.name = "android.hardware.hidl@1.0::IHidl"}};
     std::vector<AidlInterfaceMetadata> aidl{{.types = {"android.hardware.aidl.IAidl"}}};
-    EXPECT_RESULT_OK(vintfObject->checkMatrixHalsHasDefinition(hidl, aidl));
+    EXPECT_THAT(vintfObject->checkMatrixHalsHasDefinition(hidl, aidl), Ok());
 }
 
 TEST_F(CheckMatrixHalsHasDefinitionTest, FailMissingHidl) {
     std::vector<AidlInterfaceMetadata> aidl{{.types = {"android.hardware.aidl.IAidl"}}};
     auto res = vintfObject->checkMatrixHalsHasDefinition({}, aidl);
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.hidl@1.0::IHidl"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.hidl@1.0::IHidl"))));
 }
 
 TEST_F(CheckMatrixHalsHasDefinitionTest, FailMissingAidl) {
     std::vector<HidlInterfaceMetadata> hidl{{.name = "android.hardware.hidl@1.0::IHidl"}};
     auto res = vintfObject->checkMatrixHalsHasDefinition(hidl, {});
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.aidl.IAidl"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.aidl.IAidl"))));
 }
 
 TEST_F(CheckMatrixHalsHasDefinitionTest, FailMissingBoth) {
     auto res = vintfObject->checkMatrixHalsHasDefinition({}, {});
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.hidl@1.0::IHidl"));
-    EXPECT_THAT(res, HasErrorMessage("android.hardware.aidl.IAidl"));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.hidl@1.0::IHidl"))));
+    EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.aidl.IAidl"))));
 }
 
 }  // namespace testing
