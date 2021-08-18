@@ -220,7 +220,12 @@ status_t VintfObject::addDirectoryManifests(const std::string& directory, HalMan
     std::vector<std::string> fileNames;
     status_t err = getFileSystem()->listFiles(directory, &fileNames, error);
     // if the directory isn't there, that's okay
-    if (err == NAME_NOT_FOUND) return OK;
+    if (err == NAME_NOT_FOUND) {
+      if (error) {
+        error->clear();
+      }
+      return OK;
+    }
     if (err != OK) return err;
 
     for (const std::string& file : fileNames) {
@@ -496,6 +501,9 @@ status_t VintfObject::getAllFrameworkMatrixLevels(std::vector<CompatibilityMatri
         std::vector<std::string> fileNames;
         status_t listStatus = getFileSystem()->listFiles(dir, &fileNames, error);
         if (listStatus == NAME_NOT_FOUND) {
+            if (error) {
+              error->clear();
+            }
             continue;
         }
         if (listStatus != OK) {
