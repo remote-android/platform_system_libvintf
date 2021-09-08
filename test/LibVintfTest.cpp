@@ -2922,6 +2922,129 @@ TEST_F(LibVintfTest, ParsingUpdatableHals) {
     EXPECT_THAT(foo.front()->updatableViaApex(), Optional(Eq("com.android.foo")));
 }
 
+TEST_F(LibVintfTest, ParsingHalsInetTransport) {
+    std::string error;
+
+    HalManifest manifest;
+    std::string manifestXml =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"aidl\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <transport ip=\"1.2.3.4\" port=\"12\">inet</transport>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    EXPECT_TRUE(fromXml(&manifest, manifestXml, &error)) << error;
+    EXPECT_EQ(manifestXml, toXml(manifest, SerializeFlags::HALS_NO_FQNAME));
+
+    auto foo = getHals(manifest, "android.hardware.foo");
+    ASSERT_EQ(1u, foo.size());
+    ASSERT_TRUE(foo.front()->ip().has_value());
+    ASSERT_TRUE(foo.front()->port().has_value());
+    EXPECT_EQ("1.2.3.4", *foo.front()->ip());
+    EXPECT_EQ(12, *foo.front()->port());
+}
+
+TEST_F(LibVintfTest, RejectHalsInetTransportNoAttrs) {
+    std::string error;
+
+    HalManifest manifest;
+    std::string manifestXml =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"aidl\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <transport>inet</transport>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    EXPECT_FALSE(fromXml(&manifest, manifestXml, &error));
+    EXPECT_IN("Transport inet requires ip and port attributes", error);
+}
+
+TEST_F(LibVintfTest, RejectHalsInetTransportMissingAttrs) {
+    std::string error;
+
+    HalManifest manifest;
+    std::string manifestXml =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"aidl\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <transport ip=\"1.2.3.4\">inet</transport>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    EXPECT_FALSE(fromXml(&manifest, manifestXml, &error));
+    EXPECT_IN("Transport inet requires ip and port", error);
+}
+
+TEST_F(LibVintfTest, RejectHalsEmptyTransportWithInetAttrs) {
+    std::string error;
+
+    HalManifest manifest;
+    std::string manifestXml =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"aidl\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <transport ip=\"1.2.3.4\" port=\"12\"></transport>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    EXPECT_FALSE(fromXml(&manifest, manifestXml, &error));
+    EXPECT_IN("Transport  requires empty ip and port attributes", error);
+}
+
+TEST_F(LibVintfTest, RejectHidlHalsInetTransport) {
+    std::string error;
+
+    HalManifest manifest;
+    std::string manifestXml =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"hidl\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <transport ip=\"1.2.3.4\" port=\"12\">inet</transport>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    EXPECT_FALSE(fromXml(&manifest, manifestXml, &error));
+    EXPECT_IN(
+            "HIDL HAL 'android.hardware.foo' should not have <transport> \"inet\" or ip or port",
+            error);
+}
+
+TEST_F(LibVintfTest, RejectHidlHalsHwbinderInetAttrs) {
+    std::string error;
+
+    HalManifest manifest;
+    std::string manifestXml =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"hidl\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <transport ip=\"1.2.3.4\" port=\"12\">hwbinder</transport>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    EXPECT_FALSE(fromXml(&manifest, manifestXml, &error));
+    EXPECT_IN("Transport hwbinder requires empty ip and port attributes", error);
+}
+
 TEST_F(LibVintfTest, SystemSdk) {
     CompatibilityMatrix cm;
     std::string xml;
