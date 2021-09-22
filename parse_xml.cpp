@@ -143,6 +143,15 @@ static bool parse(const std::string& attrText, std::optional<std::string>* attr)
     return true;
 }
 
+bool parse(const std::string& s, std::optional<uint64_t>* out) {
+    uint64_t val;
+    if (base::ParseUint(s, &val)) {
+        *out = val;
+        return true;
+    }
+    return false;
+}
+
 // ---------------------- XmlNodeConverter definitions
 
 template <typename Object>
@@ -459,10 +468,18 @@ struct TransportArchConverter : public XmlNodeConverter<TransportArch> {
         if (object.arch != Arch::ARCH_EMPTY) {
             appendAttr(root, "arch", object.arch);
         }
+        if (object.ip.has_value()) {
+            appendAttr(root, "ip", *object.ip);
+        }
+        if (object.port.has_value()) {
+            appendAttr(root, "port", *object.port);
+        }
         appendText(root, ::android::vintf::to_string(object.transport), d);
     }
     bool buildObject(TransportArch* object, NodeType* root, std::string* error) const override {
         if (!parseOptionalAttr(root, "arch", Arch::ARCH_EMPTY, &object->arch, error) ||
+            !parseOptionalAttr(root, "ip", {}, &object->ip, error) ||
+            !parseOptionalAttr(root, "port", {}, &object->port, error) ||
             !parseText(root, &object->transport, error)) {
             return false;
         }
@@ -758,6 +775,14 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                     *error = "HIDL HAL '" + object->name + "' should have <transport> defined.";
                     return false;
                 }
+                if (object->transportArch.transport == Transport::INET ||
+                    object->transportArch.ip.has_value() ||
+                    object->transportArch.port.has_value()) {
+                    *error = "HIDL HAL '" + object->name +
+                             "' should not have <transport> \"inet\" " +
+                             "or ip or port attributes defined.";
+                    return false;
+                }
             } break;
             case HalFormat::NATIVE: {
                 if (!parseChildren(root, VersionConverter{}, &object->versions, error))
@@ -769,9 +794,10 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                 }
             } break;
             case HalFormat::AIDL: {
-                if (!object->transportArch.empty()) {
+                if (!object->transportArch.empty() &&
+                    object->transportArch.transport != Transport::INET) {
                     LOG(WARNING) << "Ignoring <transport> on manifest <hal format=\"aidl\"> "
-                                 << object->name;
+                                 << object->name << ". Only \"inet\" supported.";
                     object->transportArch = {};
                 }
                 if (!parseChildren(root, AidlVersionConverter{}, &object->versions, error)) {
