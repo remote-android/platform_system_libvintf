@@ -143,7 +143,7 @@ static bool parse(const std::string& attrText, std::optional<std::string>* attr)
     return true;
 }
 
-bool parse(const std::string& s, std::optional<uint64_t>* out) {
+static bool parse(const std::string& s, std::optional<uint64_t>* out) {
     uint64_t val;
     if (base::ParseUint(s, &val)) {
         *out = val;
