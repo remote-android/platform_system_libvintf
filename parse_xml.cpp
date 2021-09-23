@@ -185,28 +185,34 @@ struct XmlNodeConverter {
     virtual bool buildObject(Object* object, NodeType* root, const BuildObjectParam&) const = 0;
 
    public:
+    // Methods for other (usually parent) converters
+    // Name of the XML element.
     virtual std::string elementName() const = 0;
-
-    // convenience methods for user
+    // Serialize |o| into an XML element.
     inline NodeType* operator()(const Object& o, const MutateNodeParam& param) const {
         NodeType* root = createNode(this->elementName(), param.d);
         this->mutateNode(o, root, param);
         return root;
     }
-    inline std::string operator()(const Object& o, SerializeFlags::Type flags) const {
-        DocType *doc = createDocument();
-        appendChild(doc, (*this)(o, MutateNodeParam{doc, flags}));
-        std::string s = printDocument(doc);
-        deleteDocument(doc);
-        return s;
-    }
+    // Deserialize XML element |root| into |object|.
     inline bool operator()(Object* object, NodeType* root, const BuildObjectParam& param) const {
         if (nameOf(root) != this->elementName()) {
             return false;
         }
         return this->buildObject(object, root, param);
     }
-    inline bool operator()(Object* o, const std::string& xml, std::string* error) const {
+
+    // Public methods for android::vintf::fromXml / android::vintf::toXml.
+    // Serialize |o| into an XML string.
+    inline std::string toXml(const Object& o, SerializeFlags::Type flags) const {
+        DocType* doc = createDocument();
+        appendChild(doc, (*this)(o, MutateNodeParam{doc, flags}));
+        std::string s = printDocument(doc);
+        deleteDocument(doc);
+        return s;
+    }
+    // Deserialize XML string |xml| into |o|.
+    inline bool fromXml(Object* o, const std::string& xml, std::string* error) const {
         std::string errorBuffer;
         if (error == nullptr) error = &errorBuffer;
 
@@ -224,7 +230,7 @@ struct XmlNodeConverter {
         return ret;
     }
 
-    // convenience methods for implementor.
+    // convenience methods for subclasses to implement virtual functions.
 
     // All append* functions helps mutateNode() to serialize the object into XML.
     template <typename T>
@@ -1436,10 +1442,10 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
 
 #define CREATE_CONVERT_FN(type)                                         \
     std::string toXml(const type& o, SerializeFlags::Type flags) {      \
-        return type##Converter{}(o, flags);                             \
+        return type##Converter{}.toXml(o, flags);                       \
     }                                                                   \
     bool fromXml(type* o, const std::string& xml, std::string* error) { \
-        return type##Converter{}(o, xml, error);                        \
+        return type##Converter{}.fromXml(o, xml, error);                \
     }
 
 // Create convert functions for public usage.
