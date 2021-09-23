@@ -163,6 +163,12 @@ struct MutateNodeParam {
     SerializeFlags::Type flags = SerializeFlags::EVERYTHING;
 };
 
+// When deserializing an XML document to an object, these parameters don't change until
+// the XML document is fully deserialized.
+struct BuildObjectParam {
+    std::string* error;
+};
+
 template <typename Object>
 struct XmlNodeConverter {
     XmlNodeConverter() {}
@@ -170,7 +176,7 @@ struct XmlNodeConverter {
 
    protected:
     virtual void mutateNode(const Object& object, NodeType* root, const MutateNodeParam&) const = 0;
-    virtual bool buildObject(Object* o, NodeType* n, std::string* error) const = 0;
+    virtual bool buildObject(Object* object, NodeType* root, const BuildObjectParam&) const = 0;
 
    public:
     virtual std::string elementName() const = 0;
@@ -192,7 +198,7 @@ struct XmlNodeConverter {
         if (nameOf(root) != this->elementName()) {
             return false;
         }
-        return this->buildObject(object, root, error);
+        return this->buildObject(object, root, BuildObjectParam{error});
     }
     inline bool operator()(Object* o, const std::string& xml, std::string* error) const {
         std::string errorBuffer;
@@ -419,8 +425,8 @@ struct XmlTextConverter : public XmlNodeConverter<Object> {
                     const MutateNodeParam& param) const override {
         appendText(root, ::android::vintf::to_string(object), param.d);
     }
-    virtual bool buildObject(Object* object, NodeType* root, std::string* error) const override {
-        return this->parseText(root, object, error);
+    bool buildObject(Object* object, NodeType* root, const BuildObjectParam& param) const override {
+        return this->parseText(root, object, param.error);
     }
 };
 
@@ -431,9 +437,9 @@ struct XmlPairConverter : public XmlNodeConverter<Pair> {
         appendChild(root, FirstConverter{}(object.first, param));
         appendChild(root, SecondConverter{}(object.second, param));
     }
-    virtual bool buildObject(Pair* pair, NodeType* root, std::string* error) const override {
-        return this->parseChild(root, FirstConverter{}, &pair->first, error) &&
-               this->parseChild(root, SecondConverter{}, &pair->second, error);
+    bool buildObject(Pair* object, NodeType* root, const BuildObjectParam& param) const override {
+        return this->parseChild(root, FirstConverter{}, &object->first, param.error) &&
+               this->parseChild(root, SecondConverter{}, &object->second, param.error);
     }
 };
 
@@ -454,8 +460,9 @@ struct AidlVersionConverter : public XmlNodeConverter<Version> {
                     const MutateNodeParam& param) const override {
         appendText(root, aidlVersionToString(object), param.d);
     }
-    bool buildObject(Version* object, NodeType* root, std::string* error) const override {
-        return parseText(root, object, {parseAidlVersion}, error);
+    bool buildObject(Version* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        return parseText(root, object, {parseAidlVersion}, param.error);
     }
 };
 
@@ -467,8 +474,9 @@ struct AidlVersionRangeConverter : public XmlNodeConverter<VersionRange> {
                     const MutateNodeParam& param) const override {
         appendText(root, aidlVersionRangeToString(object), param.d);
     }
-    bool buildObject(VersionRange* object, NodeType* root, std::string* error) const override {
-        return parseText(root, object, {parseAidlVersionRange}, error);
+    bool buildObject(VersionRange* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        return parseText(root, object, {parseAidlVersionRange}, param.error);
     }
 };
 
@@ -487,14 +495,15 @@ struct TransportArchConverter : public XmlNodeConverter<TransportArch> {
         }
         appendText(root, ::android::vintf::to_string(object.transport), param.d);
     }
-    bool buildObject(TransportArch* object, NodeType* root, std::string* error) const override {
-        if (!parseOptionalAttr(root, "arch", Arch::ARCH_EMPTY, &object->arch, error) ||
-            !parseOptionalAttr(root, "ip", {}, &object->ip, error) ||
-            !parseOptionalAttr(root, "port", {}, &object->port, error) ||
-            !parseText(root, &object->transport, error)) {
+    bool buildObject(TransportArch* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        if (!parseOptionalAttr(root, "arch", Arch::ARCH_EMPTY, &object->arch, param.error) ||
+            !parseOptionalAttr(root, "ip", {}, &object->ip, param.error) ||
+            !parseOptionalAttr(root, "port", {}, &object->port, param.error) ||
+            !parseText(root, &object->transport, param.error)) {
             return false;
         }
-        if (!object->isValid(error)) {
+        if (!object->isValid(param.error)) {
             return false;
         }
         return true;
@@ -509,14 +518,14 @@ struct KernelConfigTypedValueConverter : public XmlNodeConverter<KernelConfigTyp
         appendText(root, ::android::vintf::to_string(object), param.d);
     }
     bool buildObject(KernelConfigTypedValue* object, NodeType* root,
-                     std::string* error) const override {
+                     const BuildObjectParam& param) const override {
         std::string stringValue;
-        if (!parseAttr(root, "type", &object->mType, error) ||
-            !parseText(root, &stringValue, error)) {
+        if (!parseAttr(root, "type", &object->mType, param.error) ||
+            !parseText(root, &stringValue, param.error)) {
             return false;
         }
         if (!::android::vintf::parseKernelConfigValue(stringValue, object)) {
-            *error = "Could not parse kernel config value \"" + stringValue + "\"";
+            *param.error = "Could not parse kernel config value \"" + stringValue + "\"";
             return false;
         }
         return true;
@@ -540,32 +549,33 @@ struct HalInterfaceConverter : public XmlNodeConverter<HalInterface> {
         appendTextElements(root, "instance", object.mInstances, param.d);
         appendTextElements(root, "regex-instance", object.mRegexes, param.d);
     }
-    bool buildObject(HalInterface* intf, NodeType* root, std::string* error) const override {
+    bool buildObject(HalInterface* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
         std::vector<std::string> instances;
         std::vector<std::string> regexes;
-        if (!parseTextElement(root, "name", &intf->mName, error) ||
-            !parseTextElements(root, "instance", &instances, error) ||
-            !parseTextElements(root, "regex-instance", &regexes, error)) {
+        if (!parseTextElement(root, "name", &object->mName, param.error) ||
+            !parseTextElements(root, "instance", &instances, param.error) ||
+            !parseTextElements(root, "regex-instance", &regexes, param.error)) {
             return false;
         }
         bool success = true;
         for (const auto& e : instances) {
-            if (!intf->insertInstance(e, false /* isRegex */)) {
-                if (!error->empty()) *error += "\n";
-                *error += "Duplicated instance '" + e + "' in " + intf->name();
+            if (!object->insertInstance(e, false /* isRegex */)) {
+                if (!param.error->empty()) *param.error += "\n";
+                *param.error += "Duplicated instance '" + e + "' in " + object->name();
                 success = false;
             }
         }
         for (const auto& e : regexes) {
             details::Regex regex;
             if (!regex.compile(e)) {
-                if (!error->empty()) *error += "\n";
-                *error += "Invalid regular expression '" + e + "' in " + intf->name();
+                if (!param.error->empty()) *param.error += "\n";
+                *param.error += "Invalid regular expression '" + e + "' in " + object->name();
                 success = false;
             }
-            if (!intf->insertInstance(e, true /* isRegex */)) {
-                if (!error->empty()) *error += "\n";
-                *error += "Duplicated regex-instance '" + e + "' in " + intf->name();
+            if (!object->insertInstance(e, true /* isRegex */)) {
+                if (!param.error->empty()) *param.error += "\n";
+                *param.error += "Duplicated regex-instance '" + e + "' in " + object->name();
                 success = false;
             }
         }
@@ -593,17 +603,19 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
         }
         appendChildren(root, HalInterfaceConverter{}, iterateValues(object.interfaces), param);
     }
-    bool buildObject(MatrixHal* object, NodeType* root, std::string* error) const override {
+    bool buildObject(MatrixHal* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
         std::vector<HalInterface> interfaces;
-        if (!parseOptionalAttr(root, "format", HalFormat::HIDL, &object->format, error) ||
+        if (!parseOptionalAttr(root, "format", HalFormat::HIDL, &object->format, param.error) ||
             !parseOptionalAttr(root, "optional", false /* defaultValue */, &object->optional,
-                               error) ||
-            !parseTextElement(root, "name", &object->name, error) ||
-            !parseChildren(root, HalInterfaceConverter{}, &interfaces, error)) {
+                               param.error) ||
+            !parseTextElement(root, "name", &object->name, param.error) ||
+            !parseChildren(root, HalInterfaceConverter{}, &interfaces, param.error)) {
             return false;
         }
         if (object->format == HalFormat::AIDL) {
-            if (!parseChildren(root, AidlVersionRangeConverter{}, &object->versionRanges, error)) {
+            if (!parseChildren(root, AidlVersionRangeConverter{}, &object->versionRanges,
+                               param.error)) {
                 return false;
             }
             // Insert fake version for AIDL HALs so that compatibility check for AIDL and other
@@ -612,7 +624,8 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
                 object->versionRanges.push_back(details::kDefaultAidlVersionRange);
             }
         } else {
-            if (!parseChildren(root, VersionRangeConverter{}, &object->versionRanges, error)) {
+            if (!parseChildren(root, VersionRangeConverter{}, &object->versionRanges,
+                               param.error)) {
                 return false;
             }
         }
@@ -620,21 +633,21 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
             std::string name{interface.name()};
             auto res = object->interfaces.emplace(std::move(name), std::move(interface));
             if (!res.second) {
-                *error = "Duplicated interface entry \"" + res.first->first +
-                         "\"; if additional instances are needed, add them to the "
-                         "existing <interface> node.";
+                *param.error = "Duplicated interface entry \"" + res.first->first +
+                               "\"; if additional instances are needed, add them to the "
+                               "existing <interface> node.";
                 return false;
             }
         }
 // Do not check for target-side libvintf to avoid restricting ability for upgrade accidentally.
 #ifndef LIBVINTF_TARGET
-        if (!checkAdditionalRestrictionsOnHal(*object, error)) {
+        if (!checkAdditionalRestrictionsOnHal(*object, param.error)) {
             return false;
         }
 #endif
 
-        if (!object->isValid(error)) {
-            error->insert(0, "'" + object->name + "' is not a valid Matrix HAL: ");
+        if (!object->isValid(param.error)) {
+            param.error->insert(0, "'" + object->name + "' is not a valid Matrix HAL: ");
             return false;
         }
         return true;
@@ -678,8 +691,8 @@ struct MatrixKernelConditionsConverter : public XmlNodeConverter<std::vector<Ker
         appendChildren(root, MatrixKernelConfigConverter{}, object, param);
     }
     bool buildObject(std::vector<KernelConfig>* object, NodeType* root,
-                     std::string* error) const override {
-        return parseChildren(root, MatrixKernelConfigConverter{}, object, error);
+                     const BuildObjectParam& param) const override {
+        return parseChildren(root, MatrixKernelConfigConverter{}, object, param.error);
     }
 };
 
@@ -704,13 +717,15 @@ struct MatrixKernelConverter : public XmlNodeConverter<MatrixKernel> {
             appendChildren(root, MatrixKernelConfigConverter{}, object.mConfigs, param);
         }
     }
-    bool buildObject(MatrixKernel* object, NodeType* root, std::string* error) const override {
+    bool buildObject(MatrixKernel* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
         Level sourceMatrixLevel = Level::UNSPECIFIED;
-        if (!parseAttr(root, "version", &object->mMinLts, error) ||
-            !parseOptionalAttr(root, "level", Level::UNSPECIFIED, &sourceMatrixLevel, error) ||
+        if (!parseAttr(root, "version", &object->mMinLts, param.error) ||
+            !parseOptionalAttr(root, "level", Level::UNSPECIFIED, &sourceMatrixLevel,
+                               param.error) ||
             !parseOptionalChild(root, MatrixKernelConditionsConverter{}, {}, &object->mConditions,
-                                error) ||
-            !parseChildren(root, MatrixKernelConfigConverter{}, &object->mConfigs, error)) {
+                                param.error) ||
+            !parseChildren(root, MatrixKernelConfigConverter{}, &object->mConfigs, param.error)) {
             return false;
         }
         object->setSourceMatrixLevel(sourceMatrixLevel);
@@ -763,41 +778,45 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             appendAttr(root, "max-level", object.getMaxLevel());
         }
     }
-    bool buildObject(ManifestHal* object, NodeType* root, std::string* error) const override {
+    bool buildObject(ManifestHal* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
         std::vector<HalInterface> interfaces;
-        if (!parseOptionalAttr(root, "format", HalFormat::HIDL, &object->format, error) ||
-            !parseOptionalAttr(root, "override", false, &object->mIsOverride, error) ||
-            !parseOptionalAttr(root, "updatable-via-apex", {}, &object->mUpdatableViaApex, error) ||
-            !parseTextElement(root, "name", &object->name, error) ||
+        if (!parseOptionalAttr(root, "format", HalFormat::HIDL, &object->format, param.error) ||
+            !parseOptionalAttr(root, "override", false, &object->mIsOverride, param.error) ||
+            !parseOptionalAttr(root, "updatable-via-apex", {}, &object->mUpdatableViaApex,
+                               param.error) ||
+            !parseTextElement(root, "name", &object->name, param.error) ||
             !parseOptionalChild(root, TransportArchConverter{}, {}, &object->transportArch,
-                                error) ||
-            !parseChildren(root, HalInterfaceConverter{}, &interfaces, error) ||
-            !parseOptionalAttr(root, "max-level", Level::UNSPECIFIED, &object->mMaxLevel, error)) {
+                                param.error) ||
+            !parseChildren(root, HalInterfaceConverter{}, &interfaces, param.error) ||
+            !parseOptionalAttr(root, "max-level", Level::UNSPECIFIED, &object->mMaxLevel,
+                               param.error)) {
             return false;
         }
 
         switch (object->format) {
             case HalFormat::HIDL: {
-                if (!parseChildren(root, VersionConverter{}, &object->versions, error))
+                if (!parseChildren(root, VersionConverter{}, &object->versions, param.error))
                     return false;
                 if (object->transportArch.empty()) {
-                    *error = "HIDL HAL '" + object->name + "' should have <transport> defined.";
+                    *param.error =
+                        "HIDL HAL '" + object->name + "' should have <transport> defined.";
                     return false;
                 }
                 if (object->transportArch.transport == Transport::INET ||
                     object->transportArch.ip.has_value() ||
                     object->transportArch.port.has_value()) {
-                    *error = "HIDL HAL '" + object->name +
-                             "' should not have <transport> \"inet\" " +
-                             "or ip or port attributes defined.";
+                    *param.error = "HIDL HAL '" + object->name +
+                                   "' should not have <transport> \"inet\" " +
+                                   "or ip or port attributes defined.";
                     return false;
                 }
             } break;
             case HalFormat::NATIVE: {
-                if (!parseChildren(root, VersionConverter{}, &object->versions, error))
+                if (!parseChildren(root, VersionConverter{}, &object->versions, param.error))
                     return false;
                 if (!object->transportArch.empty()) {
-                    *error =
+                    *param.error =
                         "Native HAL '" + object->name + "' should not have <transport> defined.";
                     return false;
                 }
@@ -809,7 +828,7 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                                  << object->name << ". Only \"inet\" supported.";
                     object->transportArch = {};
                 }
-                if (!parseChildren(root, AidlVersionConverter{}, &object->versions, error)) {
+                if (!parseChildren(root, AidlVersionConverter{}, &object->versions, param.error)) {
                     return false;
                 }
                 // Insert fake version for AIDL HALs so that forEachInstance works.
@@ -823,40 +842,40 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                                   object->format);
             } break;
         }
-        if (!object->transportArch.isValid(error)) return false;
+        if (!object->transportArch.isValid(param.error)) return false;
 
         object->interfaces.clear();
         for (auto &&interface : interfaces) {
             auto res = object->interfaces.emplace(interface.name(), std::move(interface));
             if (!res.second) {
-                *error = "Duplicated interface entry \"" + res.first->first +
-                         "\"; if additional instances are needed, add them to the "
-                         "existing <interface> node.";
+                *param.error = "Duplicated interface entry \"" + res.first->first +
+                               "\"; if additional instances are needed, add them to the "
+                               "existing <interface> node.";
                 return false;
             }
         }
 // Do not check for target-side libvintf to avoid restricting upgrade accidentally.
 #ifndef LIBVINTF_TARGET
-        if (!checkAdditionalRestrictionsOnHal(*object, error)) {
+        if (!checkAdditionalRestrictionsOnHal(*object, param.error)) {
             return false;
         }
 #endif
 
         std::set<FqInstance> fqInstances;
-        if (!parseChildren(root, FqInstanceConverter{}, &fqInstances, error)) {
+        if (!parseChildren(root, FqInstanceConverter{}, &fqInstances, param.error)) {
             return false;
         }
         std::set<FqInstance> fqInstancesToInsert;
         for (auto& e : fqInstances) {
             if (e.hasPackage()) {
-                *error = "Should not specify package: \"" + e.string() + "\"";
+                *param.error = "Should not specify package: \"" + e.string() + "\"";
                 return false;
             }
             if (object->format == HalFormat::AIDL) {
                 // <fqname> in AIDL HALs should not contain version.
                 if (e.hasVersion()) {
-                    *error = "Should not specify version in <fqname> for AIDL HAL: \"" +
-                             e.string() + "\"";
+                    *param.error = "Should not specify version in <fqname> for AIDL HAL: \"" +
+                                   e.string() + "\"";
                     return false;
                 }
                 // Put in the fake kDefaultAidlVersion so that HalManifest can
@@ -872,12 +891,12 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                 fqInstancesToInsert.emplace(std::move(e));
             }
         }
-        if (!object->insertInstances(fqInstancesToInsert, error)) {
+        if (!object->insertInstances(fqInstancesToInsert, param.error)) {
             return false;
         }
 
-        if (!object->isValid(error)) {
-            error->insert(0, "'" + object->name + "' is not a valid Manifest HAL: ");
+        if (!object->isValid(param.error)) {
+            param.error->insert(0, "'" + object->name + "' is not a valid Manifest HAL: ");
             return false;
         }
 
@@ -918,11 +937,12 @@ struct SepolicyConverter : public XmlNodeConverter<Sepolicy> {
         appendChild(root, KernelSepolicyVersionConverter{}(object.kernelSepolicyVersion(), param));
         appendChildren(root, SepolicyVersionConverter{}, object.sepolicyVersions(), param);
     }
-    bool buildObject(Sepolicy* object, NodeType* root, std::string* error) const override {
+    bool buildObject(Sepolicy* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
         if (!parseChild(root, KernelSepolicyVersionConverter{}, &object->mKernelSepolicyVersion,
-                        error) ||
+                        param.error) ||
             !parseChildren(root, SepolicyVersionConverter{}, &object->mSepolicyVersionRanges,
-                           error)) {
+                           param.error)) {
             return false;
         }
         return true;
@@ -948,9 +968,9 @@ struct [[deprecated]] VndkConverter : public XmlNodeConverter<Vndk> {
         appendChild(root, VndkVersionRangeConverter{}(object.mVersionRange, param));
         appendChildren(root, VndkLibraryConverter{}, object.mLibraries, param);
     }
-    bool buildObject(Vndk* object, NodeType* root, std::string* error) const override {
-        if (!parseChild(root, VndkVersionRangeConverter{}, &object->mVersionRange, error) ||
-            !parseChildren(root, VndkLibraryConverter{}, &object->mLibraries, error)) {
+    bool buildObject(Vndk* object, NodeType* root, const BuildObjectParam& param) const override {
+        if (!parseChild(root, VndkVersionRangeConverter{}, &object->mVersionRange, param.error) ||
+            !parseChildren(root, VndkLibraryConverter{}, &object->mLibraries, param.error)) {
             return false;
         }
         return true;
@@ -964,9 +984,10 @@ struct VendorNdkConverter : public XmlNodeConverter<VendorNdk> {
         appendChild(root, VndkVersionConverter{}(object.mVersion, param));
         appendChildren(root, VndkLibraryConverter{}, object.mLibraries, param);
     }
-    bool buildObject(VendorNdk* object, NodeType* root, std::string* error) const override {
-        if (!parseChild(root, VndkVersionConverter{}, &object->mVersion, error) ||
-            !parseChildren(root, VndkLibraryConverter{}, &object->mLibraries, error)) {
+    bool buildObject(VendorNdk* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        if (!parseChild(root, VndkVersionConverter{}, &object->mVersion, param.error) ||
+            !parseChildren(root, VndkLibraryConverter{}, &object->mLibraries, param.error)) {
             return false;
         }
         return true;
@@ -983,8 +1004,9 @@ struct SystemSdkConverter : public XmlNodeConverter<SystemSdk> {
                     const MutateNodeParam& param) const override {
         appendChildren(root, SystemSdkVersionConverter{}, object.versions(), param);
     }
-    bool buildObject(SystemSdk* object, NodeType* root, std::string* error) const override {
-        return parseChildren(root, SystemSdkVersionConverter{}, &object->mVersions, error);
+    bool buildObject(SystemSdk* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        return parseChildren(root, SystemSdkVersionConverter{}, &object->mVersions, param.error);
     }
 };
 
@@ -994,8 +1016,9 @@ struct HalManifestSepolicyConverter : public XmlNodeConverter<Version> {
                     const MutateNodeParam& param) const override {
         appendChild(root, VersionConverter{}(object, param));
     }
-    bool buildObject(Version* object, NodeType* root, std::string* error) const override {
-        return parseChild(root, VersionConverter{}, object, error);
+    bool buildObject(Version* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        return parseChild(root, VersionConverter{}, object, param.error);
     }
 };
 
@@ -1009,10 +1032,11 @@ struct ManifestXmlFileConverter : public XmlNodeConverter<ManifestXmlFile> {
             appendTextElement(root, "path", object.overriddenPath(), param.d);
         }
     }
-    bool buildObject(ManifestXmlFile* object, NodeType* root, std::string* error) const override {
-        if (!parseTextElement(root, "name", &object->mName, error) ||
-            !parseChild(root, VersionConverter{}, &object->mVersion, error) ||
-            !parseOptionalTextElement(root, "path", {}, &object->mOverriddenPath, error)) {
+    bool buildObject(ManifestXmlFile* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        if (!parseTextElement(root, "name", &object->mName, param.error) ||
+            !parseChild(root, VersionConverter{}, &object->mVersion, param.error) ||
+            !parseOptionalTextElement(root, "path", {}, &object->mOverriddenPath, param.error)) {
             return false;
         }
         return true;
@@ -1047,10 +1071,12 @@ struct KernelInfoConverter : public XmlNodeConverter<KernelInfo> {
             appendChildren(root, StringKernelConfigConverter{}, object.configs(), param);
         }
     }
-    bool buildObject(KernelInfo* o, NodeType* root, std::string* error) const override {
-        return parseOptionalAttr(root, "version", {}, &o->mVersion, error) &&
-               parseOptionalAttr(root, "target-level", Level::UNSPECIFIED, &o->mLevel, error) &&
-               parseChildren(root, StringKernelConfigConverter{}, &o->mConfigs, error);
+    bool buildObject(KernelInfo* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        return parseOptionalAttr(root, "version", {}, &object->mVersion, param.error) &&
+               parseOptionalAttr(root, "target-level", Level::UNSPECIFIED, &object->mLevel,
+                                 param.error) &&
+               parseChildren(root, StringKernelConfigConverter{}, &object->mConfigs, param.error);
     }
 };
 
@@ -1104,21 +1130,22 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
             appendChildren(root, ManifestXmlFileConverter{}, object.getXmlFiles(), param);
         }
     }
-    bool buildObject(HalManifest* object, NodeType* root, std::string* error) const override {
+    bool buildObject(HalManifest* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
         Version metaVersion;
-        if (!parseAttr(root, "version", &metaVersion, error)) return false;
+        if (!parseAttr(root, "version", &metaVersion, param.error)) return false;
         if (metaVersion > kMetaVersion) {
-            *error = "Unrecognized manifest.version " + to_string(metaVersion) + " (libvintf@" +
-                     to_string(kMetaVersion) + ")";
+            *param.error = "Unrecognized manifest.version " + to_string(metaVersion) +
+                           " (libvintf@" + to_string(kMetaVersion) + ")";
             return false;
         }
 
-        if (!parseAttr(root, "type", &object->mType, error)) {
+        if (!parseAttr(root, "type", &object->mType, param.error)) {
             return false;
         }
 
         std::vector<ManifestHal> hals;
-        if (!parseChildren(root, ManifestHalConverter{}, &hals, error)) {
+        if (!parseChildren(root, ManifestHalConverter{}, &hals, param.error)) {
             return false;
         }
         for (auto&& hal : hals) {
@@ -1130,68 +1157,70 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
             // <sepolicy> can be missing because it can be determined at build time, not hard-coded
             // in the XML file.
             if (!parseOptionalChild(root, HalManifestSepolicyConverter{}, {},
-                                    &object->device.mSepolicyVersion, error)) {
+                                    &object->device.mSepolicyVersion, param.error)) {
                 return false;
             }
 
             if (!parseOptionalAttr(root, "target-level", Level::UNSPECIFIED, &object->mLevel,
-                                   error)) {
+                                   param.error)) {
                 return false;
             }
 
-            if (!parseOptionalChild(root, KernelInfoConverter{}, &object->device.mKernel, error)) {
+            if (!parseOptionalChild(root, KernelInfoConverter{}, &object->device.mKernel,
+                                    param.error)) {
                 return false;
             }
         } else if (object->mType == SchemaType::FRAMEWORK) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            if (!parseChildren(root, VndkConverter{}, &object->framework.mVndks, error)) {
+            if (!parseChildren(root, VndkConverter{}, &object->framework.mVndks, param.error)) {
                 return false;
             }
-            for (const auto &vndk : object->framework.mVndks) {
+            for (const auto& vndk : object->framework.mVndks) {
                 if (!vndk.mVersionRange.isSingleVersion()) {
-                    *error = "vndk.version " + to_string(vndk.mVersionRange) +
-                             " cannot be a range for manifests";
+                    *param.error = "vndk.version " + to_string(vndk.mVersionRange) +
+                                   " cannot be a range for manifests";
                     return false;
                 }
             }
 #pragma clang diagnostic pop
 
-            if (!parseChildren(root, VendorNdkConverter{}, &object->framework.mVendorNdks, error)) {
+            if (!parseChildren(root, VendorNdkConverter{}, &object->framework.mVendorNdks,
+                               param.error)) {
                 return false;
             }
 
             std::set<std::string> vendorNdkVersions;
             for (const auto& vendorNdk : object->framework.mVendorNdks) {
                 if (vendorNdkVersions.find(vendorNdk.version()) != vendorNdkVersions.end()) {
-                    *error = "Duplicated manifest.vendor-ndk.version " + vendorNdk.version();
+                    *param.error = "Duplicated manifest.vendor-ndk.version " + vendorNdk.version();
                     return false;
                 }
                 vendorNdkVersions.insert(vendorNdk.version());
             }
 
             if (!parseOptionalChild(root, SystemSdkConverter{}, {}, &object->framework.mSystemSdk,
-                                    error)) {
+                                    param.error)) {
                 return false;
             }
         }
         for (auto &&hal : hals) {
             std::string description{hal.name};
             if (!object->add(std::move(hal))) {
-                *error = "Duplicated manifest.hal entry " + description;
+                *param.error = "Duplicated manifest.hal entry " + description;
                 return false;
             }
         }
 
         std::vector<ManifestXmlFile> xmlFiles;
-        if (!parseChildren(root, ManifestXmlFileConverter{}, &xmlFiles, error)) {
+        if (!parseChildren(root, ManifestXmlFileConverter{}, &xmlFiles, param.error)) {
             return false;
         }
         for (auto&& xmlFile : xmlFiles) {
             std::string description{xmlFile.name()};
             if (!object->addXmlFile(std::move(xmlFile))) {
-                *error = "Duplicated manifest.xmlfile entry " + description +
-                         "; entries cannot have duplicated name and version";
+                *param.error = "Duplicated manifest.xmlfile entry " + description +
+                               "; entries cannot have duplicated name and version";
                 return false;
             }
         }
@@ -1210,8 +1239,9 @@ struct AvbConverter : public XmlNodeConverter<Version> {
                     const MutateNodeParam& param) const override {
         appendChild(root, AvbVersionConverter{}(object, param));
     }
-    bool buildObject(Version* object, NodeType* root, std::string* error) const override {
-        return parseChild(root, AvbVersionConverter{}, object, error);
+    bool buildObject(Version* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        return parseChild(root, AvbVersionConverter{}, object, param.error);
     }
 };
 
@@ -1227,12 +1257,13 @@ struct MatrixXmlFileConverter : public XmlNodeConverter<MatrixXmlFile> {
             appendTextElement(root, "path", object.overriddenPath(), param.d);
         }
     }
-    bool buildObject(MatrixXmlFile* object, NodeType* root, std::string* error) const override {
-        if (!parseTextElement(root, "name", &object->mName, error) ||
-            !parseAttr(root, "format", &object->mFormat, error) ||
-            !parseOptionalAttr(root, "optional", false, &object->mOptional, error) ||
-            !parseChild(root, VersionRangeConverter{}, &object->mVersionRange, error) ||
-            !parseOptionalTextElement(root, "path", {}, &object->mOverriddenPath, error)) {
+    bool buildObject(MatrixXmlFile* object, NodeType* root,
+                     const BuildObjectParam& param) const override {
+        if (!parseTextElement(root, "name", &object->mName, param.error) ||
+            !parseAttr(root, "format", &object->mFormat, param.error) ||
+            !parseOptionalAttr(root, "optional", false, &object->mOptional, param.error) ||
+            !parseChild(root, VersionRangeConverter{}, &object->mVersionRange, param.error) ||
+            !parseOptionalTextElement(root, "path", {}, &object->mOverriddenPath, param.error)) {
             return false;
         }
         return true;
@@ -1296,29 +1327,30 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
         }
     }
     bool buildObject(CompatibilityMatrix* object, NodeType* root,
-                     std::string* error) const override {
+                     const BuildObjectParam& param) const override {
         Version metaVersion;
-        if (!parseAttr(root, "version", &metaVersion, error)) return false;
+        if (!parseAttr(root, "version", &metaVersion, param.error)) return false;
         if (metaVersion > kMetaVersion) {
-            *error = "Unrecognized compatibility-matrix.version " + to_string(metaVersion) +
-                     " (libvintf@" + to_string(kMetaVersion) + ")";
+            *param.error = "Unrecognized compatibility-matrix.version " + to_string(metaVersion) +
+                           " (libvintf@" + to_string(kMetaVersion) + ")";
             return false;
         }
 
         std::vector<MatrixHal> hals;
-        if (!parseAttr(root, "type", &object->mType, error) ||
-            !parseChildren(root, MatrixHalConverter{}, &hals, error)) {
+        if (!parseAttr(root, "type", &object->mType, param.error) ||
+            !parseChildren(root, MatrixHalConverter{}, &hals, param.error)) {
             return false;
         }
 
         if (object->mType == SchemaType::FRAMEWORK) {
             // <avb> and <sepolicy> can be missing because it can be determined at build time, not
             // hard-coded in the XML file.
-            if (!parseChildren(root, MatrixKernelConverter{}, &object->framework.mKernels, error) ||
+            if (!parseChildren(root, MatrixKernelConverter{}, &object->framework.mKernels,
+                               param.error) ||
                 !parseOptionalChild(root, SepolicyConverter{}, {}, &object->framework.mSepolicy,
-                                    error) ||
+                                    param.error) ||
                 !parseOptionalChild(root, AvbConverter{}, {}, &object->framework.mAvbMetaVersion,
-                                    error)) {
+                                    param.error)) {
                 return false;
             }
 
@@ -1329,14 +1361,15 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
                     continue;
                 }
                 if (!kernel.conditions().empty()) {
-                    *error = "First <kernel> for version " + to_string(minLts) +
-                             " must have empty <conditions> for backwards compatibility.";
+                    *param.error = "First <kernel> for version " + to_string(minLts) +
+                                   " must have empty <conditions> for backwards compatibility.";
                     return false;
                 }
                 seenKernelVersions.insert(minLts);
             }
 
-            if (!parseOptionalAttr(root, "level", Level::UNSPECIFIED, &object->mLevel, error)) {
+            if (!parseOptionalAttr(root, "level", Level::UNSPECIFIED, &object->mLevel,
+                                   param.error)) {
                 return false;
             }
 
@@ -1345,42 +1378,43 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
             // in the XML file.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            if (!parseOptionalChild(root, VndkConverter{}, {}, &object->device.mVndk, error)) {
+            if (!parseOptionalChild(root, VndkConverter{}, {}, &object->device.mVndk,
+                                    param.error)) {
                 return false;
             }
 #pragma clang diagnostic pop
 
             if (!parseOptionalChild(root, VendorNdkConverter{}, {}, &object->device.mVendorNdk,
-                                    error)) {
+                                    param.error)) {
                 return false;
             }
 
             if (!parseOptionalChild(root, SystemSdkConverter{}, {}, &object->device.mSystemSdk,
-                                    error)) {
+                                    param.error)) {
                 return false;
             }
         }
 
         for (auto &&hal : hals) {
             if (!object->add(std::move(hal))) {
-                *error = "Duplicated compatibility-matrix.hal entry";
+                *param.error = "Duplicated compatibility-matrix.hal entry";
                 return false;
             }
         }
 
         std::vector<MatrixXmlFile> xmlFiles;
-        if (!parseChildren(root, MatrixXmlFileConverter{}, &xmlFiles, error)) {
+        if (!parseChildren(root, MatrixXmlFileConverter{}, &xmlFiles, param.error)) {
             return false;
         }
         for (auto&& xmlFile : xmlFiles) {
             if (!xmlFile.optional()) {
-                *error = "compatibility-matrix.xmlfile entry " + xmlFile.name() +
-                         " has to be optional for compatibility matrix version 1.0";
+                *param.error = "compatibility-matrix.xmlfile entry " + xmlFile.name() +
+                               " has to be optional for compatibility matrix version 1.0";
                 return false;
             }
             std::string description{xmlFile.name()};
             if (!object->addXmlFile(std::move(xmlFile))) {
-                *error = "Duplicated compatibility-matrix.xmlfile entry " + description;
+                *param.error = "Duplicated compatibility-matrix.xmlfile entry " + description;
                 return false;
             }
         }
