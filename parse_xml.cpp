@@ -156,6 +156,8 @@ bool parse(const std::string& s, std::optional<uint64_t>* out) {
 
 // When serializing an object to an XML document, these parameters don't change until
 // the object is fully serialized.
+// These parameters are also passed to converters of child nodes so they see the same
+// serialization parameters.
 struct MutateNodeParam {
     DocType* d;
     SerializeFlags::Type flags = SerializeFlags::EVERYTHING;
@@ -174,15 +176,14 @@ struct XmlNodeConverter {
     virtual std::string elementName() const = 0;
 
     // convenience methods for user
-    inline NodeType* operator()(const Object& o, DocType* d,
-                                SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const {
-        NodeType *root = createNode(this->elementName(), d);
-        this->mutateNode(o, root, MutateNodeParam{d, flags});
+    inline NodeType* operator()(const Object& o, const MutateNodeParam& param) const {
+        NodeType* root = createNode(this->elementName(), param.d);
+        this->mutateNode(o, root, param);
         return root;
     }
     inline std::string operator()(const Object& o, SerializeFlags::Type flags) const {
         DocType *doc = createDocument();
-        appendChild(doc, (*this)(o, doc, flags));
+        appendChild(doc, (*this)(o, MutateNodeParam{doc, flags}));
         std::string s = printDocument(doc);
         deleteDocument(doc);
         return s;
@@ -240,10 +241,9 @@ struct XmlNodeConverter {
 
     template <typename T, typename Array>
     inline void appendChildren(NodeType* parent, const XmlNodeConverter<T>& conv,
-                               const Array& array, DocType* d,
-                               SerializeFlags::Type flags = SerializeFlags::EVERYTHING) const {
+                               const Array& array, const MutateNodeParam& param) const {
         for (const T &t : array) {
-            appendChild(parent, conv(t, d, flags));
+            appendChild(parent, conv(t, param));
         }
     }
 
@@ -428,8 +428,8 @@ template <typename Pair, typename FirstConverter, typename SecondConverter>
 struct XmlPairConverter : public XmlNodeConverter<Pair> {
     void mutateNode(const Pair& object, NodeType* root,
                     const MutateNodeParam& param) const override {
-        appendChild(root, FirstConverter{}(object.first, param.d));
-        appendChild(root, SecondConverter{}(object.second, param.d));
+        appendChild(root, FirstConverter{}(object.first, param));
+        appendChild(root, SecondConverter{}(object.second, param));
     }
     virtual bool buildObject(Pair* pair, NodeType* root, std::string* error) const override {
         return this->parseChild(root, FirstConverter{}, &pair->first, error) &&
@@ -586,12 +586,12 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
             // tag.
             if (object.versionRanges.size() != 1 ||
                 object.versionRanges[0] != details::kDefaultAidlVersionRange) {
-                appendChildren(root, AidlVersionRangeConverter{}, object.versionRanges, param.d);
+                appendChildren(root, AidlVersionRangeConverter{}, object.versionRanges, param);
             }
         } else {
-            appendChildren(root, VersionRangeConverter{}, object.versionRanges, param.d);
+            appendChildren(root, VersionRangeConverter{}, object.versionRanges, param);
         }
-        appendChildren(root, HalInterfaceConverter{}, iterateValues(object.interfaces), param.d);
+        appendChildren(root, HalInterfaceConverter{}, iterateValues(object.interfaces), param);
     }
     bool buildObject(MatrixHal* object, NodeType* root, std::string* error) const override {
         std::vector<HalInterface> interfaces;
@@ -675,7 +675,7 @@ struct MatrixKernelConditionsConverter : public XmlNodeConverter<std::vector<Ker
     std::string elementName() const override { return "conditions"; }
     void mutateNode(const std::vector<KernelConfig>& object, NodeType* root,
                     const MutateNodeParam& param) const override {
-        appendChildren(root, MatrixKernelConfigConverter{}, object, param.d);
+        appendChildren(root, MatrixKernelConfigConverter{}, object, param);
     }
     bool buildObject(std::vector<KernelConfig>* object, NodeType* root,
                      std::string* error) const override {
@@ -698,10 +698,10 @@ struct MatrixKernelConverter : public XmlNodeConverter<MatrixKernel> {
         }
 
         if (!object.mConditions.empty()) {
-            appendChild(root, MatrixKernelConditionsConverter{}(object.mConditions, param.d));
+            appendChild(root, MatrixKernelConditionsConverter{}(object.mConditions, param));
         }
         if (param.flags.isKernelConfigsEnabled()) {
-            appendChildren(root, MatrixKernelConfigConverter{}, object.mConfigs, param.d);
+            appendChildren(root, MatrixKernelConfigConverter{}, object.mConfigs, param);
         }
     }
     bool buildObject(MatrixKernel* object, NodeType* root, std::string* error) const override {
@@ -731,19 +731,19 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         appendAttr(root, "format", object.format);
         appendTextElement(root, "name", object.name, param.d);
         if (!object.transportArch.empty()) {
-            appendChild(root, TransportArchConverter{}(object.transportArch, param.d));
+            appendChild(root, TransportArchConverter{}(object.transportArch, param));
         }
         if (object.format == HalFormat::AIDL) {
             // By default, buildObject() assumes a <version>0</version> tag if no <version> tag
             // is specified. Don't output any <version> tag if there's only one <version>0</version>
             // tag.
             if (object.versions.size() != 1 || object.versions[0] != details::kDefaultAidlVersion) {
-                appendChildren(root, AidlVersionConverter{}, object.versions, param.d);
+                appendChildren(root, AidlVersionConverter{}, object.versions, param);
             }
         } else {
-            appendChildren(root, VersionConverter{}, object.versions, param.d);
+            appendChildren(root, VersionConverter{}, object.versions, param);
         }
-        appendChildren(root, HalInterfaceConverter{}, iterateValues(object.interfaces), param.d);
+        appendChildren(root, HalInterfaceConverter{}, iterateValues(object.interfaces), param);
         if (object.isOverride()) {
             appendAttr(root, "override", object.isOverride());
         }
@@ -915,9 +915,8 @@ struct SepolicyConverter : public XmlNodeConverter<Sepolicy> {
     std::string elementName() const override { return "sepolicy"; }
     void mutateNode(const Sepolicy& object, NodeType* root,
                     const MutateNodeParam& param) const override {
-        appendChild(root,
-                    KernelSepolicyVersionConverter{}(object.kernelSepolicyVersion(), param.d));
-        appendChildren(root, SepolicyVersionConverter{}, object.sepolicyVersions(), param.d);
+        appendChild(root, KernelSepolicyVersionConverter{}(object.kernelSepolicyVersion(), param));
+        appendChildren(root, SepolicyVersionConverter{}, object.sepolicyVersions(), param);
     }
     bool buildObject(Sepolicy* object, NodeType* root, std::string* error) const override {
         if (!parseChild(root, KernelSepolicyVersionConverter{}, &object->mKernelSepolicyVersion,
@@ -946,8 +945,8 @@ struct [[deprecated]] VndkConverter : public XmlNodeConverter<Vndk> {
     std::string elementName() const override { return "vndk"; }
     void mutateNode(const Vndk& object, NodeType* root,
                     const MutateNodeParam& param) const override {
-        appendChild(root, VndkVersionRangeConverter{}(object.mVersionRange, param.d));
-        appendChildren(root, VndkLibraryConverter{}, object.mLibraries, param.d);
+        appendChild(root, VndkVersionRangeConverter{}(object.mVersionRange, param));
+        appendChildren(root, VndkLibraryConverter{}, object.mLibraries, param);
     }
     bool buildObject(Vndk* object, NodeType* root, std::string* error) const override {
         if (!parseChild(root, VndkVersionRangeConverter{}, &object->mVersionRange, error) ||
@@ -962,8 +961,8 @@ struct VendorNdkConverter : public XmlNodeConverter<VendorNdk> {
     std::string elementName() const override { return "vendor-ndk"; }
     void mutateNode(const VendorNdk& object, NodeType* root,
                     const MutateNodeParam& param) const override {
-        appendChild(root, VndkVersionConverter{}(object.mVersion, param.d));
-        appendChildren(root, VndkLibraryConverter{}, object.mLibraries, param.d);
+        appendChild(root, VndkVersionConverter{}(object.mVersion, param));
+        appendChildren(root, VndkLibraryConverter{}, object.mLibraries, param);
     }
     bool buildObject(VendorNdk* object, NodeType* root, std::string* error) const override {
         if (!parseChild(root, VndkVersionConverter{}, &object->mVersion, error) ||
@@ -982,7 +981,7 @@ struct SystemSdkConverter : public XmlNodeConverter<SystemSdk> {
     std::string elementName() const override { return "system-sdk"; }
     void mutateNode(const SystemSdk& object, NodeType* root,
                     const MutateNodeParam& param) const override {
-        appendChildren(root, SystemSdkVersionConverter{}, object.versions(), param.d);
+        appendChildren(root, SystemSdkVersionConverter{}, object.versions(), param);
     }
     bool buildObject(SystemSdk* object, NodeType* root, std::string* error) const override {
         return parseChildren(root, SystemSdkVersionConverter{}, &object->mVersions, error);
@@ -993,7 +992,7 @@ struct HalManifestSepolicyConverter : public XmlNodeConverter<Version> {
     std::string elementName() const override { return "sepolicy"; }
     void mutateNode(const Version& object, NodeType* root,
                     const MutateNodeParam& param) const override {
-        appendChild(root, VersionConverter{}(object, param.d));
+        appendChild(root, VersionConverter{}(object, param));
     }
     bool buildObject(Version* object, NodeType* root, std::string* error) const override {
         return parseChild(root, VersionConverter{}, object, error);
@@ -1005,7 +1004,7 @@ struct ManifestXmlFileConverter : public XmlNodeConverter<ManifestXmlFile> {
     void mutateNode(const ManifestXmlFile& object, NodeType* root,
                     const MutateNodeParam& param) const override {
         appendTextElement(root, "name", object.name(), param.d);
-        appendChild(root, VersionConverter{}(object.version(), param.d));
+        appendChild(root, VersionConverter{}(object.version(), param));
         if (!object.overriddenPath().empty()) {
             appendTextElement(root, "path", object.overriddenPath(), param.d);
         }
@@ -1045,7 +1044,7 @@ struct KernelInfoConverter : public XmlNodeConverter<KernelInfo> {
             appendAttr(root, "target-level", object.level());
         }
         if (param.flags.isKernelConfigsEnabled()) {
-            appendChildren(root, StringKernelConfigConverter{}, object.configs(), param.d);
+            appendChildren(root, StringKernelConfigConverter{}, object.configs(), param);
         }
     }
     bool buildObject(KernelInfo* o, NodeType* root, std::string* error) const override {
@@ -1067,13 +1066,13 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
         }
 
         if (param.flags.isHalsEnabled()) {
-            appendChildren(root, ManifestHalConverter{}, object.getHals(), param.d, param.flags);
+            appendChildren(root, ManifestHalConverter{}, object.getHals(), param);
         }
         if (object.mType == SchemaType::DEVICE) {
             if (param.flags.isSepolicyEnabled()) {
                 if (object.device.mSepolicyVersion != Version{}) {
                     appendChild(root, HalManifestSepolicyConverter{}(object.device.mSepolicyVersion,
-                                                                     param.d));
+                                                                     param));
                 }
             }
             if (object.mLevel != Level::UNSPECIFIED) {
@@ -1082,28 +1081,27 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
 
             if (param.flags.isKernelEnabled()) {
                 if (!!object.kernel()) {
-                    appendChild(root,
-                                KernelInfoConverter{}(*object.kernel(), param.d, param.flags));
+                    appendChild(root, KernelInfoConverter{}(*object.kernel(), param));
                 }
             }
         } else if (object.mType == SchemaType::FRAMEWORK) {
             if (param.flags.isVndkEnabled()) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-                appendChildren(root, VndkConverter{}, object.framework.mVndks, param.d);
+                appendChildren(root, VndkConverter{}, object.framework.mVndks, param);
 #pragma clang diagnostic pop
 
-                appendChildren(root, VendorNdkConverter{}, object.framework.mVendorNdks, param.d);
+                appendChildren(root, VendorNdkConverter{}, object.framework.mVendorNdks, param);
             }
             if (param.flags.isSsdkEnabled()) {
                 if (!object.framework.mSystemSdk.empty()) {
-                    appendChild(root, SystemSdkConverter{}(object.framework.mSystemSdk, param.d));
+                    appendChild(root, SystemSdkConverter{}(object.framework.mSystemSdk, param));
                 }
             }
         }
 
         if (param.flags.isXmlFilesEnabled()) {
-            appendChildren(root, ManifestXmlFileConverter{}, object.getXmlFiles(), param.d);
+            appendChildren(root, ManifestXmlFileConverter{}, object.getXmlFiles(), param);
         }
     }
     bool buildObject(HalManifest* object, NodeType* root, std::string* error) const override {
@@ -1210,7 +1208,7 @@ struct AvbConverter : public XmlNodeConverter<Version> {
     std::string elementName() const override { return "avb"; }
     void mutateNode(const Version& object, NodeType* root,
                     const MutateNodeParam& param) const override {
-        appendChild(root, AvbVersionConverter{}(object, param.d));
+        appendChild(root, AvbVersionConverter{}(object, param));
     }
     bool buildObject(Version* object, NodeType* root, std::string* error) const override {
         return parseChild(root, AvbVersionConverter{}, object, error);
@@ -1224,7 +1222,7 @@ struct MatrixXmlFileConverter : public XmlNodeConverter<MatrixXmlFile> {
         appendTextElement(root, "name", object.name(), param.d);
         appendAttr(root, "format", object.format());
         appendAttr(root, "optional", object.optional());
-        appendChild(root, VersionRangeConverter{}(object.versionRange(), param.d));
+        appendChild(root, VersionRangeConverter{}(object.versionRange(), param));
         if (!object.overriddenPath().empty()) {
             appendTextElement(root, "path", object.overriddenPath(), param.d);
         }
@@ -1253,21 +1251,20 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
         }
 
         if (param.flags.isHalsEnabled()) {
-            appendChildren(root, MatrixHalConverter{}, iterateValues(object.mHals), param.d);
+            appendChildren(root, MatrixHalConverter{}, iterateValues(object.mHals), param);
         }
         if (object.mType == SchemaType::FRAMEWORK) {
             if (param.flags.isKernelEnabled()) {
-                appendChildren(root, MatrixKernelConverter{}, object.framework.mKernels, param.d,
-                               param.flags);
+                appendChildren(root, MatrixKernelConverter{}, object.framework.mKernels, param);
             }
             if (param.flags.isSepolicyEnabled()) {
                 if (!(object.framework.mSepolicy == Sepolicy{})) {
-                    appendChild(root, SepolicyConverter{}(object.framework.mSepolicy, param.d));
+                    appendChild(root, SepolicyConverter{}(object.framework.mSepolicy, param));
                 }
             }
             if (param.flags.isAvbEnabled()) {
                 if (!(object.framework.mAvbMetaVersion == Version{})) {
-                    appendChild(root, AvbConverter{}(object.framework.mAvbMetaVersion, param.d));
+                    appendChild(root, AvbConverter{}(object.framework.mAvbMetaVersion, param));
                 }
             }
             if (object.mLevel != Level::UNSPECIFIED) {
@@ -1278,24 +1275,24 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
                 if (!(object.device.mVndk == Vndk{})) {
-                    appendChild(root, VndkConverter{}(object.device.mVndk, param.d));
+                    appendChild(root, VndkConverter{}(object.device.mVndk, param));
                 }
 #pragma clang diagnostic pop
 
                 if (!(object.device.mVendorNdk == VendorNdk{})) {
-                    appendChild(root, VendorNdkConverter{}(object.device.mVendorNdk, param.d));
+                    appendChild(root, VendorNdkConverter{}(object.device.mVendorNdk, param));
                 }
             }
 
             if (param.flags.isSsdkEnabled()) {
                 if (!object.device.mSystemSdk.empty()) {
-                    appendChild(root, SystemSdkConverter{}(object.device.mSystemSdk, param.d));
+                    appendChild(root, SystemSdkConverter{}(object.device.mSystemSdk, param));
                 }
             }
         }
 
         if (param.flags.isXmlFilesEnabled()) {
-            appendChildren(root, MatrixXmlFileConverter{}, object.getXmlFiles(), param.d);
+            appendChildren(root, MatrixXmlFileConverter{}, object.getXmlFiles(), param);
         }
     }
     bool buildObject(CompatibilityMatrix* object, NodeType* root,
