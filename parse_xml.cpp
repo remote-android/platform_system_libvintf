@@ -832,6 +832,12 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             case HalFormat::AIDL: {
                 if (!object->transportArch.empty() &&
                     object->transportArch.transport != Transport::INET) {
+                    if (param.metaVersion >= kMetaVersionAidlInet) {
+                        *param.error = "AIDL HAL '" + object->name +
+                                       R"(' only supports "inet" or empty <transport>, found ")" +
+                                       to_string(object->transportArch) + "\"";
+                        return false;
+                    }
                     LOG(WARNING) << "Ignoring <transport> on manifest <hal format=\"aidl\"> "
                                  << object->name << ". Only \"inet\" supported.";
                     object->transportArch = {};
