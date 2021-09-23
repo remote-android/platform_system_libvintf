@@ -165,10 +165,14 @@ struct MutateNodeParam {
 
 // When deserializing an XML document to an object, these parameters don't change until
 // the XML document is fully deserialized.
+// * Except metaVersion, which is immediately modified when parsing top-level <manifest>
+//   or <compatibility-matrix>, and unchanged thereafter;
+//   see HalManifestConverter::BuildObject and CompatibilityMatrixConverter::BuildObject)
 // These parameters are also passed to converters of child nodes so they see the same
 // deserialization parameters.
 struct BuildObjectParam {
     std::string* error;
+    Version metaVersion;
 };
 
 template <typename Object>
@@ -211,7 +215,11 @@ struct XmlNodeConverter {
             *error = "Not a valid XML";
             return false;
         }
-        bool ret = (*this)(o, getRootChild(doc), BuildObjectParam{error});
+        // For top-level <manifest> and <compatibility-matrix>, HalManifestConverter and
+        // CompatibilityMatrixConverter fills in metaversion and pass down to children.
+        // For other nodes, we don't know metaversion of the original XML, so just leave empty
+        // for maximum backwards compatibility.
+        bool ret = (*this)(o, getRootChild(doc), BuildObjectParam{error, {}});
         deleteDocument(doc);
         return ret;
     }
@@ -1131,11 +1139,11 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
         }
     }
     bool buildObject(HalManifest* object, NodeType* root,
-                     const BuildObjectParam& param) const override {
-        Version metaVersion;
-        if (!parseAttr(root, "version", &metaVersion, param.error)) return false;
-        if (metaVersion > kMetaVersion) {
-            *param.error = "Unrecognized manifest.version " + to_string(metaVersion) +
+                     const BuildObjectParam& constParam) const override {
+        BuildObjectParam param = constParam;
+        if (!parseAttr(root, "version", &param.metaVersion, param.error)) return false;
+        if (param.metaVersion > kMetaVersion) {
+            *param.error = "Unrecognized manifest.version " + to_string(param.metaVersion) +
                            " (libvintf@" + to_string(kMetaVersion) + ")";
             return false;
         }
@@ -1325,12 +1333,13 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
         }
     }
     bool buildObject(CompatibilityMatrix* object, NodeType* root,
-                     const BuildObjectParam& param) const override {
-        Version metaVersion;
-        if (!parseAttr(root, "version", &metaVersion, param.error)) return false;
-        if (metaVersion > kMetaVersion) {
-            *param.error = "Unrecognized compatibility-matrix.version " + to_string(metaVersion) +
-                           " (libvintf@" + to_string(kMetaVersion) + ")";
+                     const BuildObjectParam& constParam) const override {
+        BuildObjectParam param = constParam;
+        if (!parseAttr(root, "version", &param.metaVersion, param.error)) return false;
+        if (param.metaVersion > kMetaVersion) {
+            *param.error = "Unrecognized compatibility-matrix.version " +
+                           to_string(param.metaVersion) + " (libvintf@" + to_string(kMetaVersion) +
+                           ")";
             return false;
         }
 
