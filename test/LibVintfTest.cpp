@@ -4218,11 +4218,30 @@ TEST_F(LibVintfTest, GetTransportHidlHalWithFakeAidlVersion) {
                                         "default"));
 }
 
+TEST_F(LibVintfTest, RejectAidlHalsWithUnsupportedTransport) {
+    std::string error;
+    HalManifest manifest;
+    std::string manifestXml =
+        "<manifest " + kMetaVersionStr + R"( type="framework">"
+             <hal format="aidl">
+                 <name>android.system.foo</name>
+                 <transport>hwbinder</transport>
+                 <fqname>IFoo/default</fqname>
+             </hal>
+         </manifest>)";
+    EXPECT_FALSE(fromXml(&manifest, manifestXml, &error));
+    EXPECT_IN("android.system.foo", error);
+    EXPECT_IN("hwbinder", error);
+}
+
 TEST_F(LibVintfTest, GetTransportAidlHalWithDummyTransport) {
     // Check that even if <transport> is specified for AIDL, it is ignored and getHidlTransport
     // will return EMPTY.
+    // This is only supported for libvintf 4.0 and below.
+    constexpr Version kLegacyMetaVersion{4, 0};
+    ASSERT_GE(kMetaVersionAidlInet, kLegacyMetaVersion);
     std::string xml =
-        "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+        "<manifest version=\"" + to_string(kLegacyMetaVersion) + "\" type=\"framework\">\n"
         "    <hal format=\"aidl\">\n"
         "        <name>android.system.foo</name>\n"
         "        <transport>hwbinder</transport>\n"
