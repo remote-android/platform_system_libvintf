@@ -165,10 +165,14 @@ struct MutateNodeParam {
 
 // When deserializing an XML document to an object, these parameters don't change until
 // the XML document is fully deserialized.
+// * Except metaVersion, which is immediately modified when parsing top-level <manifest>
+//   or <compatibility-matrix>, and unchanged thereafter;
+//   see HalManifestConverter::BuildObject and CompatibilityMatrixConverter::BuildObject)
 // These parameters are also passed to converters of child nodes so they see the same
 // deserialization parameters.
 struct BuildObjectParam {
     std::string* error;
+    Version metaVersion;
 };
 
 template <typename Object>
@@ -181,28 +185,34 @@ struct XmlNodeConverter {
     virtual bool buildObject(Object* object, NodeType* root, const BuildObjectParam&) const = 0;
 
    public:
+    // Methods for other (usually parent) converters
+    // Name of the XML element.
     virtual std::string elementName() const = 0;
-
-    // convenience methods for user
+    // Serialize |o| into an XML element.
     inline NodeType* operator()(const Object& o, const MutateNodeParam& param) const {
         NodeType* root = createNode(this->elementName(), param.d);
         this->mutateNode(o, root, param);
         return root;
     }
-    inline std::string operator()(const Object& o, SerializeFlags::Type flags) const {
-        DocType *doc = createDocument();
-        appendChild(doc, (*this)(o, MutateNodeParam{doc, flags}));
-        std::string s = printDocument(doc);
-        deleteDocument(doc);
-        return s;
-    }
+    // Deserialize XML element |root| into |object|.
     inline bool operator()(Object* object, NodeType* root, const BuildObjectParam& param) const {
         if (nameOf(root) != this->elementName()) {
             return false;
         }
         return this->buildObject(object, root, param);
     }
-    inline bool operator()(Object* o, const std::string& xml, std::string* error) const {
+
+    // Public methods for android::vintf::fromXml / android::vintf::toXml.
+    // Serialize |o| into an XML string.
+    inline std::string toXml(const Object& o, SerializeFlags::Type flags) const {
+        DocType* doc = createDocument();
+        appendChild(doc, (*this)(o, MutateNodeParam{doc, flags}));
+        std::string s = printDocument(doc);
+        deleteDocument(doc);
+        return s;
+    }
+    // Deserialize XML string |xml| into |o|.
+    inline bool fromXml(Object* o, const std::string& xml, std::string* error) const {
         std::string errorBuffer;
         if (error == nullptr) error = &errorBuffer;
 
@@ -211,12 +221,16 @@ struct XmlNodeConverter {
             *error = "Not a valid XML";
             return false;
         }
-        bool ret = (*this)(o, getRootChild(doc), BuildObjectParam{error});
+        // For top-level <manifest> and <compatibility-matrix>, HalManifestConverter and
+        // CompatibilityMatrixConverter fills in metaversion and pass down to children.
+        // For other nodes, we don't know metaversion of the original XML, so just leave empty
+        // for maximum backwards compatibility.
+        bool ret = (*this)(o, getRootChild(doc), BuildObjectParam{error, {}});
         deleteDocument(doc);
         return ret;
     }
 
-    // convenience methods for implementor.
+    // convenience methods for subclasses to implement virtual functions.
 
     // All append* functions helps mutateNode() to serialize the object into XML.
     template <typename T>
@@ -824,6 +838,12 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             case HalFormat::AIDL: {
                 if (!object->transportArch.empty() &&
                     object->transportArch.transport != Transport::INET) {
+                    if (param.metaVersion >= kMetaVersionAidlInet) {
+                        *param.error = "AIDL HAL '" + object->name +
+                                       R"(' only supports "inet" or empty <transport>, found ")" +
+                                       to_string(object->transportArch) + "\"";
+                        return false;
+                    }
                     LOG(WARNING) << "Ignoring <transport> on manifest <hal format=\"aidl\"> "
                                  << object->name << ". Only \"inet\" supported.";
                     object->transportArch = {};
@@ -1131,11 +1151,11 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
         }
     }
     bool buildObject(HalManifest* object, NodeType* root,
-                     const BuildObjectParam& param) const override {
-        Version metaVersion;
-        if (!parseAttr(root, "version", &metaVersion, param.error)) return false;
-        if (metaVersion > kMetaVersion) {
-            *param.error = "Unrecognized manifest.version " + to_string(metaVersion) +
+                     const BuildObjectParam& constParam) const override {
+        BuildObjectParam param = constParam;
+        if (!parseAttr(root, "version", &param.metaVersion, param.error)) return false;
+        if (param.metaVersion > kMetaVersion) {
+            *param.error = "Unrecognized manifest.version " + to_string(param.metaVersion) +
                            " (libvintf@" + to_string(kMetaVersion) + ")";
             return false;
         }
@@ -1325,12 +1345,13 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
         }
     }
     bool buildObject(CompatibilityMatrix* object, NodeType* root,
-                     const BuildObjectParam& param) const override {
-        Version metaVersion;
-        if (!parseAttr(root, "version", &metaVersion, param.error)) return false;
-        if (metaVersion > kMetaVersion) {
-            *param.error = "Unrecognized compatibility-matrix.version " + to_string(metaVersion) +
-                           " (libvintf@" + to_string(kMetaVersion) + ")";
+                     const BuildObjectParam& constParam) const override {
+        BuildObjectParam param = constParam;
+        if (!parseAttr(root, "version", &param.metaVersion, param.error)) return false;
+        if (param.metaVersion > kMetaVersion) {
+            *param.error = "Unrecognized compatibility-matrix.version " +
+                           to_string(param.metaVersion) + " (libvintf@" + to_string(kMetaVersion) +
+                           ")";
             return false;
         }
 
@@ -1421,10 +1442,10 @@ struct CompatibilityMatrixConverter : public XmlNodeConverter<CompatibilityMatri
 
 #define CREATE_CONVERT_FN(type)                                         \
     std::string toXml(const type& o, SerializeFlags::Type flags) {      \
-        return type##Converter{}(o, flags);                             \
+        return type##Converter{}.toXml(o, flags);                       \
     }                                                                   \
     bool fromXml(type* o, const std::string& xml, std::string* error) { \
-        return type##Converter{}(o, xml, error);                        \
+        return type##Converter{}.fromXml(o, xml, error);                \
     }
 
 // Create convert functions for public usage.
