@@ -4250,7 +4250,7 @@ TEST_F(LibVintfTest, AidlGetHalNamesAndVersions) {
     EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
     auto names = manifest.getHalNamesAndVersions();
     ASSERT_EQ(1u, names.size());
-    EXPECT_EQ("android.system.foo", *names.begin());
+    EXPECT_EQ("android.system.foo@1", *names.begin());
 }
 
 TEST_F(LibVintfTest, ManifestAddAidl) {
