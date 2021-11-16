@@ -32,6 +32,7 @@ hals_for_release.py -p wifi
 import argparse
 import collections
 import enum
+import json
 import logging
 import os
 import subprocess
@@ -73,6 +74,7 @@ def ParseArgs() -> argparse.Namespace:
                       help="Only print HALs where package contains the given substring. "
                            "E.g. wifi, usb, health. Recommend to use with --unchanged.")
   parser.add_argument("--verbose", "-v", action="store_true", help="Verbose mode")
+  parser.add_argument("--json", "-j", action="store_true", help="Print JSON")
   args = parser.parse_args()
 
   if args.verbose:
@@ -359,6 +361,33 @@ class HumanReadableReport(Report):
     return "\n".join(report)
 
 
+class JsonReport(Report):
+  def DescribePackage(self, deprecated: Sequence[str], unchanged: Sequence[str],
+      introduced: Sequence[str]) -> Any:
+    package_report = collections.defaultdict(list)
+    if self.args.deprecated and deprecated:
+      package_report["deprecated"] += deprecated
+    if self.args.unchanged and unchanged:
+      package_report["unchanged"] += unchanged
+    if self.args.introduced and introduced:
+      package_report["introduced"] += introduced
+
+    return package_report
+
+  def CombineReport(self, packages_report: dict[str, Any]) -> dict[str, Any]:
+    final = collections.defaultdict(list)
+    for package_report in packages_report.values():
+      for key, lst in package_report.items():
+        final[key] += lst
+    final["__meta__"] = {
+        "old": {"level": self.matrixData1.level,
+                "level_name": self.matrixData1.level_name},
+        "new": {"level": self.matrixData2.level,
+                "level_name": self.matrixData2.level_name},
+    }
+    return final
+
+
 def PrintReport(matrices: dict[int, MatrixData], args: argparse.Namespace):
   """
   :param matrixData1: data of first matrix
@@ -368,6 +397,14 @@ def PrintReport(matrices: dict[int, MatrixData], args: argparse.Namespace):
   sorted_matrices = sorted(matrices.items())
   if not sorted_matrices:
     logger.warning("Nothing to show, because no matrices found in '%s'.", args.input)
+
+  if args.json:
+    reports = []
+    for (level1, matrixData1), (level2, matrixData2) in zip(sorted_matrices, sorted_matrices[1:]):
+      reports.append(JsonReport(matrixData1, matrixData2, args).GetReport())
+    print(json.dumps(reports))
+    return
+
   for (level1, matrixData1), (level2, matrixData2) in zip(sorted_matrices, sorted_matrices[1:]):
     report = HumanReadableReport(matrixData1, matrixData2, args)
     print(report.GetReport())
