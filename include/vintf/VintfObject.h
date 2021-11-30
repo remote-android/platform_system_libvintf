@@ -43,7 +43,6 @@ namespace vintf {
 namespace details {
 class CheckVintfUtils;
 class FmOnlyVintfObject;
-class VintfObjectAfterUpdate;
 
 template <typename T>
 struct LockedSharedPtr {
@@ -260,7 +259,6 @@ class VintfObject {
     friend class testing::VintfObjectCompatibleTest;
 
     // Expose functions to simulate dependency injection.
-    friend class details::VintfObjectAfterUpdate;
     friend class details::CheckVintfUtils;
     friend class details::FmOnlyVintfObject;
 
