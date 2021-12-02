@@ -91,6 +91,7 @@ class VintfObjectBuilder {
 
 namespace testing {
 class VintfObjectTestBase;
+class VintfObjectRecoveryTest;
 class VintfObjectRuntimeInfoTest;
 class VintfObjectCompatibleTest;
 }  // namespace testing
@@ -286,6 +287,7 @@ class VintfObject {
 
     // Expose functions for testing and recovery
     friend class testing::VintfObjectTestBase;
+    friend class testing::VintfObjectRecoveryTest;
     friend class testing::VintfObjectRuntimeInfoTest;
     friend class testing::VintfObjectCompatibleTest;
 
@@ -341,7 +343,7 @@ class VintfObject {
     static std::shared_ptr<const RuntimeInfo> GetRuntimeInfo(
         RuntimeInfo::FetchFlags flags = RuntimeInfo::FetchFlag::ALL);
 
-   private:
+   protected:
     status_t getCombinedFrameworkMatrix(const std::shared_ptr<const HalManifest>& deviceManifest,
                                         Level kernelLevel, CompatibilityMatrix* out,
                                         std::string* error = nullptr);
@@ -350,7 +352,7 @@ class VintfObject {
     status_t getOneMatrix(const std::string& path, CompatibilityMatrix* out,
                           std::string* error = nullptr);
     status_t addDirectoryManifests(const std::string& directory, HalManifest* manifests,
-                                   std::string* error = nullptr);
+                                   bool ignoreSchemaType, std::string* error);
     status_t fetchDeviceHalManifest(HalManifest* out, std::string* error = nullptr);
     status_t fetchDeviceMatrix(CompatibilityMatrix* out, std::string* error = nullptr);
     status_t fetchOdmHalManifest(HalManifest* out, std::string* error = nullptr);
@@ -392,7 +394,7 @@ class VintfObject {
         Builder();
     };
 
-   private:
+   protected:
     /* Empty VintfObject without any dependencies. Used by Builder and subclasses. */
     VintfObject() = default;
 };
