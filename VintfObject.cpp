@@ -1243,32 +1243,38 @@ android::base::Result<void> VintfObject::checkMatrixHalsHasDefinition(
 }
 
 // make_unique does not work because VintfObject constructor is private.
-VintfObject::Builder::Builder() : mObject(std::unique_ptr<VintfObject>(new VintfObject())) {}
+VintfObject::Builder::Builder()
+    : VintfObjectBuilder(std::unique_ptr<VintfObject>(new VintfObject())) {}
 
-VintfObject::Builder& VintfObject::Builder::setFileSystem(std::unique_ptr<FileSystem>&& e) {
+namespace details {
+
+VintfObjectBuilder::~VintfObjectBuilder() {}
+
+VintfObjectBuilder& VintfObjectBuilder::setFileSystem(std::unique_ptr<FileSystem>&& e) {
     mObject->mFileSystem = std::move(e);
     return *this;
 }
 
-VintfObject::Builder& VintfObject::Builder::setRuntimeInfoFactory(
+VintfObjectBuilder& VintfObjectBuilder::setRuntimeInfoFactory(
     std::unique_ptr<ObjectFactory<RuntimeInfo>>&& e) {
     mObject->mRuntimeInfoFactory = std::move(e);
     return *this;
 }
 
-VintfObject::Builder& VintfObject::Builder::setPropertyFetcher(
-    std::unique_ptr<PropertyFetcher>&& e) {
+VintfObjectBuilder& VintfObjectBuilder::setPropertyFetcher(std::unique_ptr<PropertyFetcher>&& e) {
     mObject->mPropertyFetcher = std::move(e);
     return *this;
 }
 
-std::unique_ptr<VintfObject> VintfObject::Builder::build() {
+std::unique_ptr<VintfObject> VintfObjectBuilder::buildInternal() {
     if (!mObject->mFileSystem) mObject->mFileSystem = createDefaultFileSystem();
     if (!mObject->mRuntimeInfoFactory)
         mObject->mRuntimeInfoFactory = std::make_unique<ObjectFactory<RuntimeInfo>>();
     if (!mObject->mPropertyFetcher) mObject->mPropertyFetcher = createDefaultPropertyFetcher();
     return std::move(mObject);
 }
+
+}  // namespace details
 
 }  // namespace vintf
 }  // namespace android
