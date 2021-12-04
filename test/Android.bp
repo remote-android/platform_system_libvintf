@@ -125,3 +125,23 @@ cc_test_host {
         "VintfFmTest.cpp",
     ],
 }
+
+cc_test_host {
+    name: "vintf_object_recovery_test",
+    defaults: [
+        "libvintf-defaults",
+        "libvintf_static_user_defaults",
+    ],
+    static_libs: [
+        "libgmock",
+        "libvintf",
+        "libutils",
+    ],
+    header_libs: [
+        "libvintf_local_headers",
+    ],
+    srcs: [
+        "RuntimeInfo-fake.cpp",
+        "VintfObjectRecoveryTest.cpp",
+    ],
+}

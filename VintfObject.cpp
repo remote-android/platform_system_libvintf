@@ -30,6 +30,7 @@
 #include <hidl/metadata.h>
 
 #include "CompatibilityMatrix.h"
+#include "VintfObjectUtils.h"
 #include "constants-private.h"
 #include "parse_string.h"
 #include "parse_xml.h"
@@ -49,29 +50,6 @@ static constexpr bool kIsTarget = true;
 #else
 static constexpr bool kIsTarget = false;
 #endif
-
-template <typename T, typename F>
-static std::shared_ptr<const T> Get(const char* id, LockedSharedPtr<T>* ptr,
-                                    const F& fetchAllInformation) {
-    std::unique_lock<std::mutex> _lock(ptr->mutex);
-    if (!ptr->fetchedOnce) {
-        LOG(INFO) << id << ": Reading VINTF information.";
-        ptr->object = std::make_unique<T>();
-        std::string error;
-        status_t status = fetchAllInformation(ptr->object.get(), &error);
-        if (status == OK) {
-            ptr->fetchedOnce = true;
-            LOG(INFO) << id << ": Successfully processed VINTF information";
-        } else {
-            // Doubled because a malformed error std::string might cause us to
-            // lose the status.
-            LOG(ERROR) << id << ": status from fetching VINTF information: " << status;
-            LOG(ERROR) << id << ": " << status << " VINTF parse error: " << error;
-            ptr->object = nullptr;  // frees the old object
-        }
-    }
-    return ptr->object;
-}
 
 static std::unique_ptr<FileSystem> createDefaultFileSystem() {
     std::unique_ptr<FileSystem> fileSystem;
@@ -215,8 +193,9 @@ status_t VintfObject::getCombinedFrameworkMatrix(
 }
 
 // Load and combine all of the manifests in a directory
+// If forceSchemaType, all fragment manifests are coerced into manifest->type().
 status_t VintfObject::addDirectoryManifests(const std::string& directory, HalManifest* manifest,
-                                            std::string* error) {
+                                            bool forceSchemaType, std::string* error) {
     std::vector<std::string> fileNames;
     status_t err = getFileSystem()->listFiles(directory, &fileNames, error);
     // if the directory isn't there, that's okay
@@ -234,6 +213,10 @@ status_t VintfObject::addDirectoryManifests(const std::string& directory, HalMan
         HalManifest fragmentManifest;
         err = fetchOneHalManifest(directory + file, &fragmentManifest, error);
         if (err != OK) return err;
+
+        if (forceSchemaType) {
+            fragmentManifest.setType(manifest->type());
+        }
 
         if (!manifest->addAll(&fragmentManifest, error)) {
             if (error) {
@@ -263,7 +246,8 @@ status_t VintfObject::fetchDeviceHalManifest(HalManifest* out, std::string* erro
 
     if (vendorStatus == OK) {
         *out = std::move(vendorManifest);
-        status_t fragmentStatus = addDirectoryManifests(kVendorManifestFragmentDir, out, error);
+        status_t fragmentStatus = addDirectoryManifests(kVendorManifestFragmentDir, out,
+                                                        false /* forceSchemaType*/, error);
         if (fragmentStatus != OK) {
             return fragmentStatus;
         }
@@ -284,13 +268,15 @@ status_t VintfObject::fetchDeviceHalManifest(HalManifest* out, std::string* erro
                 return UNKNOWN_ERROR;
             }
         }
-        return addDirectoryManifests(kOdmManifestFragmentDir, out, error);
+        return addDirectoryManifests(kOdmManifestFragmentDir, out, false /* forceSchemaType */,
+                                     error);
     }
 
     // vendorStatus != OK, "out" is not changed.
     if (odmStatus == OK) {
         *out = std::move(odmManifest);
-        return addDirectoryManifests(kOdmManifestFragmentDir, out, error);
+        return addDirectoryManifests(kOdmManifestFragmentDir, out, false /* forceSchemaType */,
+                                     error);
     }
 
     // Use legacy /vendor/manifest.xml
@@ -397,7 +383,8 @@ status_t VintfObject::fetchDeviceMatrix(CompatibilityMatrix* out, std::string* e
 status_t VintfObject::fetchUnfilteredFrameworkHalManifest(HalManifest* out, std::string* error) {
     auto systemEtcStatus = fetchOneHalManifest(kSystemManifest, out, error);
     if (systemEtcStatus == OK) {
-        auto dirStatus = addDirectoryManifests(kSystemManifestFragmentDir, out, error);
+        auto dirStatus = addDirectoryManifests(kSystemManifestFragmentDir, out,
+                                               false /* forceSchemaType */, error);
         if (dirStatus != OK) {
             return dirStatus;
         }
@@ -421,7 +408,8 @@ status_t VintfObject::fetchUnfilteredFrameworkHalManifest(HalManifest* out, std:
                 }
             }
 
-            auto fragmentStatus = addDirectoryManifests(frags, out, error);
+            auto fragmentStatus =
+                addDirectoryManifests(frags, out, false /* forceSchemaType */, error);
             if (fragmentStatus != OK) {
                 return fragmentStatus;
             }
@@ -1243,32 +1231,38 @@ android::base::Result<void> VintfObject::checkMatrixHalsHasDefinition(
 }
 
 // make_unique does not work because VintfObject constructor is private.
-VintfObject::Builder::Builder() : mObject(std::unique_ptr<VintfObject>(new VintfObject())) {}
+VintfObject::Builder::Builder()
+    : VintfObjectBuilder(std::unique_ptr<VintfObject>(new VintfObject())) {}
 
-VintfObject::Builder& VintfObject::Builder::setFileSystem(std::unique_ptr<FileSystem>&& e) {
+namespace details {
+
+VintfObjectBuilder::~VintfObjectBuilder() {}
+
+VintfObjectBuilder& VintfObjectBuilder::setFileSystem(std::unique_ptr<FileSystem>&& e) {
     mObject->mFileSystem = std::move(e);
     return *this;
 }
 
-VintfObject::Builder& VintfObject::Builder::setRuntimeInfoFactory(
+VintfObjectBuilder& VintfObjectBuilder::setRuntimeInfoFactory(
     std::unique_ptr<ObjectFactory<RuntimeInfo>>&& e) {
     mObject->mRuntimeInfoFactory = std::move(e);
     return *this;
 }
 
-VintfObject::Builder& VintfObject::Builder::setPropertyFetcher(
-    std::unique_ptr<PropertyFetcher>&& e) {
+VintfObjectBuilder& VintfObjectBuilder::setPropertyFetcher(std::unique_ptr<PropertyFetcher>&& e) {
     mObject->mPropertyFetcher = std::move(e);
     return *this;
 }
 
-std::unique_ptr<VintfObject> VintfObject::Builder::build() {
+std::unique_ptr<VintfObject> VintfObjectBuilder::buildInternal() {
     if (!mObject->mFileSystem) mObject->mFileSystem = createDefaultFileSystem();
     if (!mObject->mRuntimeInfoFactory)
         mObject->mRuntimeInfoFactory = std::make_unique<ObjectFactory<RuntimeInfo>>();
     if (!mObject->mPropertyFetcher) mObject->mPropertyFetcher = createDefaultPropertyFetcher();
     return std::move(mObject);
 }
+
+}  // namespace details
 
 }  // namespace vintf
 }  // namespace android
