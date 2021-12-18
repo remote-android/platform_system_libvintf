@@ -401,8 +401,8 @@ class CheckVintfUtils {
 // If |result| is already an error, don't do anything. Otherwise, set it to
 // an error with |errorCode|. Return reference to Error object for appending
 // additional error messages.
-android::base::Error& SetErrorCode(std::optional<android::base::Error>* retError,
-                                   int errorCode = 0) {
+android::base::Error<>& SetErrorCode(std::optional<android::base::Error<>>* retError,
+                                     int errorCode = 0) {
     if (!retError->has_value()) {
         retError->emplace(errorCode);
     } else {
@@ -416,8 +416,8 @@ android::base::Error& SetErrorCode(std::optional<android::base::Error>* retError
 
 // If |other| is an error, add it to |retError|.
 template <typename T>
-void AddResult(std::optional<android::base::Error>* retError, const android::base::Result<T>& other,
-               const char* additionalMessage = "") {
+void AddResult(std::optional<android::base::Error<>>* retError,
+               const android::base::Result<T>& other, const char* additionalMessage = "") {
     if (other.ok()) return;
     SetErrorCode(retError, other.error().code()) << other.error() << additionalMessage;
 }
@@ -442,7 +442,7 @@ android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties
             .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(runtimeInfo))
             .build();
 
-    std::optional<android::base::Error> retError = std::nullopt;
+    std::optional<android::base::Error<>> retError = std::nullopt;
 
     std::string compatibleError;
     int compatibleResult = vintfObject->checkCompatibility(&compatibleError, flags);
