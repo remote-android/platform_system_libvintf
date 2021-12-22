@@ -2016,6 +2016,140 @@ TEST_F(CheckMatrixHalsHasDefinitionTest, FailMissingBoth) {
     EXPECT_THAT(res, HasError(WithMessage(HasSubstr("android.hardware.aidl.IAidl"))));
 }
 
+constexpr const char* systemMatrixHealthFormat = R"(
+<compatibility-matrix %s type="framework" level="%s">
+    <hal format="%s" optional="%s">
+        <name>android.hardware.health</name>
+        <version>%s</version>
+        <interface>
+            <name>IHealth</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+</compatibility-matrix>
+)";
+
+constexpr const char* vendorManifestHealthHidlFormat = R"(
+<manifest %s type="device" target-level="%s">
+    <hal format="hidl">
+        <name>android.hardware.health</name>
+        <transport>hwbinder</transport>
+        <fqname>@%s::IHealth/default</fqname>
+    </hal>
+</manifest>
+)";
+
+constexpr const char* vendorManifestHealthAidlFormat = R"(
+<manifest %s type="device" target-level="%s">
+    <hal format="aidl">
+        <name>android.hardware.health</name>
+        <version>%s</version>
+        <fqname>IHealth/default</fqname>
+    </hal>
+</manifest>
+)";
+
+using HealthHalVersion = std::variant<Version /* HIDL */, size_t /* AIDL */>;
+struct VintfObjectHealthHalTestParam {
+    Level targetLevel;
+    HealthHalVersion halVersion;
+    bool expected;
+
+    HalFormat getHalFormat() const {
+        if (std::holds_alternative<Version>(halVersion)) return HalFormat::HIDL;
+        if (std::holds_alternative<size_t>(halVersion)) return HalFormat::AIDL;
+        __builtin_unreachable();
+    }
+};
+std::ostream& operator<<(std::ostream& os, const VintfObjectHealthHalTestParam& param) {
+    os << param.targetLevel << "_" << param.getHalFormat() << "_";
+    switch (param.getHalFormat()) {
+        case HalFormat::HIDL: {
+            const auto& v = std::get<Version>(param.halVersion);
+            os << "v" << v.majorVer << "_" << v.minorVer;
+        } break;
+        case HalFormat::AIDL: {
+            os << "v" << std::get<size_t>(param.halVersion);
+        } break;
+        default:
+            __builtin_unreachable();
+    }
+    return os << "_" << (param.expected ? "ok" : "not_ok");
+}
+
+// Test fixture that provides compatible metadata from the mock device.
+class VintfObjectHealthHalTest : public MultiMatrixTest,
+                                 public WithParamInterface<VintfObjectHealthHalTestParam> {
+   public:
+    virtual void SetUp() {
+        MultiMatrixTest::SetUp();
+        SetUpMockSystemMatrices({
+            android::base::StringPrintf(
+                systemMatrixHealthFormat, kMetaVersionStr.c_str(), to_string(Level::P).c_str(),
+                to_string(HalFormat::HIDL).c_str(), "true", to_string(Version{2, 0}).c_str()),
+            android::base::StringPrintf(
+                systemMatrixHealthFormat, kMetaVersionStr.c_str(), to_string(Level::Q).c_str(),
+                to_string(HalFormat::HIDL).c_str(), "true", to_string(Version{2, 0}).c_str()),
+            android::base::StringPrintf(
+                systemMatrixHealthFormat, kMetaVersionStr.c_str(), to_string(Level::R).c_str(),
+                to_string(HalFormat::HIDL).c_str(), "true", to_string(Version{2, 1}).c_str()),
+            android::base::StringPrintf(
+                systemMatrixHealthFormat, kMetaVersionStr.c_str(), to_string(Level::S).c_str(),
+                to_string(HalFormat::HIDL).c_str(), "true", to_string(Version{2, 1}).c_str()),
+            android::base::StringPrintf(
+                systemMatrixHealthFormat, kMetaVersionStr.c_str(), to_string(Level::T).c_str(),
+                to_string(HalFormat::AIDL).c_str(), "false", to_string(1).c_str()),
+        });
+        switch (GetParam().getHalFormat()) {
+            case HalFormat::HIDL:
+                expectFetchRepeatedly(
+                    kVendorManifest,
+                    android::base::StringPrintf(
+                        vendorManifestHealthHidlFormat, kMetaVersionStr.c_str(),
+                        to_string(GetParam().targetLevel).c_str(),
+                        to_string(std::get<Version>(GetParam().halVersion)).c_str()));
+                break;
+            case HalFormat::AIDL:
+                expectFetchRepeatedly(
+                    kVendorManifest,
+                    android::base::StringPrintf(
+                        vendorManifestHealthAidlFormat, kMetaVersionStr.c_str(),
+                        to_string(GetParam().targetLevel).c_str(),
+                        to_string(std::get<size_t>(GetParam().halVersion)).c_str()));
+                break;
+            default:
+                __builtin_unreachable();
+        }
+    }
+    static std::vector<VintfObjectHealthHalTestParam> GetParams() {
+        std::vector<VintfObjectHealthHalTestParam> ret;
+        for (auto level : {Level::P, Level::Q, Level::R, Level::S, Level::T}) {
+            ret.push_back({level, Version{2, 0}, level < Level::R});
+            ret.push_back({level, Version{2, 1}, level < Level::T});
+            ret.push_back({level, 1, true});
+        }
+        return ret;
+    }
+};
+
+TEST_P(VintfObjectHealthHalTest, Test) {
+    auto manifest = vintfObject->getDeviceHalManifest();
+    ASSERT_NE(nullptr, manifest);
+    std::string deprecatedError;
+    auto deprecation = vintfObject->checkDeprecation({}, &deprecatedError);
+    bool hasHidl =
+        manifest->hasHidlInstance("android.hardware.health", {2, 0}, "IHealth", "default");
+    bool hasAidl = manifest->hasAidlInstance("android.hardware.health", 1, "IHealth", "default");
+    bool hasHal = hasHidl || hasAidl;
+    EXPECT_EQ(GetParam().expected, deprecation == NO_DEPRECATED_HALS && hasHal)
+        << "checkDeprecation() returns " << deprecation << "; hasHidl = " << hasHidl
+        << ", hasAidl = " << hasAidl;
+}
+
+INSTANTIATE_TEST_SUITE_P(VintfObjectHealthHalTest, VintfObjectHealthHalTest,
+                         ::testing::ValuesIn(VintfObjectHealthHalTest::GetParams()),
+                         [](const auto& info) { return to_string(info.param); });
+
 }  // namespace testing
 }  // namespace vintf
 }  // namespace android
