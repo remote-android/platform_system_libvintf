@@ -18,6 +18,7 @@
 #include "gmock-logging-compat.h"
 
 #include <stdio.h>
+#include <optional>
 
 #include <android-base/file.h>
 #include <android-base/logging.h>
@@ -2148,6 +2149,185 @@ TEST_P(VintfObjectHealthHalTest, Test) {
 
 INSTANTIATE_TEST_SUITE_P(VintfObjectHealthHalTest, VintfObjectHealthHalTest,
                          ::testing::ValuesIn(VintfObjectHealthHalTest::GetParams()),
+                         [](const auto& info) { return to_string(info.param); });
+
+constexpr const char* systemMatrixComposerFormat = R"(
+<compatibility-matrix %s type="framework" level="%s">
+    %s
+</compatibility-matrix>
+)";
+
+constexpr const char* systemMatrixComposerHalFragmentFormat = R"(
+    <hal format="%s" optional="%s">
+        <name>%s</name>
+        <version>%s</version>
+        <interface>
+            <name>IComposer</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+)";
+
+constexpr const char* vendorManifestComposerHidlFormat = R"(
+<manifest %s type="device" target-level="%s">
+    %s
+</manifest>
+)";
+
+constexpr const char* vendorManifestComposerHidlFragmentFormat = R"(
+    <hal format="hidl">
+        <name>android.hardware.graphics.composer</name>
+        <version>%s</version>
+        <transport>hwbinder</transport>
+        <interface>
+            <name>IComposer</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+)";
+
+constexpr const char* vendorManifestComposerAidlFragmentFormat = R"(
+    <hal format="aidl">
+        <name>android.hardware.graphics.composer3</name>
+        <version>%s</version>
+        <interface>
+            <name>IComposer</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+)";
+
+constexpr const char* composerHidlHalName = "android.hardware.graphics.composer";
+constexpr const char* composerAidlHalName = "android.hardware.graphics.composer3";
+
+using ComposerHalVersion = std::variant<Version /* HIDL */, size_t /* AIDL */>;
+struct VintfObjectComposerHalTestParam {
+    Level targetLevel;
+    std::optional<ComposerHalVersion> halVersion;
+    bool expected;
+
+    bool hasHal() const { return halVersion.has_value(); }
+
+    HalFormat getHalFormat() const {
+        if (std::holds_alternative<Version>(*halVersion)) return HalFormat::HIDL;
+        if (std::holds_alternative<size_t>(*halVersion)) return HalFormat::AIDL;
+        __builtin_unreachable();
+    }
+};
+std::ostream& operator<<(std::ostream& os, const VintfObjectComposerHalTestParam& param) {
+    os << param.targetLevel << "_";
+    if (param.hasHal()) {
+        os << param.getHalFormat() << "_";
+        switch (param.getHalFormat()) {
+            case HalFormat::HIDL: {
+                const auto& v = std::get<Version>(*param.halVersion);
+                os << "v" << v.majorVer << "_" << v.minorVer;
+            } break;
+            case HalFormat::AIDL: {
+                os << "v" << std::get<size_t>(*param.halVersion);
+            } break;
+            default:
+                __builtin_unreachable();
+        }
+    } else {
+        os << "no_hal";
+    }
+    return os << "_" << (param.expected ? "ok" : "not_ok");
+}
+
+// Test fixture that provides compatible metadata from the mock device.
+class VintfObjectComposerHalTest : public MultiMatrixTest,
+                                   public WithParamInterface<VintfObjectComposerHalTestParam> {
+   public:
+    virtual void SetUp() {
+        MultiMatrixTest::SetUp();
+
+        const std::string requiresHidl2_1To2_2 = android::base::StringPrintf(
+            systemMatrixComposerHalFragmentFormat, to_string(HalFormat::HIDL).c_str(), "false",
+            composerHidlHalName, to_string(VersionRange{2, 1, 2}).c_str());
+        const std::string requiresHidl2_1To2_3 = android::base::StringPrintf(
+            systemMatrixComposerHalFragmentFormat, to_string(HalFormat::HIDL).c_str(), "false",
+            composerHidlHalName, to_string(VersionRange{2, 1, 3}).c_str());
+        const std::string requiresHidl2_1To2_4 = android::base::StringPrintf(
+            systemMatrixComposerHalFragmentFormat, to_string(HalFormat::HIDL).c_str(), "false",
+            composerHidlHalName, to_string(VersionRange{2, 1, 4}).c_str());
+        const std::string optionalHidl2_1To2_4 = android::base::StringPrintf(
+            systemMatrixComposerHalFragmentFormat, to_string(HalFormat::HIDL).c_str(), "true",
+            composerHidlHalName, to_string(VersionRange{2, 1, 4}).c_str());
+        const std::string optionalAidl1 = android::base::StringPrintf(
+            systemMatrixComposerHalFragmentFormat, to_string(HalFormat::AIDL).c_str(), "true",
+            composerAidlHalName, "1");
+        const std::string optionalHidl2_1To2_4OrAidl1 = optionalHidl2_1To2_4 + optionalAidl1;
+
+        SetUpMockSystemMatrices({
+            android::base::StringPrintf(systemMatrixComposerFormat, kMetaVersionStr.c_str(),
+                                        to_string(Level::P).c_str(), requiresHidl2_1To2_2.c_str()),
+            android::base::StringPrintf(systemMatrixComposerFormat, kMetaVersionStr.c_str(),
+                                        to_string(Level::Q).c_str(), requiresHidl2_1To2_3.c_str()),
+            android::base::StringPrintf(systemMatrixComposerFormat, kMetaVersionStr.c_str(),
+                                        to_string(Level::R).c_str(), requiresHidl2_1To2_4.c_str()),
+            android::base::StringPrintf(systemMatrixComposerFormat, kMetaVersionStr.c_str(),
+                                        to_string(Level::S).c_str(), requiresHidl2_1To2_4.c_str()),
+            android::base::StringPrintf(systemMatrixComposerFormat, kMetaVersionStr.c_str(),
+                                        to_string(Level::T).c_str(),
+                                        optionalHidl2_1To2_4OrAidl1.c_str()),
+        });
+
+        const auto param = GetParam();
+
+        std::string vendorHalFragment;
+        if (param.hasHal()) {
+            switch (param.getHalFormat()) {
+                case HalFormat::HIDL:
+                    vendorHalFragment = android::base::StringPrintf(
+                        vendorManifestComposerHidlFragmentFormat,
+                        to_string(std::get<Version>(*param.halVersion)).c_str());
+                    break;
+                case HalFormat::AIDL:
+                    vendorHalFragment = android::base::StringPrintf(
+                        vendorManifestComposerAidlFragmentFormat,
+                        to_string(std::get<size_t>(*param.halVersion)).c_str());
+                    break;
+                default:
+                    __builtin_unreachable();
+            }
+        } else {
+            vendorHalFragment = "";
+        }
+        expectFetchRepeatedly(kVendorManifest,
+                              android::base::StringPrintf(
+                                  vendorManifestComposerHidlFormat, kMetaVersionStr.c_str(),
+                                  to_string(param.targetLevel).c_str(), vendorHalFragment.c_str()));
+    }
+    static std::vector<VintfObjectComposerHalTestParam> GetParams() {
+        std::vector<VintfObjectComposerHalTestParam> ret;
+        for (auto level : {Level::P, Level::Q, Level::R, Level::S, Level::T}) {
+            ret.push_back({level, std::nullopt, false});
+            ret.push_back({level, ComposerHalVersion{Version{2, 1}}, true});
+            ret.push_back({level, ComposerHalVersion{Version{2, 2}}, true});
+            ret.push_back({level, ComposerHalVersion{Version{2, 3}}, true});
+            ret.push_back({level, ComposerHalVersion{Version{2, 4}}, true});
+            ret.push_back({level, ComposerHalVersion{1}, true});
+        }
+        return ret;
+    }
+};
+
+TEST_P(VintfObjectComposerHalTest, Test) {
+    auto manifest = vintfObject->getDeviceHalManifest();
+    ASSERT_NE(nullptr, manifest);
+    std::string deprecatedError;
+    auto deprecation = vintfObject->checkDeprecation({}, &deprecatedError);
+    bool hasHidl = manifest->hasHidlInstance(composerHidlHalName, {2, 1}, "IComposer", "default");
+    bool hasAidl = manifest->hasAidlInstance(composerAidlHalName, 1, "IComposer", "default");
+    bool hasHal = hasHidl || hasAidl;
+    EXPECT_EQ(GetParam().expected, deprecation == NO_DEPRECATED_HALS && hasHal)
+        << "checkDeprecation() returns " << deprecation << "; hasHidl = " << hasHidl
+        << ", hasAidl = " << hasAidl;
+}
+
+INSTANTIATE_TEST_SUITE_P(VintfObjectComposerHalTest, VintfObjectComposerHalTest,
+                         ::testing::ValuesIn(VintfObjectComposerHalTest::GetParams()),
                          [](const auto& info) { return to_string(info.param); });
 
 }  // namespace testing
