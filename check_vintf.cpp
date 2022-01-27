@@ -118,7 +118,7 @@ struct StaticRuntimeInfo : public RuntimeInfo {
         if (flags & RuntimeInfo::FetchFlag::CONFIG_GZ) {
             std::string content;
             if (!android::base::ReadFileToString(kernelConfigFile, &content)) {
-                LOG(ERROR) << "Cannot read " << kernelConfigFile;
+                LOG(ERROR) << "ERROR: Cannot read " << kernelConfigFile;
                 return UNKNOWN_ERROR;
             }
             KernelConfigParser parser;
@@ -156,13 +156,13 @@ std::unique_ptr<T> readObject(FileSystem* fileSystem, const std::string& path) {
     std::string error;
     status_t err = fileSystem->fetch(path, &xml, &error);
     if (err != OK) {
-        LOG(ERROR) << "Cannot read '" << path << "' (" << strerror(-err) << "): " << error;
+        LOG(ERROR) << "ERROR: Cannot read '" << path << "' (" << strerror(-err) << "): " << error;
         return nullptr;
     }
     auto ret = std::make_unique<T>();
     ret->setFileName(path);
     if (!fromXml(ret.get(), xml, &error)) {
-        LOG(ERROR) << "Cannot parse '" << path << "': " << error;
+        LOG(ERROR) << "ERROR: Cannot parse '" << path << "': " << error;
         return nullptr;
     }
     return ret;
@@ -178,7 +178,7 @@ int checkCompatibilityForFiles(const std::string& manifestPath, const std::strin
 
     std::string error;
     if (!manifest->checkCompatibility(*matrix, &error)) {
-        LOG(ERROR) << "Incompatible: " << error;
+        LOG(ERROR) << "ERROR: Incompatible: " << error;
         std::cout << "false" << std::endl;
         return 1;
     }
@@ -220,7 +220,7 @@ Args parseArgs(int argc, char** argv) {
     }
     if (optind < argc) {
         // see non option
-        LOG(ERROR) << "unrecognized option `" << argv[optind] << "'";
+        LOG(ERROR) << "ERROR: unrecognized option `" << argv[optind] << "'";
         return {{HELP, ""}};
     }
     return ret;
@@ -278,7 +278,7 @@ bool parseKernelArgFirstHalf(const std::string& s, StaticRuntimeInfo* ret) {
         LOG(INFO) << "Successfully parsed content of " << s << ": " << content;
         return true;
     }
-    LOG(ERROR) << "Cannot parse content of " << s << ": " << content;
+    LOG(ERROR) << "ERROR: Cannot parse content of " << s << ": " << content;
     return false;
 }
 
@@ -286,13 +286,13 @@ template <typename T>
 std::shared_ptr<StaticRuntimeInfo> getRuntimeInfo(const T& args) {
     auto ret = std::make_shared<StaticRuntimeInfo>();
     if (std::distance(args.begin(), args.end()) > 1) {
-        LOG(ERROR) << "Can't have multiple --kernel options";
+        LOG(ERROR) << "ERROR: Can't have multiple --kernel options";
         return nullptr;
     }
     const auto& arg = *args.begin();
     auto colonPos = arg.rfind(":");
     if (colonPos == std::string::npos) {
-        LOG(ERROR) << "Invalid --kernel";
+        LOG(ERROR) << "ERROR: Invalid --kernel";
         return nullptr;
     }
 
@@ -504,27 +504,27 @@ int checkDirmaps(const Dirmap& dirmap, const Properties& props) {
             LOG(INFO) << "Checking system manifest.";
             auto manifest = vintfObject->getFrameworkHalManifest();
             if (!manifest) {
-                LOG(ERROR) << "Cannot fetch system manifest.";
+                LOG(ERROR) << "ERROR: Cannot fetch system manifest.";
                 exitCode = EX_SOFTWARE;
             }
             LOG(INFO) << "Checking system matrix.";
             auto matrix = vintfObject->getFrameworkCompatibilityMatrix();
             if (!matrix) {
-                LOG(ERROR) << "Cannot fetch system matrix.";
+                LOG(ERROR) << "ERROR: Cannot fetch system matrix.";
                 exitCode = EX_SOFTWARE;
             }
             auto res = vintfObject->checkMissingHalsInMatrices(HidlInterfaceMetadata::all(),
                                                                AidlInterfaceMetadata::all(),
                                                                ShouldCheckMissingHalsInFcm);
             if (!res.ok()) {
-                LOG(ERROR) << res.error() << gCheckMissingHalsSuggestion;
+                LOG(ERROR) << "ERROR: " << res.error() << gCheckMissingHalsSuggestion;
                 exitCode = EX_SOFTWARE;
             }
 
             res = vintfObject->checkMatrixHalsHasDefinition(HidlInterfaceMetadata::all(),
                                                             AidlInterfaceMetadata::all());
             if (!res.ok()) {
-                LOG(ERROR) << res.error();
+                LOG(ERROR) << "ERROR: " << res.error();
                 exitCode = EX_SOFTWARE;
             }
             continue;
@@ -534,22 +534,32 @@ int checkDirmaps(const Dirmap& dirmap, const Properties& props) {
             LOG(INFO) << "Checking vendor manifest.";
             auto manifest = vintfObject->getDeviceHalManifest();
             if (!manifest) {
-                LOG(ERROR) << "Cannot fetch vendor manifest.";
+                LOG(ERROR) << "ERROR: Cannot fetch vendor manifest.";
                 exitCode = EX_SOFTWARE;
             }
             LOG(INFO) << "Checking vendor matrix.";
             auto matrix = vintfObject->getDeviceCompatibilityMatrix();
             if (!matrix) {
-                LOG(ERROR) << "Cannot fetch vendor matrix.";
+                LOG(ERROR) << "ERROR: Cannot fetch vendor matrix.";
                 exitCode = EX_SOFTWARE;
             }
             continue;
         }
 
-        LOG(ERROR) << "--check-one does not work with --dirmap " << prefix;
+        LOG(ERROR) << "ERROR: --check-one does not work with --dirmap " << prefix;
         exitCode = EX_SOFTWARE;
     }
     return exitCode;
+}
+
+void Logger(android::base::LogId, android::base::LogSeverity severity, const char* /*tag*/,
+            const char* /*file*/, unsigned int /*line*/, const char* message) {
+    if (severity >= android::base::WARNING) {
+        fflush(stdout);
+        fprintf(stderr, "%s\n", message);
+    } else {
+        fprintf(stdout, "%s\n", message);
+    }
 }
 
 }  // namespace details
@@ -557,7 +567,7 @@ int checkDirmaps(const Dirmap& dirmap, const Properties& props) {
 }  // namespace android
 
 int main(int argc, char** argv) {
-    android::base::SetLogger(android::base::StderrLogger);
+    android::base::SetLogger(android::vintf::details::Logger);
 
     using namespace android::vintf;
     using namespace android::vintf::details;
@@ -595,7 +605,7 @@ int main(int argc, char** argv) {
     auto rootdirs = iterateValues(args, ROOTDIR);
     if (!rootdirs.empty()) {
         if (std::distance(rootdirs.begin(), rootdirs.end()) > 1) {
-            LOG(ERROR) << "Can't have multiple --rootdir options";
+            LOG(ERROR) << "ERROR: Can't have multiple --rootdir options";
             return usage(argv[0]);
         }
         args.emplace(DIR_MAP, "/:" + *rootdirs.begin());
@@ -611,7 +621,7 @@ int main(int argc, char** argv) {
     }
 
     if (dirmap.empty()) {
-        LOG(ERROR) << "Missing --rootdir or --dirmap option.";
+        LOG(ERROR) << "ERROR: Missing --rootdir or --dirmap option.";
         return usage(argv[0]);
     }
 
@@ -622,10 +632,10 @@ int main(int argc, char** argv) {
         return EX_OK;
     }
     if (compat.error().code() == 0) {
-        LOG(ERROR) << "files are incompatible: " << compat.error();
+        LOG(ERROR) << "ERROR: files are incompatible: " << compat.error();
         std::cout << "INCOMPATIBLE" << std::endl;
         return EX_DATAERR;
     }
-    LOG(ERROR) << strerror(compat.error().code()) << ": " << compat.error();
+    LOG(ERROR) << "ERROR: " << strerror(compat.error().code()) << ": " << compat.error();
     return EX_SOFTWARE;
 }
