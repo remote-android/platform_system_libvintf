@@ -25,6 +25,9 @@ cc_test {
     defaults: ["libvintf-defaults"],
     host_supported: true,
     gtest: false,
+    tidy_timeout_srcs: [
+        "LibVintfTest.cpp",
+    ],
     srcs: [
         "AssembleVintfTest.cpp",
         "LibVintfTest.cpp",
@@ -73,6 +76,9 @@ cc_test {
     defaults: ["libvintf-defaults"],
     host_supported: true,
     native_coverage: true,
+    tidy_timeout_srcs: [
+        "vintf_object_tests.cpp",
+    ],
     srcs: [
         "RuntimeInfo-fake.cpp",
         "vintf_object_tests.cpp",
