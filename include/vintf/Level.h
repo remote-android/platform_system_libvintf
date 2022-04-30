@@ -40,6 +40,7 @@ enum Level : size_t {
     R = 5,
     S = 6,
     T = 7,
+    U = 8,
     // To add new values: (1) add above this line.  (2) edit if needed:
     // - RuntimeInfo::gkiAndroidReleaseToLevel
     // - analyze_matrix.cpp, LevelDescription()
