@@ -42,6 +42,9 @@ class AssembleVintfTest : public ::testing::Test {
         auto s = makeStream("");
         mOutputStream = s.get();
         mInstance->setOutputStream(std::move(s));
+        s = makeStream("");
+        mErrorStream = s.get();
+        mInstance->setErrorStream(std::move(s));
 
         getInstance()->setFakeEnv("PRODUCT_ENFORCE_VINTF_MANIFEST", "true");
     }
@@ -50,6 +53,7 @@ class AssembleVintfTest : public ::testing::Test {
     const std::unique_ptr<AssembleVintf>& getInstance() { return mInstance; }
 
     std::string getOutput() { return mOutputStream->str(); }
+    std::string getError() { return mErrorStream->str(); }
 
     void resetOutput() { mOutputStream->str(""); }
 
@@ -70,6 +74,7 @@ class AssembleVintfTest : public ::testing::Test {
     std::unique_ptr<AssembleVintf> mInstance;
     // do not own this object.
     std::stringstream* mOutputStream;
+    std::stringstream* mErrorStream;
 };
 
 // clang-format off
