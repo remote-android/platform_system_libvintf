@@ -366,6 +366,11 @@ class AssembleVintfImpl : public AssembleVintf {
     bool assembleHalManifest(HalManifests* halManifests) {
         std::string error;
         HalManifest* halManifest = &halManifests->front();
+        HalManifest* manifestWithLevel = nullptr;
+        if (halManifest->level() != Level::UNSPECIFIED) {
+            manifestWithLevel = halManifest;
+        }
+
         for (auto it = halManifests->begin() + 1; it != halManifests->end(); ++it) {
             const std::string& path = it->fileName();
             HalManifest& manifestToAdd = *it;
@@ -373,10 +378,12 @@ class AssembleVintfImpl : public AssembleVintf {
             if (manifestToAdd.level() != Level::UNSPECIFIED) {
                 if (halManifest->level() == Level::UNSPECIFIED) {
                     halManifest->mLevel = manifestToAdd.level();
+                    manifestWithLevel = &manifestToAdd;
                 } else if (halManifest->level() != manifestToAdd.level()) {
                     err() << "Inconsistent FCM Version in HAL manifests:" << std::endl
-                          << "    File '" << halManifests->front().fileName() << "' has level "
-                          << halManifest->level() << std::endl
+                          << "    File '"
+                          << (manifestWithLevel ? manifestWithLevel->fileName() : "<unknown>")
+                          << "' has level " << halManifest->level() << std::endl
                           << "    File '" << path << "' has level " << manifestToAdd.level()
                           << std::endl;
                     return false;
