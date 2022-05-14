@@ -689,5 +689,16 @@ TEST_F(AssembleVintfTest, NoKernelRequirements) {
 
 // clang-format on
 
+TEST_F(AssembleVintfTest, ManifestLevelConflictCorrectLocation) {
+    addInput("manifest.xml", "<manifest " + kMetaVersionStr + R"( type="device" />)");
+    addInput("manifest_1.xml",
+             "<manifest " + kMetaVersionStr + R"( type="device" target-level="1" />)");
+    addInput("manifest_2.xml",
+             "<manifest " + kMetaVersionStr + R"( type="device" target-level="2" />)");
+    EXPECT_FALSE(getInstance()->assemble());
+    EXPECT_IN("File 'manifest_1.xml' has level 1", getError());
+    EXPECT_IN("File 'manifest_2.xml' has level 2", getError());
+}
+
 }  // namespace vintf
 }  // namespace android
