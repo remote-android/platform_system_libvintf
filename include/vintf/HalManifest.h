@@ -41,6 +41,7 @@
 #include "Vndk.h"
 #include "WithFileName.h"
 #include "XmlFileGroup.h"
+#include "constants.h"
 
 namespace android {
 namespace vintf {
@@ -229,6 +230,10 @@ struct HalManifest : public HalGroup<ManifestHal>,
 
     SchemaType mType;
     Level mLevel = Level::UNSPECIFIED;
+
+    // The metaversion on the source file if the HAL manifest is parsed from an XML file,
+    // Otherwise, the object is created programmatically, so default to libvintf meta version.
+    Version mSourceMetaVersion = kMetaVersion;
 
     // entries for device hal manifest only
     struct {

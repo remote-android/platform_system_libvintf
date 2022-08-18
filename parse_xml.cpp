@@ -1191,6 +1191,8 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
     void mutateNode(const HalManifest& object, NodeType* root,
                     const MutateNodeParam& param) const override {
         if (param.flags.isMetaVersionEnabled()) {
+            // Append the current metaversion of libvintf because the XML file
+            // is generated with libvintf @ current meta version.
             appendAttr(root, "version", kMetaVersion);
         }
         if (param.flags.isSchemaTypeEnabled()) {
@@ -1245,6 +1247,7 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
                            " (libvintf@" + to_string(kMetaVersion) + ")";
             return false;
         }
+        object->mSourceMetaVersion = param.metaVersion;
 
         if (!parseAttr(root, "type", &object->mType, param.error)) {
             return false;
