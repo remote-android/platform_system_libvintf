@@ -35,6 +35,12 @@
 
 using namespace std::string_literals;
 
+#ifdef LIBVINTF_TARGET
+static constexpr bool kDevice = true;
+#else
+static constexpr bool kDevice = false;
+#endif
+
 namespace android {
 namespace vintf {
 
@@ -653,12 +659,9 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
                 return false;
             }
         }
-// Do not check for target-side libvintf to avoid restricting ability for upgrade accidentally.
-#ifndef LIBVINTF_TARGET
         if (!checkAdditionalRestrictionsOnHal(*object, param.error)) {
             return false;
         }
-#endif
 
         if (!object->isValid(param.error)) {
             param.error->insert(0, "'" + object->name + "' is not a valid Matrix HAL: ");
@@ -667,9 +670,13 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
         return true;
     }
 
-#ifndef LIBVINTF_TARGET
    private:
     bool checkAdditionalRestrictionsOnHal(const MatrixHal& hal, std::string* error) const {
+        // Do not check for target-side libvintf to avoid restricting ability for upgrade
+        // accidentally.
+        if constexpr (kDevice) {
+            return true;
+        }
         if (hal.getName() == "netutils-wrapper") {
             if (hal.versionRanges.size() != 1) {
                 *error =
@@ -695,7 +702,6 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
         }
         return true;
     }
-#endif
 };
 
 struct MatrixKernelConditionsConverter : public XmlNodeConverter<std::vector<KernelConfig>> {
@@ -874,12 +880,9 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                 return false;
             }
         }
-// Do not check for target-side libvintf to avoid restricting upgrade accidentally.
-#ifndef LIBVINTF_TARGET
         if (!checkAdditionalRestrictionsOnHal(*object, param.error)) {
             return false;
         }
-#endif
 
         std::set<FqInstance> fqInstances;
         if (!parseChildren(root, FqInstanceConverter{}, &fqInstances, param)) {
@@ -923,9 +926,12 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         return true;
     }
 
-#ifndef LIBVINTF_TARGET
    private:
     bool checkAdditionalRestrictionsOnHal(const ManifestHal& hal, std::string* error) const {
+        // Do not check for target-side libvintf to avoid restricting upgrade accidentally.
+        if constexpr (kDevice) {
+            return true;
+        }
         if (hal.getName() == "netutils-wrapper") {
             for (const Version& v : hal.versions) {
                 if (v.minorVer != 0) {
@@ -939,7 +945,6 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         }
         return true;
     }
-#endif
 };
 
 struct KernelSepolicyVersionConverter : public XmlTextConverter<KernelSepolicyVersion> {
