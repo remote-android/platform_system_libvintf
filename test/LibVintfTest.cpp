@@ -3916,6 +3916,7 @@ TEST_F(LibVintfTest, ManifestAddAllConflictMajorVersion) {
             "</version>\n"
             "        <interface>\n"
             "            <name>IFoo</name>\n"
+            "            <instance>default</instance>\n"
             "        </interface>\n"
             "    </hal>\n"
             "</manifest>\n";
@@ -3934,8 +3935,8 @@ TEST_F(LibVintfTest, ManifestAddAllConflictMajorVersion) {
     ASSERT_FALSE(manifest1.addAll(&manifest2, &error));
 
     EXPECT_IN("android.hardware.foo", error);
-    EXPECT_IN("1.0 (from 1.xml)", error);
-    EXPECT_IN("1.1 (from 2.xml)", error);
+    EXPECT_IN("@1.0::IFoo/default (from 1.xml)", error);
+    EXPECT_IN("@1.1::IFoo/default (from 2.xml)", error);
 }
 
 TEST_F(LibVintfTest, ManifestAddAllConflictLevel) {
@@ -5095,6 +5096,70 @@ TEST_P(AllowDupMajorVersionTest, DoNotAllow6_0) {
 INSTANTIATE_TEST_SUITE_P(LibVintfTest, AllowDupMajorVersionTest,
                          ::testing::ValuesIn(AllowDupMajorVersionTest::createParams()),
                          &AllowDupMajorVersionTest::getTestSuffix);
+
+struct InterfaceMissingInstanceTestParam {
+    HalFormat format;
+    std::string footer;
+};
+
+class InterfaceMissingInstanceTest
+    : public LibVintfTest,
+      public ::testing::WithParamInterface<InterfaceMissingInstanceTestParam> {
+   public:
+    static std::vector<InterfaceMissingInstanceTestParam> createParams() {
+        std::vector<InterfaceMissingInstanceTestParam> ret;
+
+        std::string hidlFooter = R"(
+    <hal>
+        <name>android.hardware.nfc</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>INfc</name>
+        </interface>
+    </hal>
+</manifest>
+)";
+        std::string aidlFooter = R"(
+    <hal format="aidl">
+        <name>android.hardware.nfc</name>
+        <interface>
+            <name>INfc</name>
+        </interface>
+    </hal>
+</manifest>
+)";
+
+        return {{HalFormat::HIDL, hidlFooter}, {HalFormat::AIDL, aidlFooter}};
+    }
+    static std::string getTestSuffix(const TestParamInfo<ParamType>& info) {
+        return to_string(info.param.format);
+    }
+};
+
+TEST_P(InterfaceMissingInstanceTest, Test5_0) {
+    auto&& [testName, footer] = GetParam();
+    std::string header = R"(<manifest version="5.0" type="device">)";
+    std::string xml = header + footer;
+    HalManifest vm;
+    std::string error;
+    EXPECT_TRUE(fromXml(&vm, xml, &error)) << error;
+}
+
+TEST_P(InterfaceMissingInstanceTest, Test6_0) {
+    auto&& [testName, footer] = GetParam();
+    std::string header = R"(<manifest version=")" + to_string(kMetaVersionNoHalInterfaceInstance) +
+                         R"(" type="device">)";
+    std::string xml = header + footer;
+    HalManifest vm;
+    std::string error;
+    EXPECT_FALSE(fromXml(&vm, xml, &error));
+    EXPECT_THAT(error, HasSubstr("<hal> android.hardware.nfc <interface> INfc has no <instance>."));
+}
+
+INSTANTIATE_TEST_SUITE_P(LibVintfTest, InterfaceMissingInstanceTest,
+                         ::testing::ValuesIn(InterfaceMissingInstanceTest::createParams()),
+                         &InterfaceMissingInstanceTest::getTestSuffix);
 
 // clang-format off
 
