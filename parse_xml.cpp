@@ -998,8 +998,12 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             }
         }
 
-        // TODO(b/148808037): Require !fqInstancesToInsert.empty() for HIDL & AIDL >=
-        // kMetaVersionNoHalInterfaceInstance.
+        if (param.metaVersion >= kMetaVersionNoHalInterfaceInstance &&
+            (object->format == HalFormat::HIDL || object->format == HalFormat::AIDL) &&
+            fqInstancesToInsert.empty()) {
+            *param.error = "<hal> " + object->name + " has no instance. Fix by adding <fqname>.";
+            return false;
+        }
 
         bool allowMajorVersionDup = param.metaVersion < kMetaVersionNoHalInterfaceInstance;
         if (!object->insertInstances(fqInstancesToInsert, allowMajorVersionDup, param.error)) {

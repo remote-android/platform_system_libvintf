@@ -401,7 +401,7 @@ TEST_F(LibVintfTest, HalManifestOptional) {
     EXPECT_TRUE(fromXml(&vm,
             "<manifest " + kMetaVersionStr + " type=\"device\"></manifest>"));
     EXPECT_TRUE(fromXml(&vm,
-            "<manifest " + kMetaVersionStr + " type=\"device\">"
+            "<manifest version=\"5.0\" type=\"device\">"
             "    <hal>"
             "        <name>android.hidl.manager</name>"
             "        <transport>hwbinder</transport>"
@@ -409,7 +409,7 @@ TEST_F(LibVintfTest, HalManifestOptional) {
             "    </hal>"
             "</manifest>"));
     EXPECT_FALSE(fromXml(&vm,
-            "<manifest " + kMetaVersionStr + " type=\"device\">"
+            "<manifest version=\"5.0\" type=\"device\">"
             "    <hal>"
             "        <name>android.hidl.manager</name>"
             "        <version>1.0</version>"
@@ -2719,7 +2719,7 @@ TEST_F(LibVintfTest, ManifestHalOverride) {
     std::string error;
     HalManifest manifest;
     std::string xml =
-        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "<manifest version=\"5.0\" type=\"device\">\n"
         "    <hal format=\"hidl\" override=\"true\">\n"
         "        <name>android.hardware.foo</name>\n"
         "        <transport>hwbinder</transport>\n"
@@ -2800,7 +2800,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalSimpleOverride) {
     std::string error;
     HalManifest manifest;
     std::string xml =
-        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "<manifest version=\"5.0\" type=\"device\">\n"
         "    <hal format=\"hidl\">\n"
         "        <name>android.hardware.foo</name>\n"
         "        <transport>hwbinder</transport>\n"
@@ -2828,7 +2828,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalSimpleOverrideWithInterface) {
     std::string error;
     HalManifest manifest;
     std::string xml =
-        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "<manifest version=\"5.0\" type=\"device\">\n"
         "    <hal format=\"hidl\">\n"
         "        <name>android.hardware.foo</name>\n"
         "        <transport>hwbinder</transport>\n"
@@ -2869,7 +2869,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalMultiVersion) {
     std::string error;
     HalManifest manifest;
     std::string xml =
-        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "<manifest version=\"5.0\" type=\"device\">\n"
         "    <hal format=\"hidl\">\n"
         "        <name>android.hardware.foo</name>\n"
         "        <transport>hwbinder</transport>\n"
@@ -3015,7 +3015,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalRemoveAll) {
     std::string error;
     HalManifest manifest;
     std::string xml =
-        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "<manifest version=\"5.0\" type=\"device\">\n"
         "    <hal format=\"hidl\">\n"
         "        <name>android.hardware.foo</name>\n"
         "        <transport>hwbinder</transport>\n"
@@ -3046,7 +3046,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalRemoveAll) {
 
     HalManifest newManifest;
     xml =
-        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "<manifest version=\"5.0\" type=\"device\">\n"
         "    <hal format=\"hidl\" override=\"true\">\n"
         "        <name>android.hardware.foo</name>\n"
         "        <transport>hwbinder</transport>\n"
@@ -3474,7 +3474,7 @@ TEST_F(LibVintfTest, DisabledHal) {
     std::string xml;
     HalManifest manifest;
     xml =
-        "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+        "<manifest version=\"5.0\" type=\"framework\">\n"
         "    <hal format=\"hidl\" override=\"true\">\n"
         "        <transport>hwbinder</transport>\n"
         "        <name>android.hardware.foo</name>\n"
@@ -5160,6 +5160,65 @@ TEST_P(InterfaceMissingInstanceTest, Test6_0) {
 INSTANTIATE_TEST_SUITE_P(LibVintfTest, InterfaceMissingInstanceTest,
                          ::testing::ValuesIn(InterfaceMissingInstanceTest::createParams()),
                          &InterfaceMissingInstanceTest::getTestSuffix);
+
+struct ManifestHalNoInstanceTestParam {
+    HalFormat format;
+    std::string footer;
+};
+
+class ManifestHalNoInstanceTest
+    : public LibVintfTest,
+      public ::testing::WithParamInterface<ManifestHalNoInstanceTestParam> {
+   public:
+    static std::vector<ManifestHalNoInstanceTestParam> createParams() {
+        std::vector<ManifestHalNoInstanceTestParam> ret;
+
+        std::string hidlFooter = R"(
+    <hal>
+        <name>android.hardware.nfc</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+    </hal>
+</manifest>
+)";
+        std::string aidlFooter = R"(
+    <hal format="aidl">
+        <name>android.hardware.nfc</name>
+    </hal>
+</manifest>
+)";
+
+        return {{HalFormat::HIDL, hidlFooter}, {HalFormat::AIDL, aidlFooter}};
+    }
+    static std::string getTestSuffix(const TestParamInfo<ParamType>& info) {
+        return to_string(info.param.format);
+    }
+};
+
+TEST_P(ManifestHalNoInstanceTest, Test5_0) {
+    auto&& [testName, footer] = GetParam();
+    std::string header = R"(<manifest version="5.0" type="device">)";
+    std::string xml = header + footer;
+    HalManifest vm;
+    std::string error;
+    EXPECT_TRUE(fromXml(&vm, xml, &error)) << error;
+}
+
+TEST_P(ManifestHalNoInstanceTest, Test6_0) {
+    auto&& [testName, footer] = GetParam();
+    std::string header = R"(<manifest version=")" + to_string(kMetaVersionNoHalInterfaceInstance) +
+                         R"(" type="device">)";
+    std::string xml = header + footer;
+    HalManifest vm;
+    std::string error;
+    EXPECT_FALSE(fromXml(&vm, xml, &error));
+    EXPECT_THAT(error,
+                HasSubstr("<hal> android.hardware.nfc has no instance. Fix by adding <fqname>."));
+}
+
+INSTANTIATE_TEST_SUITE_P(LibVintfTest, ManifestHalNoInstanceTest,
+                         ::testing::ValuesIn(ManifestHalNoInstanceTest::createParams()),
+                         &ManifestHalNoInstanceTest::getTestSuffix);
 
 // clang-format off
 
