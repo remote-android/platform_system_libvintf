@@ -70,7 +70,7 @@ struct CompatibilityMatrix : public HalGroup<MatrixHal>,
 
     std::vector<VersionRange> getSepolicyVersions() const;
 
-    bool add(MatrixHal&&, std::string* error = nullptr) override;
+    bool add(MatrixHal&&, std::string* error = nullptr);
     // Move all hals from another CompatibilityMatrix to this.
     bool addAllHals(CompatibilityMatrix* other, std::string* error = nullptr);
 
