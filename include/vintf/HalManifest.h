@@ -68,7 +68,7 @@ struct HalManifest : public HalGroup<ManifestHal>,
     // Construct a device HAL manifest.
     HalManifest() : mType(SchemaType::DEVICE) {}
 
-    bool add(ManifestHal&& hal, std::string* error = nullptr) override;
+    bool add(ManifestHal&& hal, std::string* error = nullptr);
     // Move all hals from another HalManifest to this.
     bool addAllHals(HalManifest* other, std::string* error = nullptr);
 
