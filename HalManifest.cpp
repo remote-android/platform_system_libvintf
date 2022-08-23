@@ -497,10 +497,6 @@ Level HalManifest::level() const {
     return mLevel;
 }
 
-Version HalManifest::getMetaVersion() const {
-    return kMetaVersion;
-}
-
 const Version &HalManifest::sepolicyVersion() const {
     CHECK(mType == SchemaType::DEVICE);
     return device.mSepolicyVersion;
