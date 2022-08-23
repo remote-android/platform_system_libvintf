@@ -1229,8 +1229,8 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
         }
         for (auto &&hal : hals) {
             std::string description{hal.name};
-            if (!object->add(std::move(hal))) {
-                *param.error = "Duplicated manifest.hal entry " + description;
+            if (!object->add(std::move(hal), param.error)) {
+                param.error->insert(0, "Duplicated manifest.hal entry " + description + ": ");
                 return false;
             }
         }

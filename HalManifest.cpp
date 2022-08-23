@@ -614,7 +614,7 @@ bool HalManifest::insertInstance(const FqInstance& fqInstance, Transport transpo
     hal.format = format;
     hal.transportArch = TransportArch(transport, arch);
     if (!hal.insertInstance(fqInstance, error)) return false;
-    return add(std::move(hal));
+    return add(std::move(hal), error);
 }
 
 bool HalManifest::empty() const {
