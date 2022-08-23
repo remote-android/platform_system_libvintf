@@ -118,7 +118,11 @@ void HalManifest::removeHals(const std::string& name, size_t majorVer) {
         removeIf(existingVersions, [majorVer](const auto& existingVersion) {
             return existingVersion.majorVer == majorVer;
         });
-        return existingVersions.empty();
+        auto& existingManifestInstances = existingHal.mManifestInstances;
+        removeIf(existingManifestInstances, [majorVer](const auto& existingManifestInstance) {
+            return existingManifestInstance.version().majorVer == majorVer;
+        });
+        return existingVersions.empty() && existingManifestInstances.empty();
     });
 }
 
@@ -133,6 +137,11 @@ bool HalManifest::add(ManifestHal&& halToAdd, std::string* error) {
         for (const Version& versionToAdd : halToAdd.versions) {
             removeHals(halToAdd.name, versionToAdd.majorVer);
         }
+        // If there are <fqname> tags, remove all existing major versions that causes a conflict.
+        halToAdd.forEachInstance([this, &halToAdd](const auto& manifestInstanceToAdd) {
+            removeHals(halToAdd.name, manifestInstanceToAdd.version().majorVer);
+            return true;  // continue
+        });
     }
 
     if (!shouldAdd(halToAdd, error)) {
