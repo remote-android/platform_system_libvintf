@@ -122,9 +122,6 @@ struct HalManifest : public HalGroup<ManifestHal>,
     // Otherwise if the <xmlfile> entry does not exist, "" is returned.
     std::string getXmlFilePath(const std::string& xmlFileName, const Version& version) const;
 
-    // Get metaversion of this manifest.
-    Version getMetaVersion() const;
-
     // Alternative to forEachInstance if you just need a set of instance names instead.
     std::set<std::string> getHidlInstances(const std::string& package, const Version& version,
                                            const std::string& interfaceName) const;

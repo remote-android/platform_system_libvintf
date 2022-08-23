@@ -1110,7 +1110,7 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
     void mutateNode(const HalManifest& object, NodeType* root,
                     const MutateNodeParam& param) const override {
         if (param.flags.isMetaVersionEnabled()) {
-            appendAttr(root, "version", object.getMetaVersion());
+            appendAttr(root, "version", kMetaVersion);
         }
         if (param.flags.isSchemaTypeEnabled()) {
             appendAttr(root, "type", object.mType);
