@@ -497,10 +497,6 @@ Level HalManifest::level() const {
     return mLevel;
 }
 
-Version HalManifest::getMetaVersion() const {
-    return kMetaVersion;
-}
-
 const Version &HalManifest::sepolicyVersion() const {
     CHECK(mType == SchemaType::DEVICE);
     return device.mSepolicyVersion;
@@ -618,7 +614,7 @@ bool HalManifest::insertInstance(const FqInstance& fqInstance, Transport transpo
     hal.format = format;
     hal.transportArch = TransportArch(transport, arch);
     if (!hal.insertInstance(fqInstance, error)) return false;
-    return add(std::move(hal));
+    return add(std::move(hal), error);
 }
 
 bool HalManifest::empty() const {
