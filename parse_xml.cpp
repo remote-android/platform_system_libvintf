@@ -920,9 +920,25 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                             return false;
                         }
 
-                        // TODO(b/148808037): Check for duplication in fqInstances.
+                        // Check for duplication in fqInstances.
+                        // Before kMetaVersionNoHalInterfaceInstance: It is okay to have duplication
+                        // between <interface> and <fqname>.
+                        // After kMetaVersionNoHalInterfaceInstance: Duplication between
+                        // <interface> and <fqname> is not allowed.
                         auto&& [it, inserted] = fqInstances.emplace(std::move(fqInstance.value()));
-                        (void)inserted;
+                        if (param.metaVersion >= kMetaVersionNoHalInterfaceInstance && !inserted) {
+                            *param.error = "Duplicated " + debugString +
+                                           " in <interface><instance> and <fqname>. ";
+                            if constexpr (kDevice) {
+                                *param.error +=
+                                    "(Did you copy source manifests to the device directly "
+                                    "without going through assemble_vintf, e.g. not using "
+                                    "DEVICE_MANIFEST_FILE or ODM_MANIFEST_FILES?)";
+                            } else {
+                                *param.error += "Remove deprecated <interface>.";
+                            }
+                            return false;
+                        }
 
                         convertedInstancesIntoFqnames = true;
                         return true;  // continue
