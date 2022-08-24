@@ -4874,6 +4874,84 @@ TEST_F(LibVintfTest, CompatibilityMatrixInvalidPackage) {
     EXPECT_THAT(error, HasSubstr("not_a_valid_package!"));
 }
 
+struct DupInterfaceAndFqnameTestParam {
+    HalFormat format;
+    std::string footer;
+    std::string halName;
+};
+
+class DupInterfaceAndFqnameTest
+    : public LibVintfTest,
+      public ::testing::WithParamInterface<DupInterfaceAndFqnameTestParam> {
+   public:
+    static std::vector<DupInterfaceAndFqnameTestParam> createParams() {
+        std::vector<DupInterfaceAndFqnameTestParam> ret;
+
+        std::string hidlFooter = R"(
+    <hal>
+        <name>android.hardware.nfc</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>INfc</name>
+            <instance>default</instance>
+        </interface>
+        <fqname>@1.0::INfc/default</fqname>
+    </hal>
+</manifest>
+)";
+
+        std::string aidlFooter = R"(
+    <hal format="aidl">
+        <name>android.hardware.nfc</name>
+        <interface>
+            <name>INfc</name>
+            <instance>default</instance>
+        </interface>
+        <fqname>INfc/default</fqname>
+    </hal>
+</manifest>
+)";
+
+        return {
+            {HalFormat::HIDL, hidlFooter, "android.hardware.nfc@1.0::INfc/default"},
+            {HalFormat::AIDL, aidlFooter, "android.hardware.nfc.INfc/default"},
+        };
+    }
+    static std::string getTestSuffix(const TestParamInfo<ParamType>& info) {
+        return to_string(info.param.format);
+    }
+};
+
+TEST_P(DupInterfaceAndFqnameTest, Test5_0) {
+    auto&& [_, footer, halName] = GetParam();
+    std::string xml = R"(<manifest version="5.0" type="device">)" + footer;
+    HalManifest vm;
+    std::string error;
+    EXPECT_TRUE(fromXml(&vm, xml, &error))
+        << "<fqname> and <interface> are allowed to exist "
+           "together for the same instance for libvintf 5.0, but error is: "
+        << error;
+}
+
+TEST_P(DupInterfaceAndFqnameTest, Test6_0) {
+    auto&& [_, footer, halName] = GetParam();
+    std::string xml = R"(<manifest version=")" + to_string(kMetaVersionNoHalInterfaceInstance) +
+                      R"(" type="device">)" + footer;
+    HalManifest vm;
+    std::string error;
+    EXPECT_FALSE(fromXml(&vm, xml, &error));
+    EXPECT_THAT(error,
+                HasSubstr("Duplicated " + halName + " in <interface><instance> and <fqname>."))
+        << "<fqname> and <interface> are not allowed to exist "
+           "together for the same instance for libvintf "
+        << kMetaVersionNoHalInterfaceInstance << ".";
+}
+
+INSTANTIATE_TEST_SUITE_P(LibVintfTest, DupInterfaceAndFqnameTest,
+                         ::testing::ValuesIn(DupInterfaceAndFqnameTest::createParams()),
+                         &DupInterfaceAndFqnameTest::getTestSuffix);
+
 // clang-format off
 
 struct FrameworkCompatibilityMatrixCombineTest : public LibVintfTest {
