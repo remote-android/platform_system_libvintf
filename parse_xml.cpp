@@ -32,6 +32,7 @@
 #include "constants.h"
 #include "parse_string.h"
 #include "parse_xml_for_test.h"
+#include "utils.h"
 
 using namespace std::string_literals;
 
@@ -778,7 +779,6 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         } else {
             appendChildren(root, VersionConverter{}, object.versions, param);
         }
-        appendChildren(root, HalInterfaceConverter{}, iterateValues(object.interfaces), param);
         if (object.isOverride()) {
             appendAttr(root, "override", object.isOverride());
         }
@@ -808,7 +808,6 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             !parseTextElement(root, "name", &object->name, param.error) ||
             !parseOptionalChild(root, TransportArchConverter{}, {}, &object->transportArch,
                                 param) ||
-            !parseChildren(root, HalInterfaceConverter{}, &interfaces, param) ||
             !parseOptionalAttr(root, "max-level", Level::UNSPECIFIED, &object->mMaxLevel,
                                param.error)) {
             return false;
@@ -870,24 +869,99 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         }
         if (!object->transportArch.isValid(param.error)) return false;
 
-        object->interfaces.clear();
+        // Parse <fqname> into fqInstances list
+        std::set<FqInstance> fqInstances;
+        if (!parseChildren(root, FqInstanceConverter{}, &fqInstances, param)) {
+            return false;
+        }
+
+        // Handle deprecated <interface> x <instance>
+        if (!parseChildren(root, HalInterfaceConverter{}, &interfaces, param)) {
+            return false;
+        }
+        // Check duplicated <interface><name>
+        std::set<std::string> interface_names;
         for (auto &&interface : interfaces) {
-            auto res = object->interfaces.emplace(interface.name(), std::move(interface));
+            auto res = interface_names.emplace(interface.name());
             if (!res.second) {
-                *param.error = "Duplicated interface entry \"" + res.first->first +
+                *param.error = "Duplicated interface entry \"" + *res.first +
                                "\"; if additional instances are needed, add them to the "
                                "existing <interface> node.";
                 return false;
             }
         }
+        // Turn <version> x <interface> x <instance> into <fqname>s; insert into
+        // fqInstances list.
+        bool convertedInstancesIntoFqnames = false;
+        for (const auto& v : object->versions) {
+            for (const auto& intf : interfaces) {
+                bool cont = intf.forEachInstance(
+                    [&v, &fqInstances, &convertedInstancesIntoFqnames, &object, &param](
+                        const auto& interface, const auto& instance, bool /* isRegex */) {
+                        // AIDL HAL <fqname> never contains version
+                        auto fqInstance =
+                            object->format == HalFormat::AIDL
+                                ? FqInstance::from(interface, instance)
+                                : FqInstance::from(v.majorVer, v.minorVer, interface, instance);
+                        std::string debugString =
+                            object->format == HalFormat::AIDL
+                                ? toAidlFqnameString(object->name, interface, instance)
+                                : toFQNameString(object->name, v, interface, instance);
+
+                        if (!fqInstance.has_value()) {
+                            // Bad FqInstance. Infer an error message.
+                            if (details::canConvertToFqInstance(object->name, v, interface,
+                                                                instance, object->format,
+                                                                param.error)) {
+                                // Unable to determine a better error. Return a generic error.
+                                *param.error = "Invalid FqInstance: " + debugString;
+                            }
+                            // else param.error is set appropriately.
+                            return false;
+                        }
+
+                        // Check for duplication in fqInstances.
+                        // Before kMetaVersionNoHalInterfaceInstance: It is okay to have duplication
+                        // between <interface> and <fqname>.
+                        // After kMetaVersionNoHalInterfaceInstance: Duplication between
+                        // <interface> and <fqname> is not allowed.
+                        auto&& [it, inserted] = fqInstances.emplace(std::move(fqInstance.value()));
+                        if (param.metaVersion >= kMetaVersionNoHalInterfaceInstance && !inserted) {
+                            *param.error = "Duplicated " + debugString +
+                                           " in <interface><instance> and <fqname>. ";
+                            if constexpr (kDevice) {
+                                *param.error +=
+                                    "(Did you copy source manifests to the device directly "
+                                    "without going through assemble_vintf, e.g. not using "
+                                    "DEVICE_MANIFEST_FILE or ODM_MANIFEST_FILES?)";
+                            } else {
+                                *param.error += "Remove deprecated <interface>.";
+                            }
+                            return false;
+                        }
+
+                        convertedInstancesIntoFqnames = true;
+                        return true;  // continue
+                    });
+                if (!cont) {
+                    return false;
+                }
+            }
+        }
+
         if (!checkAdditionalRestrictionsOnHal(*object, param.error)) {
             return false;
         }
 
-        std::set<FqInstance> fqInstances;
-        if (!parseChildren(root, FqInstanceConverter{}, &fqInstances, param)) {
-            return false;
+        // For HIDL, if any <version> x <interface> x <instance> tuple, all <version>
+        // tags can be cleared. <version> information is already in <fqname>'s.
+        // For AIDL, <version> information is not in <fqname>, so don't clear them.
+        // For HALs with only <version> but no <interface>
+        // (e.g. native HALs like netutils-wrapper), <version> is kept.
+        if (convertedInstancesIntoFqnames && object->format != HalFormat::AIDL) {
+            object->versions.clear();
         }
+
         std::set<FqInstance> fqInstancesToInsert;
         for (auto& e : fqInstances) {
             if (e.hasPackage()) {
@@ -914,7 +988,14 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                 fqInstancesToInsert.emplace(std::move(e));
             }
         }
-        if (!object->insertInstances(fqInstancesToInsert, param.error)) {
+
+        // TODO(b/148808037): Require !fqInstancesToInsert.empty() for HIDL & AIDL >=
+        // kMetaVersionNoHalInterfaceInstance.
+
+        // TODO(b/148808037): Do not allowMajorVersionDup on manifests
+        // >= kMetaVersionNoHalInterfaceInstance.
+        bool allowMajorVersionDup = true;
+        if (!object->insertInstances(fqInstancesToInsert, allowMajorVersionDup, param.error)) {
             return false;
         }
 
@@ -1110,6 +1191,8 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
     void mutateNode(const HalManifest& object, NodeType* root,
                     const MutateNodeParam& param) const override {
         if (param.flags.isMetaVersionEnabled()) {
+            // Append the current metaversion of libvintf because the XML file
+            // is generated with libvintf @ current meta version.
             appendAttr(root, "version", kMetaVersion);
         }
         if (param.flags.isSchemaTypeEnabled()) {
@@ -1164,6 +1247,7 @@ struct HalManifestConverter : public XmlNodeConverter<HalManifest> {
                            " (libvintf@" + to_string(kMetaVersion) + ")";
             return false;
         }
+        object->mSourceMetaVersion = param.metaVersion;
 
         if (!parseAttr(root, "type", &object->mType, param.error)) {
             return false;
