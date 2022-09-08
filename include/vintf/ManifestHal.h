@@ -64,6 +64,7 @@ struct ManifestHal : public WithFileName {
     bool forEachInstance(const std::function<bool(const ManifestInstance&)>& func) const;
 
     bool isOverride() const { return mIsOverride; }
+    bool isApexDefined() const { return mIsApexDefined; }
     const std::optional<std::string>& updatableViaApex() const { return mUpdatableViaApex; }
 
     // When true, the existence of this <hal> tag means the component does NOT
@@ -107,6 +108,9 @@ struct ManifestHal : public WithFileName {
     // If set, HALs with max-level < target FCM version in device manifest is
     // disabled.
     Level mMaxLevel = Level::UNSPECIFIED;
+
+    void setApexDefined() { mIsApexDefined = true; }
+    bool mIsApexDefined = false;
 };
 
 } // namespace vintf

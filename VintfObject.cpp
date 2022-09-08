@@ -259,11 +259,24 @@ status_t VintfObject::fetchDeviceHalManifest(HalManifest* out, std::string* erro
 // Vendor + odm
 status_t VintfObject::fetchDeviceHalManifestApex(HalManifest* out, std::string* error) {
     status_t status = OK;
+
+    // Create HalManifest for all APEX HALs so that the apex defined attribute can
+    // be set.
+    HalManifest apexManifest;
     for (const auto& dir : getApex()->DeviceVintfDirs()) {
-        status = addDirectoryManifests(dir, out, false, error);
+        status = addDirectoryManifests(dir, &apexManifest, false, error);
         if (status != OK) {
             return status;
         }
+    }
+    status = apexManifest.setApexDefined(error);
+    if (status != OK) {
+        return status;
+    }
+
+    // Add APEX HALs to out
+    if (!out->addAllHals(&apexManifest, error)) {
+        return UNKNOWN_ERROR;
     }
     return OK;
 }
