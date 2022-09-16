@@ -225,6 +225,11 @@ struct HalManifest : public HalGroup<ManifestHal>,
     // false if hal should not be added, and set |error| accordingly. Return true if check passes.
     bool addingConflictingMajorVersion(const ManifestHal& hal, std::string* error) const;
 
+    // Helper for shouldAdd(). Check if |hal| has a conflicting major version in <fqname> with this.
+    // Return false if hal should not be added, and set |error| accordingly. Return true if check
+    // passes.
+    bool addingConflictingFqInstance(const ManifestHal& hal, std::string* error) const;
+
     // Inferred kernel level.
     Level inferredKernelLevel() const;
 
