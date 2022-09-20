@@ -416,7 +416,9 @@ namespace details {
 // because some files have a higher priority than others. The list does NOT
 // include "files" (including kernel interfaces) that are read when GetRuntimeInfo
 // is called.
-std::vector<std::string> dumpFileList();
+// The sku string from ro.boot.product.hardware.sku is needed to build the ODM
+// manifest file name for legacy devices.
+std::vector<std::string> dumpFileList(const std::string& sku);
 
 } // namespace details
 
