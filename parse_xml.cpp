@@ -992,7 +992,9 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         // TODO(b/148808037): Require !fqInstancesToInsert.empty() for HIDL & AIDL >=
         // kMetaVersionNoHalInterfaceInstance.
 
-        bool allowMajorVersionDup = param.metaVersion < kMetaVersionNoHalInterfaceInstance;
+        // TODO(b/148808037): Do not allowMajorVersionDup on manifests
+        // >= kMetaVersionNoHalInterfaceInstance.
+        bool allowMajorVersionDup = true;
         if (!object->insertInstances(fqInstancesToInsert, allowMajorVersionDup, param.error)) {
             return false;
         }
