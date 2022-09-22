@@ -68,9 +68,7 @@ public:
         EXPECT_EQ(success, error == "") << "success: " << success << ", error: " << error;
         return success;
     }
-    bool add(HalManifest &vm, ManifestHal &&hal) {
-        return vm.add(std::move(hal));
-    }
+    bool add(HalManifest& vm, ManifestHal&& hal) { return vm.add(std::move(hal), nullptr); }
     void addXmlFile(CompatibilityMatrix& cm, std::string name, VersionRange range) {
         MatrixXmlFile f;
         f.mName = name;
@@ -186,10 +184,10 @@ public:
             std::set({*FqInstance::from(1, 0, "IServiceManager", "default")})));
         Vndk vndk2505;
         vndk2505.mVersionRange = {25, 0, 5};
-        vndk2505.mLibraries = { "libjpeg.so", "libbase.so" };
+        vndk2505.mLibraries = {"libjpeg.so", "libbase.so"};
         Vndk vndk2513;
         vndk2513.mVersionRange = {25, 1, 3};
-        vndk2513.mLibraries = { "libjpeg.so", "libbase.so", "libtinyxml2.so" };
+        vndk2513.mLibraries = {"libjpeg.so", "libbase.so", "libtinyxml2.so"};
         vm.framework.mVndks = { std::move(vndk2505), std::move(vndk2513) };
 
         return vm;
@@ -3534,7 +3532,7 @@ TEST_F(LibVintfTest, FqNameValid) {
     {
         HalManifest manifest;
         xml =
-            "<manifest " + kMetaVersionStr + " type=\"framework\">\n"
+            "<manifest version=\"5.0\" type=\"framework\">\n"
             "    <hal format=\"hidl\">\n"
             "        <name>android.hardware.foo</name>\n"
             "        <transport>hwbinder</transport>\n"
@@ -3613,14 +3611,17 @@ TEST_F(LibVintfTest, FqNameValid) {
 TEST_F(LibVintfTest, FqNameInvalid) {
     std::string error;
     std::string xml;
+    {
+        ManifestHal hal;
+        xml =
+            "<hal format=\"hidl\">\n"
+            "    <name>android.hardware.foo</name>\n"
+            "    <transport>hwbinder</transport>\n"
+            "    <fqname>@1.1::IFoo/custom</fqname>\n"
+            "</hal>\n";
+        EXPECT_TRUE(fromXml(&hal, xml, &error)) << error;
+    }
     ManifestHal hal;
-    xml =
-        "<hal format=\"hidl\">\n"
-        "    <name>android.hardware.foo</name>\n"
-        "    <transport>hwbinder</transport>\n"
-        "    <fqname>@1.1::IFoo/custom</fqname>\n"
-        "</hal>\n";
-    EXPECT_TRUE(fromXml(&hal, xml, &error)) << error;
     xml =
         "<hal format=\"hidl\">\n"
         "    <name>android.hardware.foo</name>\n"
@@ -4951,6 +4952,149 @@ TEST_P(DupInterfaceAndFqnameTest, Test6_0) {
 INSTANTIATE_TEST_SUITE_P(LibVintfTest, DupInterfaceAndFqnameTest,
                          ::testing::ValuesIn(DupInterfaceAndFqnameTest::createParams()),
                          &DupInterfaceAndFqnameTest::getTestSuffix);
+
+struct AllowDupMajorVersionTestParam {
+    std::string testName;
+    std::string expectedError;
+    std::string footer;
+};
+
+class AllowDupMajorVersionTest
+    : public LibVintfTest,
+      public ::testing::WithParamInterface<AllowDupMajorVersionTestParam> {
+   public:
+    static std::vector<AllowDupMajorVersionTestParam> createParams() {
+        std::vector<AllowDupMajorVersionTestParam> ret;
+        ret.push_back({"HidlInterfaceAndFqName", "Duplicated major version", R"(
+                <hal>
+                    <name>android.hardware.nfc</name>
+                    <transport>hwbinder</transport>
+                    <version>1.0</version>
+                    <interface>
+                        <name>INfc</name>
+                        <instance>default</instance>
+                    </interface>
+                    <fqname>@1.1::INfc/default</fqname>
+                </hal>
+            </manifest>
+            )"});
+        ret.push_back({"HidlFqNameInTheSameHal", "Duplicated major version", R"(
+                <hal>
+                    <name>android.hardware.nfc</name>
+                    <transport>hwbinder</transport>
+                    <fqname>@1.0::INfc/default</fqname>
+                    <fqname>@1.1::INfc/default</fqname>
+                </hal>
+            </manifest>
+            )"});
+        ret.push_back({"HidlFqNameInDifferentHals", "Conflicting FqInstance", R"(
+                <hal>
+                    <name>android.hardware.nfc</name>
+                    <transport>hwbinder</transport>
+                    <fqname>@1.0::INfc/default</fqname>
+                </hal>
+                <hal>
+                    <name>android.hardware.nfc</name>
+                    <transport>hwbinder</transport>
+                    <fqname>@1.1::INfc/default</fqname>
+                </hal>
+            </manifest>
+            )"});
+        ret.push_back({"HidlInterfaceAndFqNameInDifferentHals", "Conflicting FqInstance", R"(
+                <hal>
+                    <name>android.hardware.nfc</name>
+                    <transport>hwbinder</transport>
+                    <version>1.0</version>
+                    <interface>
+                        <name>INfc</name>
+                        <instance>default</instance>
+                    </interface>
+                </hal>
+                <hal>
+                    <name>android.hardware.nfc</name>
+                    <transport>hwbinder</transport>
+                    <fqname>@1.1::INfc/default</fqname>
+                </hal>
+            </manifest>
+            )"});
+        ret.push_back({"AidlInterfaceInDifferentHals", "Conflicting FqInstance", R"(
+                <hal format="aidl">
+                    <name>android.hardware.nfc</name>
+                    <version>1</version>
+                    <interface>
+                        <name>INfc</name>
+                        <instance>default</instance>
+                    </interface>
+                </hal>
+                <hal format="aidl">
+                    <name>android.hardware.nfc</name>
+                    <version>2</version>
+                    <interface>
+                        <name>INfc</name>
+                        <instance>default</instance>
+                    </interface>
+                </hal>
+            </manifest>
+            )"});
+        ret.push_back({"AidlFqNameInDifferentHals", "Conflicting FqInstance", R"(
+                <hal format="aidl">
+                    <name>android.hardware.nfc</name>
+                    <version>1</version>
+                    <fqname>INfc/default</fqname>
+                </hal>
+                <hal format="aidl">
+                    <name>android.hardware.nfc</name>
+                    <version>2</version>
+                    <fqname>INfc/default</fqname>
+                </hal>
+            </manifest>
+            )"});
+        ret.push_back({"AidlInterfaceAndFqNameInDifferentHals", "Conflicting FqInstance", R"(
+                <hal format="aidl">
+                    <name>android.hardware.nfc</name>
+                    <version>1</version>
+                    <interface>
+                        <name>INfc</name>
+                        <instance>default</instance>
+                    </interface>
+                </hal>
+                <hal format="aidl">
+                    <name>android.hardware.nfc</name>
+                    <version>2</version>
+                    <fqname>INfc/default</fqname>
+                </hal>
+            </manifest>
+            )"});
+        return ret;
+    }
+    static std::string getTestSuffix(const TestParamInfo<ParamType>& info) {
+        return info.param.testName;
+    }
+};
+
+TEST_P(AllowDupMajorVersionTest, Allow5_0) {
+    auto&& [_, expectedError, footer] = GetParam();
+    std::string xml = R"(<manifest version="5.0" type="device">)" + footer;
+    HalManifest vm;
+    std::string error;
+    EXPECT_TRUE(fromXml(&vm, xml, &error))
+        << "Conflicting major version in <fqname> is allowed in libvintf 5.0. However, error is: "
+        << error;
+}
+
+TEST_P(AllowDupMajorVersionTest, DoNotAllow6_0) {
+    auto&& [_, expectedError, footer] = GetParam();
+    std::string xml = R"(<manifest version=")" + to_string(kMetaVersionNoHalInterfaceInstance) +
+                      R"(" type="device">)" + footer;
+    HalManifest vm;
+    std::string error;
+    EXPECT_FALSE(fromXml(&vm, xml, &error));
+    EXPECT_THAT(error, HasSubstr(expectedError));
+}
+
+INSTANTIATE_TEST_SUITE_P(LibVintfTest, AllowDupMajorVersionTest,
+                         ::testing::ValuesIn(AllowDupMajorVersionTest::createParams()),
+                         &AllowDupMajorVersionTest::getTestSuffix);
 
 // clang-format off
 
