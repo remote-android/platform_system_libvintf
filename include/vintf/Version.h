@@ -64,6 +64,8 @@ struct Version {
     inline bool minorAtLeast(const Version& other) const {
         return majorVer == other.majorVer && minorVer >= other.minorVer;
     }
+
+    inline Version withMinor(size_t mi) { return Version(majorVer, mi); }
 };
 
 struct KernelVersion {
