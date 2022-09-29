@@ -583,15 +583,16 @@ int main(int argc, char** argv) {
         return usage(argv[0]);
     }
 
+    auto dirmap = getDirmap(iterateValues(args, DIR_MAP));
+    auto properties = getProperties(iterateValues(args, PROPERTY));
     if (!iterateValues(args, DUMP_FILE_LIST).empty()) {
-        for (const auto& file : dumpFileList()) {
+        auto it = properties.find("ro.boot.product.hardware.sku");
+        const std::string sku = it == properties.end() ? "" : it->second;
+        for (const auto& file : dumpFileList(sku)) {
             std::cout << file << std::endl;
         }
         return 0;
     }
-
-    auto dirmap = getDirmap(iterateValues(args, DIR_MAP));
-    auto properties = getProperties(iterateValues(args, PROPERTY));
 
     if (!iterateValues(args, CHECK_ONE).empty()) {
         return checkDirmaps(dirmap, properties);
