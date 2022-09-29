@@ -310,6 +310,10 @@ status_t VintfObject::fetchVendorHalManifest(HalManifest* out, std::string* erro
     return NAME_NOT_FOUND;
 }
 
+std::string getOdmProductManifestFile(const std::string& dir, const ::std::string& sku) {
+    return sku.empty() ? "" : dir + "manifest_"s + sku + ".xml";
+}
+
 // "out" is written to iff return status is OK.
 // Priority:
 // 1. if {sku} is defined, /odm/etc/vintf/manifest_{sku}.xml
@@ -320,13 +324,12 @@ status_t VintfObject::fetchVendorHalManifest(HalManifest* out, std::string* erro
 // {sku} is the value of ro.boot.product.hardware.sku
 status_t VintfObject::fetchOdmHalManifest(HalManifest* out, std::string* error) {
     status_t status;
-
     std::string productModel;
     productModel = getPropertyFetcher()->getProperty("ro.boot.product.hardware.sku", "");
 
-    if (!productModel.empty()) {
-        status =
-            fetchOneHalManifest(kOdmVintfDir + "manifest_"s + productModel + ".xml", out, error);
+    const std::string productFile = getOdmProductManifestFile(kOdmVintfDir, productModel);
+    if (!productFile.empty()) {
+        status = fetchOneHalManifest(productFile, out, error);
         if (status == OK || status != NAME_NOT_FOUND) {
             return status;
         }
@@ -337,9 +340,10 @@ status_t VintfObject::fetchOdmHalManifest(HalManifest* out, std::string* error) 
         return status;
     }
 
-    if (!productModel.empty()) {
-        status = fetchOneHalManifest(kOdmLegacyVintfDir + "manifest_"s + productModel + ".xml", out,
-                                     error);
+    const std::string productLegacyFile =
+        getOdmProductManifestFile(kOdmLegacyVintfDir, productModel);
+    if (!productLegacyFile.empty()) {
+        status = fetchOneHalManifest(productLegacyFile, out, error);
         if (status == OK || status != NAME_NOT_FOUND) {
             return status;
         }
@@ -644,21 +648,25 @@ int32_t VintfObject::checkCompatibility(std::string* error, CheckFlags::Type fla
 
 namespace details {
 
-std::vector<std::string> dumpFileList() {
-    return {
+std::vector<std::string> dumpFileList(const std::string& sku) {
+    std::vector<std::string> list = {
         // clang-format off
         kSystemVintfDir,
         kVendorVintfDir,
         kOdmVintfDir,
         kProductVintfDir,
         kSystemExtVintfDir,
-        kOdmLegacyVintfDir,
+        kOdmLegacyManifest,
         kVendorLegacyManifest,
         kVendorLegacyMatrix,
         kSystemLegacyManifest,
         kSystemLegacyMatrix,
         // clang-format on
     };
+    if (!sku.empty()) {
+        list.push_back(getOdmProductManifestFile(kOdmLegacyVintfDir, sku));
+    }
+    return list;
 }
 
 }  // namespace details
