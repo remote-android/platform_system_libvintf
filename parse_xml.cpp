@@ -895,6 +895,15 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         bool convertedInstancesIntoFqnames = false;
         for (const auto& v : object->versions) {
             for (const auto& intf : interfaces) {
+                if (param.metaVersion >= kMetaVersionNoHalInterfaceInstance &&
+                    (object->format == HalFormat::HIDL || object->format == HalFormat::AIDL) &&
+                    !intf.hasAnyInstance()) {
+                    *param.error +=
+                        "<hal> " + object->name + " <interface> " + intf.name() +
+                        " has no <instance>. Either specify <instance> or, "
+                        "preferably, specify <fqname> and delete <version> and <interface>.";
+                    return false;
+                }
                 bool cont = intf.forEachInstance(
                     [&v, &fqInstances, &convertedInstancesIntoFqnames, &object, &param](
                         const auto& interface, const auto& instance, bool /* isRegex */) {
@@ -989,8 +998,12 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             }
         }
 
-        // TODO(b/148808037): Require !fqInstancesToInsert.empty() for HIDL & AIDL >=
-        // kMetaVersionNoHalInterfaceInstance.
+        if (param.metaVersion >= kMetaVersionNoHalInterfaceInstance &&
+            (object->format == HalFormat::HIDL || object->format == HalFormat::AIDL) &&
+            fqInstancesToInsert.empty()) {
+            *param.error = "<hal> " + object->name + " has no instance. Fix by adding <fqname>.";
+            return false;
+        }
 
         bool allowMajorVersionDup = param.metaVersion < kMetaVersionNoHalInterfaceInstance;
         if (!object->insertInstances(fqInstancesToInsert, allowMajorVersionDup, param.error)) {
