@@ -16,6 +16,7 @@
 
 #include <gmock/gmock.h>
 
+#include <vintf/Apex.h>
 #include <vintf/ObjectFactory.h>
 #include <vintf/PropertyFetcher.h>
 #include "utils.h"
@@ -85,6 +86,13 @@ class MockPropertyFetcher : public PropertyFetcher {
     MOCK_CONST_METHOD2(getProperty, std::string(const std::string&, const std::string&));
     MOCK_CONST_METHOD2(getBoolProperty, bool(const std::string&, bool));
     MOCK_CONST_METHOD3(getUintProperty, uint64_t(const std::string&, uint64_t, uint64_t));
+};
+
+class MockApex : public ApexInterface {
+   public:
+    MockApex() = default;
+    MOCK_METHOD(bool, HasUpdate, (), (const, override));
+    MOCK_METHOD(std::vector<std::string>, DeviceVintfDirs, (), (override));
 };
 
 }  // namespace details
