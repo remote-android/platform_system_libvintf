@@ -32,6 +32,8 @@ static constexpr VersionRange kDefaultAidlVersionRange{kFakeAidlMajorVersion,
                                                        kDefaultAidlMinorVersion};
 static constexpr Version kDefaultAidlVersion = kDefaultAidlVersionRange.minVer();
 
+#define VINTF_SUB_DIR "etc/vintf/"
+constexpr const char* kVintfSubDir = VINTF_SUB_DIR;
 #define SYSTEM_VINTF_DIR "/system/etc/vintf/"
 constexpr const char* kSystemVintfDir = SYSTEM_VINTF_DIR;
 #define VENDOR_VINTF_DIR "/vendor/etc/vintf/"
