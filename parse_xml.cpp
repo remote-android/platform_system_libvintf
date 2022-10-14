@@ -612,6 +612,10 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
                     const MutateNodeParam& param) const override {
         appendAttr(root, "format", object.format);
         appendAttr(root, "optional", object.optional);
+        // Only include update-via-apex if enabled
+        if (object.updatableViaApex) {
+            appendAttr(root, "updatable-via-apex", object.updatableViaApex);
+        }
         appendTextElement(root, "name", object.name, param.d);
         if (object.format == HalFormat::AIDL) {
             // By default, buildObject() assumes a <version>0</version> tag if no <version> tag
@@ -632,6 +636,8 @@ struct MatrixHalConverter : public XmlNodeConverter<MatrixHal> {
         if (!parseOptionalAttr(root, "format", HalFormat::HIDL, &object->format, param.error) ||
             !parseOptionalAttr(root, "optional", false /* defaultValue */, &object->optional,
                                param.error) ||
+            !parseOptionalAttr(root, "updatable-via-apex", false /* defaultValue */,
+                               &object->updatableViaApex, param.error) ||
             !parseTextElement(root, "name", &object->name, param.error) ||
             !parseChildren(root, HalInterfaceConverter{}, &interfaces, param)) {
             return false;

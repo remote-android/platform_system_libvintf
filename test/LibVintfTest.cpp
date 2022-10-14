@@ -539,7 +539,7 @@ static bool insert(std::map<std::string, HalInterface>* map, HalInterface&& intf
 TEST_F(LibVintfTest, MatrixHalConverter) {
     MatrixHal mh{HalFormat::NATIVE, "android.hardware.camera",
             {{VersionRange(1,2,3), VersionRange(4,5,6)}},
-            false /* optional */, {}};
+            false /* optional */, false /* updatableViaApex */, {}};
     EXPECT_TRUE(insert(&mh.interfaces, {"IBetterCamera", {"default", "great"}}));
     EXPECT_TRUE(insert(&mh.interfaces, {"ICamera", {"default"}}));
     std::string xml = toXml(mh);
@@ -651,10 +651,10 @@ TEST_F(LibVintfTest, CompatibilityMatrixConverter) {
     CompatibilityMatrix cm;
     EXPECT_TRUE(add(cm, MatrixHal{HalFormat::NATIVE, "android.hardware.camera",
             {{VersionRange(1,2,3), VersionRange(4,5,6)}},
-            false /* optional */, testHalInterfaces()}));
+            false /* optional */,  false /* updatableViaApex */, testHalInterfaces()}));
     EXPECT_TRUE(add(cm, MatrixHal{HalFormat::NATIVE, "android.hardware.nfc",
             {{VersionRange(4,5,6), VersionRange(10,11,12)}},
-            true /* optional */, testHalInterfaces()}));
+            true /* optional */,  false /* updatableViaApex */, testHalInterfaces()}));
     EXPECT_TRUE(add(cm, MatrixKernel{KernelVersion(3, 18, 22),
             {KernelConfig{"CONFIG_FOO", Tristate::YES}, KernelConfig{"CONFIG_BAR", "stringvalue"}}}));
     EXPECT_TRUE(add(cm, MatrixKernel{KernelVersion(4, 4, 1),
@@ -720,7 +720,7 @@ TEST_F(LibVintfTest, DeviceCompatibilityMatrixCoverter) {
     CompatibilityMatrix cm;
     EXPECT_TRUE(add(cm, MatrixHal{HalFormat::NATIVE, "android.hidl.manager",
             {{VersionRange(1,0)}},
-            false /* optional */, testHalInterfaces()}));
+            false /* optional */,  false /* updatableViaApex */, testHalInterfaces()}));
     set(cm, SchemaType::DEVICE);
     set(cm, VndkVersionRange{25,0,1,5}, {"libjpeg.so", "libbase.so"});
     std::string xml = toXml(cm);
@@ -835,11 +835,13 @@ TEST_F(LibVintfTest, CompatibilityMatrixGetHals) {
                                   "android.hardware.camera",
                                   {{VersionRange(1, 2, 3), VersionRange(4, 5, 6)}},
                                   false /* optional */,
+                                  false /* updatableViaApex */,
                                   testHalInterfaces()}));
     EXPECT_TRUE(add(cm, MatrixHal{HalFormat::NATIVE,
                                   "android.hardware.nfc",
                                   {{VersionRange(4, 5, 6), VersionRange(10, 11, 12)}},
                                   true /* optional */,
+                                  false /* updatableViaApex */,
                                   testHalInterfaces()}));
 
     MatrixHal expectedCameraHal = MatrixHal{
@@ -847,12 +849,14 @@ TEST_F(LibVintfTest, CompatibilityMatrixGetHals) {
         "android.hardware.camera",
         {{VersionRange(1, 2, 3), VersionRange(4, 5, 6)}},
         false /* optional */,
+        false /* updatableViaApex */,
         testHalInterfaces(),
     };
     MatrixHal expectedNfcHal = MatrixHal{HalFormat::NATIVE,
                                          "android.hardware.nfc",
                                          {{VersionRange(4, 5, 6), VersionRange(10, 11, 12)}},
                                          true /* optional */,
+                                         false /* updatableViaApex */,
                                          testHalInterfaces()};
     auto cameraHals = getHals(cm, "android.hardware.camera");
     EXPECT_EQ((int)cameraHals.size(), 1);
