@@ -395,6 +395,14 @@ const std::string systemMatrixKernel318 =
     "    </sepolicy>\n"
     "</compatibility-matrix>\n";
 
+const std::string apexManifest =
+    "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+    "    <hal format=\"aidl\">\n"
+    "        <name>android.apex.foo</name>\n"
+    "        <fqname>IApex/default</fqname>\n"
+    "    </hal>\n"
+    "</manifest>\n";
+
 class VintfObjectTestBase : public ::testing::Test {
    protected:
     MockFileSystem& fetcher() {
@@ -447,13 +455,13 @@ class VintfObjectTestBase : public ::testing::Test {
                 return 0;
             }));
     }
-
     virtual void SetUp() {
         vintfObject = VintfObject::Builder()
                           .setFileSystem(std::make_unique<NiceMock<MockFileSystem>>())
                           .setRuntimeInfoFactory(std::make_unique<NiceMock<MockRuntimeInfoFactory>>(
                               std::make_shared<NiceMock<MockRuntimeInfo>>()))
                           .setPropertyFetcher(std::make_unique<NiceMock<MockPropertyFetcher>>())
+                          .setApex(std::make_unique<NiceMock<MockApex>>())
                           .build();
     }
     virtual void TearDown() {
@@ -511,6 +519,39 @@ class VintfObjectTestBase : public ::testing::Test {
     MockRuntimeInfoFactory& runtimeInfoFactory() {
         return static_cast<MockRuntimeInfoFactory&>(*vintfObject->getRuntimeInfoFactory());
     }
+    MockApex& apex() {
+        return static_cast<MockApex&>(*vintfObject->getApex());
+    }
+    // Setup APEX calls
+    void SetUpApex(const std::string &manifest=apexManifest,
+                   const std::string &apexDir="/apex/com.test/") {
+
+        // Look in every APEX for data
+        std::vector<std::string> apex_dirs{apexDir + kVintfSubDir};
+
+
+        // Map the apex with manifest to the files below
+        const std::string& active_apex = apex_dirs.at(0);
+
+        EXPECT_CALL(apex(), DeviceVintfDirs())
+            .WillOnce(Return(apex_dirs))
+            ;
+
+        EXPECT_CALL(fetcher(), listFiles(_, _, _))
+                .WillRepeatedly(Invoke([](const auto&, auto* out, auto*) {
+                  *out = {};
+                  return ::android::OK;
+                }));
+
+        EXPECT_CALL(fetcher(), listFiles(StrEq(active_apex), _, _))
+            .WillOnce(Invoke([](const auto&, auto* out, auto*) {
+              *out = {"manifest.xml"};
+              return ::android::OK;
+            }));
+
+        // Expect to fetch APEX directory manifest once.
+        expectFetch(std::string(active_apex).append("manifest.xml"), manifest);
+    }
 
     std::unique_ptr<VintfObject> vintfObject;
 };
@@ -563,6 +604,103 @@ TEST_F(VintfObjectIncompatibleTest, TestDeviceCompatibility) {
     ASSERT_EQ(result, 1) << "Should have failed:" << error.c_str();
 }
 
+// APEX-implemented HAL compatibility matrix tests.
+// Each test will include apexManifest as an APEX-implemented HAL
+// the test cases will cover different settings in the compatibility
+// matrix.
+class ApexCompatibilityTest : public VintfObjectTestBase {
+   protected:
+    // Create string with system matrix based off of systemMatrixXml1
+    // adding the input APEX HAL definition
+    std::string CreateSystemMatrix(const std::string & apexHal) const {
+        std::string out =
+            "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\">\n"
+            "    <hal format=\"hidl\" optional=\"false\">\n"
+            "        <name>android.hardware.camera</name>\n"
+            "        <version>2.0-5</version>\n"
+            "        <version>3.4-16</version>\n"
+            "    </hal>\n"
+            "    <hal format=\"hidl\" optional=\"false\">\n"
+            "        <name>android.hardware.nfc</name>\n"
+            "        <version>1.0</version>\n"
+            "        <version>2.0</version>\n"
+            "    </hal>\n"
+            "    <hal format=\"hidl\" optional=\"true\">\n"
+            "        <name>android.hardware.foo</name>\n"
+            "        <version>1.0</version>\n"
+            "    </hal>\n"
+            + apexHal +
+            "    <kernel version=\"3.18.31\"></kernel>\n"
+            "    <sepolicy>\n"
+            "        <kernel-sepolicy-version>30</kernel-sepolicy-version>\n"
+            "        <sepolicy-version>25.5</sepolicy-version>\n"
+            "        <sepolicy-version>26.0-3</sepolicy-version>\n"
+            "    </sepolicy>\n"
+            "    <avb>\n"
+            "        <vbmeta-version>0.0</vbmeta-version>\n"
+            "    </avb>\n"
+            "</compatibility-matrix>\n";
+        return out;
+    }
+    std::string CreateApexHal(const std::string &attr) const {
+        // Create HAL for compatibility matrix.
+        //
+        // Use input attr to determine how to set updatable-via-apex
+        // attribute.
+        //
+        // Cases:
+        //    - true  : updatable-via-apex=true
+        //    - false : updatable-via-apex=false
+        //    - ""    : do not include updatable-via-apex
+        std::string updatable;
+        if (!attr.empty()) {
+            updatable ="updatable-via-apex=\""+attr+"\"";
+        }
+        std::string apexHal =
+            "    <hal format=\"aidl\" " + updatable + ">\n"
+            "        <name>android.apex.foo</name>"
+            "        <interface>  \n"
+            "           <name>IApex</name> \n"
+            "           <instance>default</instance> \n"
+            "        </interface> \n"
+            "    </hal>\n";
+        return apexHal;
+    }
+    void setup(const std::string& systemMatrix) {
+        VintfObjectTestBase::SetUp();
+        setupMockFetcher(vendorManifestXml1, systemMatrix,
+                         systemManifestXml1, vendorMatrixXml1);
+        expectVendorManifest();
+        expectSystemManifest();
+        expectVendorMatrix();
+        expectSystemMatrix();
+        SetUpApex();
+    }
+};
+
+// Test updatable-via-apex attribute in compatibility matrix, only
+// the case with updatable-via-apex=true should be compatible.
+TEST_F(ApexCompatibilityTest, TRUE) {
+    std::string error;
+    // Set updatable-via-apex=true
+    std::string systemMatrix = CreateSystemMatrix(CreateApexHal("true"));
+    setup(systemMatrix);
+    ASSERT_EQ(COMPATIBLE,vintfObject->checkCompatibility(&error))<<error;
+}
+TEST_F(ApexCompatibilityTest, FALSE) {
+    std::string error;
+    // Set updatable-via-apex=false
+    std::string systemMatrix = CreateSystemMatrix(CreateApexHal("false"));
+    setup(systemMatrix);
+    ASSERT_NE(COMPATIBLE,vintfObject->checkCompatibility(&error))<< "Should have failed";
+}
+TEST_F(ApexCompatibilityTest, UNSET) {
+    std::string error;
+    // Do not include updatable-via-apex attribute
+    std::string systemMatrix = CreateSystemMatrix(CreateApexHal(""));
+    setup(systemMatrix);
+    ASSERT_NE(COMPATIBLE,vintfObject->checkCompatibility(&error))<< "Should have failed";
+}
 const std::string vendorManifestKernelFcm =
         "<manifest " + kMetaVersionStr + " type=\"device\">\n"
         "    <kernel version=\"3.18.999\" target-level=\"92\"/>\n"
@@ -789,15 +927,74 @@ bool containsOdmProductManifest(const std::shared_ptr<const HalManifest>& p) {
     return !p->getHidlInstances("android.hardware.foo", {1, 1}, "IOdmProduct").empty();
 }
 
+bool containsApexManifest(const std::shared_ptr<const HalManifest>& p) {
+    return !p->getAidlInstances("android.apex.foo", "IApex").empty();
+}
+
 class DeviceManifestTest : public VintfObjectTestBase {
    protected:
+    void setupApex(const std::string &apexWithManifestDir="/apex/com.test/",
+                   const std::string &manifest=apexManifest,
+                   const std::string &apexWithoutManifestDir= "/apex/com.novintf/") {
+
+      // Mimic the system initialization
+      //  When first building device manifest setup for no device vintf dirs
+      //  Followed by HasUpdate() -> true with device vintf dirs
+      //  After building the APEX version expect HasUpdate to false with no further call for
+      //   device vintf dirs
+
+      // Look in every APEX for data, only  apexWithManifest will contain a manifest file
+      std::vector<std::string> apex_dirs{apexWithManifestDir + kVintfSubDir,
+                                         apexWithoutManifestDir + kVintfSubDir};
+
+      // Map the apex with manifest to the files below
+      const std::string& active_apex = apex_dirs.at(0);
+
+      EXPECT_CALL(apex(), DeviceVintfDirs())
+          .WillOnce({}) // Initialization
+          .WillOnce(Return(apex_dirs)) // after apex loaded
+          ;
+
+      EXPECT_CALL(apex(),HasUpdate()) // Not called during init
+          .WillOnce(Return(true)) // Apex loaded
+          .WillOnce(Return(false)) // no updated to apex data
+          ;
+
+      EXPECT_CALL(fetcher(), listFiles(_, _, _))
+          .WillRepeatedly(Invoke([](const auto&, auto* out, auto*) {
+              *out = {};
+              return ::android::OK;
+          }));
+
+      EXPECT_CALL(fetcher(), listFiles(StrEq(active_apex), _, _))
+          .WillOnce(Invoke([](const auto&, auto* out, auto*) {
+              *out = {"manifest.xml"};
+              return ::android::OK;
+          }));
+
+
+      // Expect to fetch APEX directory manifest once.
+      expectFetch(std::string(active_apex).append("manifest.xml"), manifest);
+
+    }
+
     // Expect that /vendor/etc/vintf/manifest.xml is fetched.
-    void expectVendorManifest() { expectFetch(kVendorManifest, vendorEtcManifest); }
+    void expectVendorManifest(bool repeatedly = false) {
+        if (repeatedly) {
+            expectFetchRepeatedly(kVendorManifest, vendorEtcManifest);
+        } else {
+            expectFetch(kVendorManifest, vendorEtcManifest);
+        }
+    }
     // /vendor/etc/vintf/manifest.xml does not exist.
     void noVendorManifest() { expectFileNotExist(StrEq(kVendorManifest)); }
     // Expect some ODM manifest is fetched.
-    void expectOdmManifest() {
-        expectFetch(kOdmManifest, odmManifest);
+    void expectOdmManifest(bool repeatedly = false) {
+        if (repeatedly) {
+            expectFetchRepeatedly(kOdmManifest, odmManifest);
+        } else {
+            expectFetch(kOdmManifest, odmManifest);
+        }
     }
     void noOdmManifest() { expectFileNotExist(StartsWith("/odm/")); }
     std::shared_ptr<const HalManifest> get() {
@@ -852,6 +1049,167 @@ TEST_F(DeviceManifestTest, Combine4) {
     EXPECT_TRUE(vendorEtcManifestOverridden(p));
     EXPECT_FALSE(containsOdmManifest(p));
     EXPECT_TRUE(containsVendorManifest(p));
+}
+
+// Run the same tests as above (Combine1,2,3,4) including APEX data.
+// APEX tests all of the same variation:
+//   create device manifest without APEX data
+//   trigger update to APEX
+//   create new device manifest with APEX data
+//   no new APEX data
+//
+// Since HalManifest is created twice expect[Vendor|Odm]Manifest will
+// be called multiple times compared to Combine test.
+
+// Test /vendor/etc/vintf/manifest.xml + ODM manifest + APEX
+TEST_F(DeviceManifestTest, ApexCombine1) {
+    expectVendorManifest(true); // Create device manifest twice.
+    expectOdmManifest(true); // Create device manifest twice.
+    setupApex();
+    auto p = get();
+    ASSERT_NE(nullptr, p);
+    EXPECT_TRUE(containsVendorEtcManifest(p));
+    EXPECT_TRUE(vendorEtcManifestOverridden(p));
+    EXPECT_TRUE(containsOdmManifest(p));
+    EXPECT_FALSE(containsVendorManifest(p));
+
+    EXPECT_FALSE(containsApexManifest(p));
+
+    // Second call should create new maninfest containing APEX info.
+    auto p2 = get();
+    ASSERT_NE(nullptr, p2);
+    ASSERT_NE(p, p2);
+    EXPECT_TRUE(containsVendorEtcManifest(p2));
+    EXPECT_TRUE(vendorEtcManifestOverridden(p2));
+    EXPECT_TRUE(containsOdmManifest(p2));
+    EXPECT_FALSE(containsVendorManifest(p2));
+
+    EXPECT_TRUE(containsApexManifest(p2));
+
+    // Third call expect no update and no call to DeviceVintfDirs.
+    auto p3 = get();
+    ASSERT_EQ(p2,p3);
+}
+
+// Test /vendor/etc/vintf/manifest.xml + APEX
+TEST_F(DeviceManifestTest, ApexCombine2) {
+    expectVendorManifest(true); // Create device manifest twice.
+    noOdmManifest();
+
+    setupApex();
+    auto p = get();
+    ASSERT_NE(nullptr, p);
+    EXPECT_TRUE(containsVendorEtcManifest(p));
+    EXPECT_FALSE(vendorEtcManifestOverridden(p));
+    EXPECT_FALSE(containsOdmManifest(p));
+    EXPECT_FALSE(containsVendorManifest(p));
+
+    EXPECT_FALSE(containsApexManifest(p));
+
+    // Second call should create new maninfest containing APEX info.
+    auto p2 = get();
+    ASSERT_NE(nullptr, p2);
+    ASSERT_NE(p, p2);
+    EXPECT_TRUE(containsVendorEtcManifest(p2));
+    EXPECT_FALSE(vendorEtcManifestOverridden(p2));
+    EXPECT_FALSE(containsOdmManifest(p2));
+    EXPECT_FALSE(containsVendorManifest(p2));
+
+    EXPECT_TRUE(containsApexManifest(p2));
+
+    // Third call expect no update and no call to DeviceVintfDirs.
+    auto p3 = get();
+    ASSERT_EQ(p2,p3);
+}
+
+// Test ODM manifest + APEX
+TEST_F(DeviceManifestTest, ApexCombine3) {
+    noVendorManifest();
+    expectOdmManifest(true);  // Create device manifest twice.
+
+    setupApex();
+    auto p = get();
+    ASSERT_NE(nullptr, p);
+    EXPECT_FALSE(containsVendorEtcManifest(p));
+    EXPECT_TRUE(vendorEtcManifestOverridden(p));
+    EXPECT_TRUE(containsOdmManifest(p));
+    EXPECT_FALSE(containsVendorManifest(p));
+
+    EXPECT_FALSE(containsApexManifest(p));
+
+    // Second call should create new maninfest containing APEX info.
+    auto p2 = get();
+    ASSERT_NE(nullptr, p2);
+    EXPECT_FALSE(containsVendorEtcManifest(p2));
+    EXPECT_TRUE(vendorEtcManifestOverridden(p2));
+    EXPECT_TRUE(containsOdmManifest(p2));
+    EXPECT_FALSE(containsVendorManifest(p2));
+
+    EXPECT_TRUE(containsApexManifest(p2));
+
+    // Third call expect no update and no call to DeviceVintfDirs.
+    auto p3 = get();
+    ASSERT_EQ(p2,p3);
+}
+
+// Test /vendor/manifest.xml + APEX
+TEST_F(DeviceManifestTest, ApexCombine4) {
+    noVendorManifest();
+    noOdmManifest();
+    expectFetchRepeatedly(kVendorLegacyManifest, vendorManifest);
+    setupApex();
+    auto p = get();
+    ASSERT_NE(nullptr, p);
+    EXPECT_FALSE(containsVendorEtcManifest(p));
+    EXPECT_TRUE(vendorEtcManifestOverridden(p));
+    EXPECT_FALSE(containsOdmManifest(p));
+    EXPECT_TRUE(containsVendorManifest(p));
+
+    EXPECT_FALSE(containsApexManifest(p));
+
+    // Second call should create new maninfest containing APEX info.
+    auto p2 = get();
+    ASSERT_NE(nullptr, p2);
+    ASSERT_NE(p, p2);
+    EXPECT_FALSE(containsVendorEtcManifest(p2));
+    EXPECT_TRUE(vendorEtcManifestOverridden(p2));
+    EXPECT_FALSE(containsOdmManifest(p2));
+    EXPECT_TRUE(containsVendorManifest(p2));
+
+    EXPECT_TRUE(containsApexManifest(p2));
+
+    // Third call expect no update and no call to DeviceVintfDirs.
+    auto p3 = get();
+    ASSERT_EQ(p2,p3);
+}
+
+
+// Tests for valid/invalid APEX defined HAL
+// For a HAL to be defined within an APEX it must not have
+// the update-via-apex attribute defined in the HAL manifest
+
+// Valid APEX HAL definition
+TEST_F(DeviceManifestTest, ValidApexHal) {
+    expectVendorManifest();
+    noOdmManifest();
+    SetUpApex(apexManifest);
+    auto p = get();
+    ASSERT_NE(nullptr, p);
+}
+// Invalid APEX HAL definition
+TEST_F(DeviceManifestTest, InvalidApexHal) {
+    const std::string apexInvalidManifest =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"aidl\" updatable-via-apex=\"com.android.apex.foo\">\n"
+        "        <name>android.apex.foo</name>\n"
+        "        <fqname>IApex/default</fqname>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    expectVendorManifest();
+    noOdmManifest();
+    SetUpApex(apexInvalidManifest);
+    auto p = get();
+    ASSERT_EQ(nullptr, p);
 }
 
 class OdmManifestTest : public VintfObjectTestBase,

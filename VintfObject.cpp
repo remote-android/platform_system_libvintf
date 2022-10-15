@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #include "VintfObject.h"
 
 #include <dirent.h>
@@ -29,6 +28,7 @@
 #include <android-base/strings.h>
 #include <hidl/metadata.h>
 
+#include "Apex.h"
 #include "CompatibilityMatrix.h"
 #include "VintfObjectUtils.h"
 #include "constants-private.h"
@@ -70,7 +70,9 @@ static std::unique_ptr<PropertyFetcher> createDefaultPropertyFetcher() {
     }
     return propertyFetcher;
 }
-
+static std::unique_ptr<ApexInterface> createDefaultApex() {
+    return std::make_unique<details::Apex>();
+}
 std::shared_ptr<VintfObject> VintfObject::GetInstance() {
     static details::LockedSharedPtr<VintfObject> sInstance{};
     std::unique_lock<std::mutex> lock(sInstance.mutex);
@@ -85,6 +87,19 @@ std::shared_ptr<const HalManifest> VintfObject::GetDeviceHalManifest() {
 }
 
 std::shared_ptr<const HalManifest> VintfObject::getDeviceHalManifest() {
+    // Check if any updates to the APEX data, if so rebuild the manifest
+    {
+        std::lock_guard<std::mutex> lock(mDeviceManifest.mutex);
+        if (mDeviceManifest.fetchedOnce) {
+            if (getApex()->HasUpdate()) {
+                LOG(INFO) << __func__ << ": Reloading VINTF information.";
+                mDeviceManifest.object = nullptr;
+                mDeviceManifest.fetchedOnce = false;
+                // TODO(b/242070736): only APEX data needs to be updated
+            }
+        }
+    }
+
     return Get(__func__, &mDeviceManifest,
                std::bind(&VintfObject::fetchDeviceHalManifest, this, _1, _2));
 }
@@ -229,6 +244,43 @@ status_t VintfObject::addDirectoryManifests(const std::string& directory, HalMan
     return OK;
 }
 
+// Create device HalManifest
+// 1. Create manifest based on /vendor /odm data
+// 2. Add any APEX data
+status_t VintfObject::fetchDeviceHalManifest(HalManifest* out, std::string* error) {
+    auto status = fetchDeviceHalManifestMinusApex(out, error);
+    if (status != OK) {
+        return status;
+    }
+    return fetchDeviceHalManifestApex(out, error);
+}
+
+// Priority for loading APEX vendor manifests
+// Vendor + odm
+status_t VintfObject::fetchDeviceHalManifestApex(HalManifest* out, std::string* error) {
+    status_t status = OK;
+
+    // Create HalManifest for all APEX HALs so that the apex defined attribute can
+    // be set.
+    HalManifest apexManifest;
+    for (const auto& dir : getApex()->DeviceVintfDirs()) {
+        status = addDirectoryManifests(dir, &apexManifest, false, error);
+        if (status != OK) {
+            return status;
+        }
+    }
+    status = apexManifest.setApexDefined(error);
+    if (status != OK) {
+        return status;
+    }
+
+    // Add APEX HALs to out
+    if (!out->addAllHals(&apexManifest, error)) {
+        return UNKNOWN_ERROR;
+    }
+    return OK;
+}
+
 // Priority for loading vendor manifest:
 // 1. Vendor manifest + device fragments + ODM manifest (optional) + odm fragments
 // 2. Vendor manifest + device fragments
@@ -237,7 +289,7 @@ status_t VintfObject::addDirectoryManifests(const std::string& directory, HalMan
 // where:
 // A + B means unioning <hal> tags from A and B. If B declares an override, then this takes priority
 // over A.
-status_t VintfObject::fetchDeviceHalManifest(HalManifest* out, std::string* error) {
+status_t VintfObject::fetchDeviceHalManifestMinusApex(HalManifest* out, std::string* error) {
     HalManifest vendorManifest;
     status_t vendorStatus = fetchVendorHalManifest(&vendorManifest, error);
     if (vendorStatus != OK && vendorStatus != NAME_NOT_FOUND) {
@@ -967,6 +1019,9 @@ const std::unique_ptr<ObjectFactory<RuntimeInfo>>& VintfObject::getRuntimeInfoFa
     return mRuntimeInfoFactory;
 }
 
+const std::unique_ptr<ApexInterface>& VintfObject::getApex() {
+    return mApex;
+}
 android::base::Result<bool> VintfObject::hasFrameworkCompatibilityMatrixExtensions() {
     std::vector<CompatibilityMatrix> matrixFragments;
     std::string error;
@@ -1262,11 +1317,16 @@ VintfObjectBuilder& VintfObjectBuilder::setPropertyFetcher(std::unique_ptr<Prope
     return *this;
 }
 
+VintfObjectBuilder& VintfObjectBuilder::setApex(std::unique_ptr<ApexInterface>&& a) {
+    mObject->mApex = std::move(a);
+    return *this;
+}
 std::unique_ptr<VintfObject> VintfObjectBuilder::buildInternal() {
     if (!mObject->mFileSystem) mObject->mFileSystem = createDefaultFileSystem();
     if (!mObject->mRuntimeInfoFactory)
         mObject->mRuntimeInfoFactory = std::make_unique<ObjectFactory<RuntimeInfo>>();
     if (!mObject->mPropertyFetcher) mObject->mPropertyFetcher = createDefaultPropertyFetcher();
+    if (!mObject->mApex) mObject->mApex = createDefaultApex();
     return std::move(mObject);
 }
 
