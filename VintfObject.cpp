@@ -713,7 +713,6 @@ int32_t VintfObject::checkCompatibility(std::string* error, CheckFlags::Type fla
                 error->insert(0,
                               "Runtime info and framework compatibility matrix are incompatible: ");
             }
-            return INCOMPATIBLE;
         }
     }
 
