@@ -2553,6 +2553,51 @@ TEST_F(LibVintfTest, AddRequiredHalOverlapInstanceSplit) {
         "</compatibility-matrix>\n",
         xml);
 }
+
+TEST_F(LibVintfTest, AddOptionalHalUpdatableViaApex) {
+    CompatibilityMatrix cm1;
+    CompatibilityMatrix cm2;
+    std::string error;
+    std::string xml;
+
+    xml =
+        "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
+        "    <hal format=\"aidl\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</compatibility-matrix>\n";
+    EXPECT_TRUE(fromXml(&cm1, xml, &error)) << error;
+
+    xml =
+        "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"2\">\n"
+        "    <hal format=\"aidl\" updatable-via-apex=\"true\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <interface>\n"
+        "            <name>IFoo</name>\n"
+        "            <instance>default</instance>\n"
+        "        </interface>\n"
+        "    </hal>\n"
+        "</compatibility-matrix>\n";
+    EXPECT_TRUE(fromXml(&cm2, xml, &error)) << error;
+
+    EXPECT_TRUE(addAllHalsAsOptional(&cm1, &cm2, &error)) << error;
+    xml = toXml(cm1, SerializeFlags::HALS_ONLY);
+    EXPECT_EQ(xml,
+              "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"1\">\n"
+              "    <hal format=\"aidl\" optional=\"false\" updatable-via-apex=\"true\">\n"
+              "        <name>android.hardware.foo</name>\n"
+              "        <interface>\n"
+              "            <name>IFoo</name>\n"
+              "            <instance>default</instance>\n"
+              "        </interface>\n"
+              "    </hal>\n"
+              "</compatibility-matrix>\n");
+}
+
 TEST_F(LibVintfTest, AddOptionalXmlFile) {
     CompatibilityMatrix cm1;
     CompatibilityMatrix cm2;
