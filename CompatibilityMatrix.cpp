@@ -215,6 +215,7 @@ bool CompatibilityMatrix::addAllHalsAsOptional(CompatibilityMatrix* other, std::
                 MatrixHal* splitInstance =
                     this->splitInstance(existingHal, interface, instanceOrPattern, isRegex);
                 if (splitInstance != nullptr) {
+                    splitInstance->updatableViaApex |= halToAdd.updatableViaApex;
                     splitInstance->insertVersionRanges(versionRanges);
                     if (isRegex) {
                         insertedRegex.insert(std::make_pair(interface, instanceOrPattern));
