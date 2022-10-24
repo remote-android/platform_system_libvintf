@@ -153,9 +153,6 @@ struct HalManifest : public HalGroup<ManifestHal>,
     // that other->empty() == true after execution.
     [[nodiscard]] bool addAll(HalManifest* other, std::string* error = nullptr);
 
-    // Mark all HALs as APEX defined
-    status_t setApexDefined(std::string* error = nullptr);
-
    protected:
     // Check before add()
     bool shouldAdd(const ManifestHal& toAdd, std::string* error) const;

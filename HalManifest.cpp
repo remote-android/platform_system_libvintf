@@ -393,19 +393,20 @@ std::vector<std::string> HalManifest::checkApexHals(const CompatibilityMatrix& m
     std::vector<std::string> ret;
 
     // Validate any APEX-implemented HALs.
-    // Any HALs found within an APEX (hal.isApexDefined()) must
+    // Any HALs found within an APEX (hal.updatableViaApex()) must
     // be declared as updatable-via-apex in the compatibility matrix (matrixHal.updatableViaApex).
-    // A matrix.updatableViaApex does not have to be defined within an APEX.
     //
-    //   hal.isApexDefined == true  AND matrixHal.updatableViaApex == true   # VALID
-    //   hal.isApexDefined == true  AND matrixHal.updatableViaApex == false  # INVALID
-    //   hal.isApexDefined == false AND matrixHal.updatableViaApex == true   # VALID
-    //   hal.isApexDefined == false AND matrixHal.updatableViaApex == false  # VALID
+    //   hal.updatableViaApex == <any> AND matrixHal.updatableViaApex == true   # VALID
+    //   hal.updatableViaApex == <any> AND matrixHal.updatableViaApex == false  # INVALID
+    //   hal.updatableViaApex == "" (not updatable)                             # VALID
     //
-    // Below check for INVALID case (hal.isApexDefined() && !matrixHal.updatableViaApex())
+    // Below check for INVALID case (hal.updatableViaApex == <any> && !matrixHal.updatableViaApex)
 
     for (const auto& hal : getHals()) {
-        if (hal.isApexDefined()) {
+        bool updatableViaApex =
+            hal.updatableViaApex().has_value() && !hal.updatableViaApex()->empty();
+
+        if (updatableViaApex) {
             // Check every instance is contained in the matrix with an updatable apex attribute
             (void)hal.forEachInstance([&mat, &ret](const auto& manifestInstance) {
                 LOG(DEBUG) << "Checking APEX HAL " << manifestInstance.description();
@@ -853,28 +854,6 @@ Level HalManifest::inferredKernelLevel() const {
         return level();
     }
     return Level::UNSPECIFIED;
-}
-status_t HalManifest::setApexDefined(std::string* error) {
-    status_t ret = OK;
-
-    // Validate each HAL prior to setting as APEX valid.
-    // To be a valid HAL within the APEX:
-    //    - definition can not contain an updatable-via-apex attribute
-    //
-    for (auto& hal : getHals()) {
-        bool bValid = !hal.updatableViaApex().has_value();
-
-        if (bValid) {
-            hal.setApexDefined();
-        } else {
-            if (error) {
-                *error +=
-                    "Invalid APEX HAL " + hal.getName() + " cannot include updatable-via-apex\n";
-            }
-            ret = BAD_VALUE;
-        }
-    }
-    return ret;
 }
 
 } // namespace vintf

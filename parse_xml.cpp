@@ -180,6 +180,7 @@ struct MutateNodeParam {
 struct BuildObjectParam {
     std::string* error;
     Version metaVersion;
+    std::string fileName;
 };
 
 template <typename Object>
@@ -232,7 +233,12 @@ struct XmlNodeConverter {
         // CompatibilityMatrixConverter fills in metaversion and pass down to children.
         // For other nodes, we don't know metaversion of the original XML, so just leave empty
         // for maximum backwards compatibility.
-        bool ret = (*this)(o, getRootChild(doc), BuildObjectParam{error, {}});
+        BuildObjectParam buildObjectParam{error, {}, {}};
+        // Pass down filename for the current XML document.
+        if constexpr (std::is_base_of_v<WithFileName, Object>) {
+            buildObjectParam.fileName = o->fileName();
+        }
+        bool ret = (*this)(o, getRootChild(doc), buildObjectParam);
         deleteDocument(doc);
         return ret;
     }
@@ -817,6 +823,27 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             !parseOptionalAttr(root, "max-level", Level::UNSPECIFIED, &object->mMaxLevel,
                                param.error)) {
             return false;
+        }
+
+        std::string_view apexName = parseApexName(param.fileName);
+        if (!apexName.empty()) {
+            if (object->mUpdatableViaApex.has_value()) {
+                // When defined in APEX, updatable-via-apex can be either
+                // - ""(empty)  : the HAL isn't updatable even if it's in APEX
+                // - {apex name}: the HAL is updtable via the current APEX
+                const std::string& updatableViaApex = object->mUpdatableViaApex.value();
+                if (!updatableViaApex.empty() && apexName.compare(updatableViaApex) != 0) {
+                    *param.error = "Invalid APEX HAL " + object->name + ": updatable-via-apex " +
+                                   updatableViaApex + " doesn't match with the defining APEX " +
+                                   std::string(apexName) + "\n";
+                    return false;
+                }
+            } else {
+                // Set updatable-via-apex to the defining APEX when it's not set explicitly.
+                // This should be set before calling insertInstances() which copies the current
+                // value to ManifestInstance.
+                object->mUpdatableViaApex = apexName;
+            }
         }
 
         switch (object->format) {
