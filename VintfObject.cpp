@@ -269,10 +269,6 @@ status_t VintfObject::fetchDeviceHalManifestApex(HalManifest* out, std::string* 
             return status;
         }
     }
-    status = apexManifest.setApexDefined(error);
-    if (status != OK) {
-        return status;
-    }
 
     // Add APEX HALs to out
     if (!out->addAllHals(&apexManifest, error)) {
