@@ -508,5 +508,17 @@ bool parseAidlVersionRange(const std::string& s, VersionRange* vr) {
     return parseVersionRange(s, vr, parseAidlVersion);
 }
 
+std::string_view parseApexName(std::string_view path) {
+    std::string_view apexDir{"/apex/"};
+    if (path.compare(0, apexDir.size(), apexDir) == 0) {
+        path.remove_prefix(apexDir.size());
+        if (auto slash = path.find('/'); slash != path.npos) {
+            path.remove_suffix(path.size() - slash);
+        }
+        return path;
+    }
+    return {};
+}
+
 } // namespace vintf
 } // namespace android

@@ -67,7 +67,6 @@ bool ManifestHal::operator==(const ManifestHal &other) const {
     if (isOverride() != other.isOverride()) return false;
     if (updatableViaApex() != other.updatableViaApex()) return false;
     if (mManifestInstances != other.mManifestInstances) return false;
-    if (isApexDefined() != other.isApexDefined()) return false;
     return true;
 }
 
