@@ -1195,6 +1195,17 @@ TEST_F(DeviceManifestTest, ValidApexHal) {
     SetUpApex(apexManifest);
     auto p = get();
     ASSERT_NE(nullptr, p);
+    // HALs defined in APEX should set updatable-via-apex
+    bool found = false;
+    p->forEachInstance([&found](const ManifestInstance& instance){
+        if (instance.package() == "android.apex.foo") {
+            std::optional<std::string> apexName = "com.test";
+            EXPECT_EQ(apexName, instance.updatableViaApex());
+            found = true;
+        }
+        return true;
+    });
+    ASSERT_TRUE(found) << "should found android.apex.foo";
 }
 // Invalid APEX HAL definition
 TEST_F(DeviceManifestTest, InvalidApexHal) {
