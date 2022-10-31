@@ -48,6 +48,8 @@ using ::testing::Range;
 using ::testing::SizeIs;
 using ::testing::TestParamInfo;
 
+using std::string_literals::operator""s;
+
 namespace android {
 namespace vintf {
 
@@ -213,6 +215,10 @@ public:
                          {"CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES", "\"\""},
                          {"CONFIG_ILLEGAL_POINTER_VALUE", "0xdead000000000000"}};
         return info;
+    }
+    status_t fetchManifest(HalManifest& manifest, FileSystem* files, const std::string& path,
+                           std::string* error) {
+        return manifest.fetchAllInformation(files, path, error);
     }
 };
 
@@ -4170,6 +4176,83 @@ TEST_F(LibVintfTest, MatrixMetaVersionWriteLatest) {
     EXPECT_TRUE(fromXml(&matrix, xml, &error)) << error;
     EXPECT_IN(kMetaVersionStr, toXml(matrix, SerializeFlags::NO_TAGS));
 }
+
+// clang-format on
+
+struct InMemoryFileSystem : FileSystem {
+    std::map<std::string, std::string> files;
+    InMemoryFileSystem(std::map<std::string, std::string> files) : files(std::move(files)) {}
+    status_t fetch(const std::string& path, std::string* fetched,
+                   std::string* error) const override {
+        (void)error;
+        if (auto it = files.find(path); it != files.end()) {
+            *fetched = it->second;
+            return OK;
+        }
+        return NAME_NOT_FOUND;
+    }
+    status_t listFiles(const std::string& path, std::vector<std::string>* out,
+                       std::string* error) const override {
+        (void)error;
+        std::set<std::string> entries;
+        for (const auto& pair : files) {
+            std::string_view entry{pair.first};
+            if (android::base::ConsumePrefix(&entry, path)) {
+                android::base::ConsumePrefix(&entry, "/");
+                entries.emplace(entry.substr(0, entry.find('/')));
+            }
+        }
+        *out = std::vector<std::string>{begin(entries), end(entries)};
+        return OK;
+    }
+};
+
+TEST_F(LibVintfTest, HalManifestWithMultipleFiles) {
+    std::string vendorXmlPath = "/vendor/etc/vintf/manifest.xml";
+    std::string vendorXml = "<manifest " + kMetaVersionStr +
+                            " type=\"device\">\n"
+                            "    <hal format=\"aidl\">\n"
+                            "        <name>android.hardware.foo</name>\n"
+                            "        <fqname>IFoo/default</fqname>\n"
+                            "    </hal>\n"
+                            "</manifest>";
+    std::string apexXmlPath = "/apex/com.android.bar/etc/vintf/manifest.xml";
+    std::string apexXml = "<manifest " + kMetaVersionStr +
+                          " type=\"device\">\n"
+                          "    <hal format=\"aidl\">\n"
+                          "        <name>android.hardware.bar</name>\n"
+                          "        <fqname>IBar/default</fqname>\n"
+                          "    </hal>\n"
+                          "</manifest>";
+    InMemoryFileSystem files{{
+        {vendorXmlPath, vendorXml},
+        {apexXmlPath, apexXml},
+    }};
+    // Read apexXml later. This shouldn't affect the result except HalManifest::fileName.
+    {
+        std::string error;
+        HalManifest manifest;
+        EXPECT_EQ(OK, fetchManifest(manifest, &files, vendorXmlPath, &error)) << error;
+        EXPECT_EQ(OK, fetchManifest(manifest, &files, apexXmlPath, &error)) << error;
+        EXPECT_EQ(vendorXmlPath + ":" + apexXmlPath, manifest.fileName());
+        EXPECT_EQ(std::nullopt, getAnyHal(manifest, "android.hardware.foo")->updatableViaApex());
+        EXPECT_EQ(std::make_optional("com.android.bar"s),
+                  getAnyHal(manifest, "android.hardware.bar")->updatableViaApex());
+    }
+    // Read apexXml first. This shouldn't affect the result except HalManifest::fileName.
+    {
+        std::string error;
+        HalManifest manifest;
+        EXPECT_EQ(OK, fetchManifest(manifest, &files, apexXmlPath, &error)) << error;
+        EXPECT_EQ(OK, fetchManifest(manifest, &files, vendorXmlPath, &error)) << error;
+        EXPECT_EQ(apexXmlPath + ":" + vendorXmlPath, manifest.fileName());
+        EXPECT_EQ(std::nullopt, getAnyHal(manifest, "android.hardware.foo")->updatableViaApex());
+        EXPECT_EQ(std::make_optional("com.android.bar"s),
+                  getAnyHal(manifest, "android.hardware.bar")->updatableViaApex());
+    }
+}
+
+// clang-format off
 
 TEST_F(LibVintfTest, Aidl) {
     std::string xml =
