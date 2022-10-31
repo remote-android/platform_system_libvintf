@@ -19,6 +19,7 @@
 #include "parse_string.h"
 
 #include <android-base/parseint.h>
+#include <android-base/strings.h>
 
 #include "constants-private.h"
 
@@ -509,13 +510,8 @@ bool parseAidlVersionRange(const std::string& s, VersionRange* vr) {
 }
 
 std::string_view parseApexName(std::string_view path) {
-    std::string_view apexDir{"/apex/"};
-    if (path.compare(0, apexDir.size(), apexDir) == 0) {
-        path.remove_prefix(apexDir.size());
-        if (auto slash = path.find('/'); slash != path.npos) {
-            path.remove_suffix(path.size() - slash);
-        }
-        return path;
+    if (base::ConsumePrefix(&path, "/apex/")) {
+        return path.substr(0, path.find('/'));
     }
     return {};
 }
