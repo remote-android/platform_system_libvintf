@@ -105,6 +105,9 @@ struct RuntimeInfo {
     // specified in Level.
     static Level gkiAndroidReleaseToLevel(uint64_t androidRelease);
 
+    // Returns true if kernelRelease is a kernel release for a mainline kernel.
+    static bool kernelReleaseIsMainline(std::string_view kernelRelease);
+
    protected:
     virtual status_t fetchAllInformation(FetchFlags flags);
 
