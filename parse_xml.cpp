@@ -236,7 +236,12 @@ struct XmlNodeConverter {
         BuildObjectParam buildObjectParam{error, {}, {}};
         // Pass down filename for the current XML document.
         if constexpr (std::is_base_of_v<WithFileName, Object>) {
-            buildObjectParam.fileName = o->fileName();
+            // Get the last filename in case `o` keeps the list of filenames
+            std::string_view fileName{o->fileName()};
+            if (auto pos = fileName.rfind(':'); pos != fileName.npos) {
+                fileName.remove_prefix(pos + 1);
+            }
+            buildObjectParam.fileName = std::string(fileName);
         }
         bool ret = (*this)(o, getRootChild(doc), buildObjectParam);
         deleteDocument(doc);
