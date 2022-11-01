@@ -135,6 +135,8 @@ struct StaticRuntimeInfo : public RuntimeInfo {
         }
         return OK;
     }
+
+    void setIsMainline(bool value) { mIsMainline = value; }
 };
 
 struct StubRuntimeInfo : public RuntimeInfo {
@@ -246,6 +248,8 @@ bool parseKernelVersionOrRelease(const std::string& s, StaticRuntimeInfo* ret) {
     // 5.4.42
     if (parse(s, &ret->kernelVersion)) {
         ret->kernelLevel = Level::UNSPECIFIED;
+        ret->setIsMainline(false);
+        LOG(INFO) << "\"" << s << "\" is not a mainline kernel.";
         return true;
     }
     LOG(INFO) << "Cannot parse \"" << s << "\" as kernel version, parsing as GKI kernel release.";
@@ -256,6 +260,8 @@ bool parseKernelVersionOrRelease(const std::string& s, StaticRuntimeInfo* ret) {
         ret->kernelVersion = KernelVersion{kernelRelease->version(), kernelRelease->patch_level(),
                                            kernelRelease->sub_level()};
         ret->kernelLevel = RuntimeInfo::gkiAndroidReleaseToLevel(kernelRelease->android_release());
+        ret->setIsMainline(false);
+        LOG(INFO) << "\"" << s << "\" is not a mainline kernel.";
         return true;
     }
     LOG(INFO) << "Cannot parse \"" << s << "\" as GKI kernel release, parsing as kernel release";
@@ -265,6 +271,11 @@ bool parseKernelVersionOrRelease(const std::string& s, StaticRuntimeInfo* ret) {
     // substr handles pos == npos case
     if (parse(s.substr(0, pos), &ret->kernelVersion)) {
         ret->kernelLevel = Level::UNSPECIFIED;
+
+        bool isMainline = RuntimeInfo::kernelReleaseIsMainline(s);
+        ret->setIsMainline(isMainline);
+        LOG(INFO) << "\"" << s << "\" is" << (isMainline ? "" : " not") << " a mainline kernel.";
+
         return true;
     }
 
