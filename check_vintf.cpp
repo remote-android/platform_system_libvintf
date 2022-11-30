@@ -515,16 +515,15 @@ android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties
 int checkDirmaps(const Dirmap& dirmap, const Properties& props, const std::string& apex_info_file) {
     auto hostPropertyFetcher = std::make_unique<PresetPropertyFetcher>();
     hostPropertyFetcher->setProperties(props);
+    auto vintfObject =
+        VintfObject::Builder()
+            .setFileSystem(std::make_unique<HostFileSystem>(dirmap, NAME_NOT_FOUND))
+            .setPropertyFetcher(std::move(hostPropertyFetcher))
+            .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(nullptr))
+            .setApex(createApex(apex_info_file))
+            .build();
     auto exitCode = EX_OK;
     for (auto&& [prefix, mappedPath] : dirmap) {
-        auto vintfObject =
-            VintfObject::Builder()
-                .setFileSystem(std::make_unique<HostFileSystem>(dirmap, NAME_NOT_FOUND))
-                .setPropertyFetcher(std::move(hostPropertyFetcher))
-                .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(nullptr))
-                .setApex(createApex(apex_info_file))
-                .build();
-
         if (android::base::StartsWith(prefix, "/system")) {
             LOG(INFO) << "Checking system manifest.";
             auto manifest = vintfObject->getFrameworkHalManifest();
