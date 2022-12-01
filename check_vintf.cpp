@@ -40,8 +40,10 @@
 #include <vintf/fcm_exclude.h>
 #include <vintf/parse_string.h>
 #include <vintf/parse_xml.h>
+#include "constants-private.h"
 #include "utils.h"
 
+using android::apex::info::kApexInfoFile;
 using android::kver::KernelRelease;
 
 namespace android {
@@ -63,7 +65,6 @@ enum Option : int {
     PROPERTY,
     DIR_MAP,
     KERNEL,
-    APEX_INFO_FILE,
 };
 // command line arguments
 using Args = std::multimap<Option, std::string>;
@@ -213,7 +214,6 @@ Args parseArgs(int argc, char** argv) {
         {"property", required_argument, &longOptFlag, PROPERTY},
         {"dirmap", required_argument, &longOptFlag, DIR_MAP},
         {"kernel", required_argument, &longOptFlag, KERNEL},
-        {"apex-info-file", required_argument, &longOptFlag, APEX_INFO_FILE},
         {0, 0, 0, 0}};
     std::map<int, Option> shortopts{
         {'h', HELP}, {'D', PROPERTY}, {'c', CHECK_COMPAT},
@@ -348,7 +348,6 @@ int usage(const char* me) {
         << "                unspecified, kernel requirements are skipped." << std::endl
         << "                The first half, version, can be just x.y.z, or a file " << std::endl
         << "                containing the full kernel release string x.y.z-something." << std::endl
-        << "        --apex-info-file <file>.  Set apex-info-list.xml file." << std::endl
         << "        --help: show this message." << std::endl
         << std::endl
         << "    Example:" << std::endl
@@ -450,20 +449,22 @@ static constexpr const char* gCheckMissingHalsSuggestion{
     "types-only package), add it to the exempt list in libvintf_fcm_exclude."};
 
 android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties& props,
-                                          std::shared_ptr<StaticRuntimeInfo> runtimeInfo,
-                                          const std::string& apex_info_file) {
+                                          std::shared_ptr<StaticRuntimeInfo> runtimeInfo) {
+    auto hostFileSystem = std::make_unique<HostFileSystem>(dirmap, UNKNOWN_ERROR);
     auto hostPropertyFetcher = std::make_unique<PresetPropertyFetcher>();
     hostPropertyFetcher->setProperties(props);
 
     CheckFlags::Type flags = CheckFlags::DEFAULT;
     if (!runtimeInfo) flags = flags.disableRuntimeInfo();
 
+    auto hostApex = createApex(hostFileSystem->resolve(kApexInfoFile, nullptr));
+
     auto vintfObject =
         VintfObject::Builder()
-            .setFileSystem(std::make_unique<HostFileSystem>(dirmap, UNKNOWN_ERROR))
+            .setFileSystem(std::move(hostFileSystem))
             .setPropertyFetcher(std::move(hostPropertyFetcher))
             .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(runtimeInfo))
-            .setApex(createApex(apex_info_file))
+            .setApex(std::move(hostApex))
             .build();
 
     std::optional<android::base::Error<>> retError = std::nullopt;
@@ -512,15 +513,18 @@ android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties
     }
 }
 
-int checkDirmaps(const Dirmap& dirmap, const Properties& props, const std::string& apex_info_file) {
+int checkDirmaps(const Dirmap& dirmap, const Properties& props) {
+    auto hostFileSystem = std::make_unique<HostFileSystem>(dirmap, NAME_NOT_FOUND);
     auto hostPropertyFetcher = std::make_unique<PresetPropertyFetcher>();
     hostPropertyFetcher->setProperties(props);
+    auto hostApex = createApex(hostFileSystem->resolve(kApexInfoFile, nullptr));
+
     auto vintfObject =
         VintfObject::Builder()
-            .setFileSystem(std::make_unique<HostFileSystem>(dirmap, NAME_NOT_FOUND))
+            .setFileSystem(std::move(hostFileSystem))
             .setPropertyFetcher(std::move(hostPropertyFetcher))
             .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(nullptr))
-            .setApex(createApex(apex_info_file))
+            .setApex(std::move(hostApex))
             .build();
     auto exitCode = EX_OK;
     for (auto&& [prefix, mappedPath] : dirmap) {
@@ -618,18 +622,8 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    std::string apex_info_file = android::apex::info::kApexInfoFile;
-    auto apexinfofiles = iterateValues(args, APEX_INFO_FILE);
-    if (!apexinfofiles.empty()) {
-        if (std::distance(apexinfofiles.begin(), apexinfofiles.end()) > 1) {
-            LOG(ERROR) << "ERROR: Can't have multiple apex info files";
-            return usage(argv[0]);
-        }
-        apex_info_file = *apexinfofiles.begin();
-    }
-
     if (!iterateValues(args, CHECK_ONE).empty()) {
-        return checkDirmaps(dirmap, properties, apex_info_file);
+        return checkDirmaps(dirmap, properties);
     }
 
     auto checkCompat = iterateValues(args, CHECK_COMPAT);
@@ -660,7 +654,7 @@ int main(int argc, char** argv) {
         return usage(argv[0]);
     }
 
-    auto compat = checkAllFiles(dirmap, properties, runtimeInfo, apex_info_file);
+    auto compat = checkAllFiles(dirmap, properties, runtimeInfo);
 
     if (compat.ok()) {
         std::cout << "COMPATIBLE" << std::endl;

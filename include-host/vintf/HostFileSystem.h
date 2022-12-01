@@ -41,9 +41,9 @@ class HostFileSystem : public FileSystemImpl {
     status_t listFiles(const std::string& path, std::vector<std::string>* out,
                        std::string* error) const override;
 
-   private:
     std::string resolve(const std::string& path, std::string* error) const;
 
+   private:
     Dirmap mDirMap;
     status_t mMissingError;
 
