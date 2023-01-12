@@ -485,24 +485,41 @@ status_t VintfObject::fetchFrameworkHalManifest(HalManifest* out, std::string* e
     return OK;
 }
 
+// If deviceManifestLevel is not in the range [minLevel, maxLevel] of a HAL, remove the HAL,
+// where:
+//    minLevel = hal.getMinLevel(); if unspecified, -infinity
+//    maxLevel = hal.getMaxLevel(); if unspecified, +infinity
+//    deviceManifestLevel = deviceManifest->level(); if unspecified, -infinity
+// That is, if device manifest has no level, it is treated as an infinitely old device.
 void VintfObject::filterHalsByDeviceManifestLevel(HalManifest* out) {
     auto deviceManifest = getDeviceHalManifest();
+    Level deviceManifestLevel =
+        deviceManifest != nullptr ? deviceManifest->level() : Level::UNSPECIFIED;
+
     if (deviceManifest == nullptr) {
         LOG(WARNING) << "Cannot fetch device manifest to determine target FCM version to "
-                        "filter framework manifest HALs.";
-        return;
-    }
-    Level deviceManifestLevel = deviceManifest->level();
-    if (deviceManifestLevel == Level::UNSPECIFIED) {
+                        "filter framework manifest HALs properly. Treating as infinitely old "
+                        "device.";
+    } else if (deviceManifestLevel == Level::UNSPECIFIED) {
         LOG(WARNING)
-            << "Not filtering framework manifest HALs because target FCM version is unspecified.";
-        return;
+            << "Cannot filter framework manifest HALs properly because target FCM version is "
+               "unspecified in the device manifest. Treating as infinitely old device.";
     }
+
     out->removeHalsIf([deviceManifestLevel](const ManifestHal& hal) {
-        if (hal.getMaxLevel() == Level::UNSPECIFIED) {
-            return false;
+        if (hal.getMaxLevel() != Level::UNSPECIFIED) {
+            if (deviceManifestLevel != Level::UNSPECIFIED &&
+                hal.getMaxLevel() < deviceManifestLevel) {
+                return true;
+            }
         }
-        return hal.getMaxLevel() < deviceManifestLevel;
+        if (hal.getMinLevel() != Level::UNSPECIFIED) {
+            if (deviceManifestLevel == Level::UNSPECIFIED ||
+                hal.getMinLevel() > deviceManifestLevel) {
+                return true;
+            }
+        }
+        return false;
     });
 }
 

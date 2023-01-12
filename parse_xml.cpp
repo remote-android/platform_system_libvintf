@@ -814,6 +814,9 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
         if (object.getMaxLevel() != Level::UNSPECIFIED) {
             appendAttr(root, "max-level", object.getMaxLevel());
         }
+        if (object.getMinLevel() != Level::UNSPECIFIED) {
+            appendAttr(root, "min-level", object.getMinLevel());
+        }
     }
     bool buildObject(ManifestHal* object, NodeType* root,
                      const BuildObjectParam& param) const override {
@@ -826,6 +829,8 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
             !parseOptionalChild(root, TransportArchConverter{}, {}, &object->transportArch,
                                 param) ||
             !parseOptionalAttr(root, "max-level", Level::UNSPECIFIED, &object->mMaxLevel,
+                               param.error) ||
+            !parseOptionalAttr(root, "min-level", Level::UNSPECIFIED, &object->mMinLevel,
                                param.error)) {
             return false;
         }

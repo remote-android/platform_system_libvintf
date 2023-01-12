@@ -4974,6 +4974,71 @@ TEST_F(LibVintfTest, FrameworkManifestHalMaxLevel) {
     EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMaxLevel, Eq(static_cast<Level>(5)))));
 }
 
+TEST_F(LibVintfTest, FrameworkManifestHalMinLevel) {
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="framework">
+                           <hal min-level="3">
+                               <name>android.frameworks.schedulerservice</name>
+                               <transport>hwbinder</transport>
+                               <fqname>@1.0::ISchedulingPolicyService/default</fqname>
+                           </hal>
+                           <hal format="aidl" min-level="4">
+                               <name>android.frameworks.myaidl</name>
+                               <fqname>IAidl/default</fqname>
+                           </hal>
+                           <hal format="native" min-level="5">
+                               <name>some-native-hal</name>
+                               <version>1.0</version>
+                           </hal>
+                       </manifest>)";
+
+    std::string error;
+    HalManifest manifest;
+    ASSERT_TRUE(fromXml(&manifest, xml, &error)) << error;
+
+    auto hals = getHals(manifest, "android.frameworks.schedulerservice");
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMinLevel, Eq(static_cast<Level>(3)))));
+
+    hals = getHals(manifest, "android.frameworks.myaidl");
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMinLevel, Eq(static_cast<Level>(4)))));
+
+    hals = getHals(manifest, "some-native-hal");
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMinLevel, Eq(static_cast<Level>(5)))));
+}
+
+TEST_F(LibVintfTest, FrameworkManifestHalMinMaxLevel) {
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="framework">
+                           <hal min-level="2" max-level="5">
+                               <name>android.frameworks.schedulerservice</name>
+                               <transport>hwbinder</transport>
+                               <fqname>@1.0::ISchedulingPolicyService/default</fqname>
+                           </hal>
+                           <hal format="aidl" min-level="3" max-level="6">
+                               <name>android.frameworks.myaidl</name>
+                               <fqname>IAidl/default</fqname>
+                           </hal>
+                           <hal format="native" min-level="4" max-level="7">
+                               <name>some-native-hal</name>
+                               <version>1.0</version>
+                           </hal>
+                       </manifest>)";
+
+    std::string error;
+    HalManifest manifest;
+    ASSERT_TRUE(fromXml(&manifest, xml, &error)) << error;
+
+    auto hals = getHals(manifest, "android.frameworks.schedulerservice");
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMinLevel, Eq(static_cast<Level>(2)))));
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMaxLevel, Eq(static_cast<Level>(5)))));
+
+    hals = getHals(manifest, "android.frameworks.myaidl");
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMinLevel, Eq(static_cast<Level>(3)))));
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMaxLevel, Eq(static_cast<Level>(6)))));
+
+    hals = getHals(manifest, "some-native-hal");
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMinLevel, Eq(static_cast<Level>(4)))));
+    EXPECT_THAT(hals, ElementsAre(Property(&ManifestHal::getMaxLevel, Eq(static_cast<Level>(7)))));
+}
+
 TEST_F(LibVintfTest, RuntimeInfoParseGkiKernelReleaseOk) {
     KernelVersion version;
     Level level = Level::UNSPECIFIED;
