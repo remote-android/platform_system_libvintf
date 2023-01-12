@@ -44,14 +44,14 @@ bool canConvertToFqInstance(const std::string& package, const Version& version,
 
     // Attempt to guess the source of error.
     bool foundError = false;
-    if (!FqInstance::from(package).has_value()) {
+    details::FQName fqName;
+    if (!fqName.setTo(package)) {
         ss << "Package '" << package
            << "' should have the format [a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*";
         foundError = true;
     }
 
-    std::optional<FqInstance> convertedInterface = FqInstance::from(interface);
-    if (!convertedInterface.has_value() || !convertedInterface->hasInterface()) {
+    if (!fqName.setTo(interface) || !fqName.isInterfaceName()) {
         ss << "Interface '" << interface << "' should have the format I[a-zA-Z0-9_]*";
         foundError = true;
     }
