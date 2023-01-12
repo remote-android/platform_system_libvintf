@@ -19,10 +19,9 @@
 
 #include <string>
 
-#include <hidl-util/FqInstance.h>
-
-#include "HalFormat.h"
-#include "VersionRange.h"
+#include <vintf/FqInstance.h>
+#include <vintf/HalFormat.h>
+#include <vintf/VersionRange.h>
 
 namespace android {
 namespace vintf {
