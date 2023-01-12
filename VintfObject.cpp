@@ -839,12 +839,12 @@ android::base::Result<std::vector<FqInstance>> VintfObject::GetListedInstanceInh
         return {};
     }
 
-    const FQName& fqName = fqInstance.getFqName();
+    const auto& fqName = fqInstance.getFqNameString();
 
     std::vector<FqInstance> ret;
     ret.push_back(fqInstance);
 
-    auto childRange = childrenMap.equal_range(fqName.string());
+    auto childRange = childrenMap.equal_range(fqName);
     for (auto it = childRange.first; it != childRange.second; ++it) {
         const auto& childFqNameString = it->second;
         FQName childFqName;
