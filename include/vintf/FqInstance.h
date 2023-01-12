@@ -25,8 +25,7 @@
 namespace android::vintf {
 
 // A wrapper around FQName to include instance name as well.
-// FqInstance::setTo also recognizes all FQName formats, including enum names
-// etc.
+// FqInstance::setTo also recognizes all FQName formats
 // Typical usage:
 // FqInstance fqInstance;
 // if (!fqInstance.setTo("...")) {
@@ -63,9 +62,6 @@ class FqInstance {
     // android.hardware.foo@1.0
     // IFoo.Type
     // Type
-    // android.hardware.foo@1.0::IFoo.Type:MY_ENUM_VALUE
-    // @1.0::IFoo.Type:MY_ENUM_VALUE
-    // IFoo.Type:MY_ENUM_VALUE
     //
     // If no "/instance", hasInstance() will return false afterwards.
     __attribute__((warn_unused_result)) bool setTo(const std::string& s);
