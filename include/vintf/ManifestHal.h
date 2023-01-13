@@ -72,6 +72,7 @@ struct ManifestHal : public WithFileName {
     bool isDisabledHal() const;
 
     Level getMaxLevel() const { return mMaxLevel; }
+    Level getMinLevel() const { return mMinLevel; }
 
    private:
     friend struct LibVintfTest;
@@ -103,10 +104,14 @@ struct ManifestHal : public WithFileName {
     // All instances specified with <fqname> and <version> x <interface> x <instance>
     std::set<ManifestInstance> mManifestInstances;
 
-    // Max level of this HAL. Only valid for framework manifest HALs.
+    // Max level of this HAL (inclusive). Only valid for framework manifest HALs.
     // If set, HALs with max-level < target FCM version in device manifest is
     // disabled.
     Level mMaxLevel = Level::UNSPECIFIED;
+    // Min level of this HAL (inclusive). Only valid for framework manifest HALs.
+    // If set, HALs with max-level > target FCM version in device manifest is
+    // disabled.
+    Level mMinLevel = Level::UNSPECIFIED;
 };
 
 } // namespace vintf

@@ -2068,15 +2068,19 @@ class FrameworkManifestLevelTest : public VintfObjectTestBase {
         auto head = "<manifest " + kMetaVersionStr + R"( type="framework">)";
         auto tail = "</manifest>";
 
-        auto systemManifest = head + getFragment(HalFormat::HIDL, 13, "@3.0::ISystemEtc") +
-                              getFragment(HalFormat::AIDL, 14, "ISystemEtc4") + tail;
+        auto systemManifest =
+            head + getFragment(HalFormat::HIDL, Level::UNSPECIFIED, Level{13}, "@3.0::ISystemEtc") +
+            getFragment(HalFormat::AIDL, Level{13}, Level{14}, "ISystemEtc4") + tail;
         expectFetch(kSystemManifest, systemManifest);
 
-        auto hidlFragment =
-            head + getFragment(HalFormat::HIDL, 14, "@4.0::ISystemEtcFragment") + tail;
+        auto hidlFragment = head +
+                            getFragment(HalFormat::HIDL, Level::UNSPECIFIED, Level{14},
+                                        "@4.0::ISystemEtcFragment") +
+                            tail;
         expectFetch(kSystemManifestFragmentDir + "hidl.xml"s, hidlFragment);
 
-        auto aidlFragment = head + getFragment(HalFormat::AIDL, 13, "ISystemEtcFragment3") + tail;
+        auto aidlFragment =
+            head + getFragment(HalFormat::AIDL, Level{12}, Level{13}, "ISystemEtcFragment3") + tail;
         expectFetch(kSystemManifestFragmentDir + "aidl.xml"s, aidlFragment);
 
         EXPECT_CALL(fetcher(), listFiles(StrEq(kSystemManifestFragmentDir), _, _))
@@ -2115,18 +2119,27 @@ class FrameworkManifestLevelTest : public VintfObjectTestBase {
     }
 
    private:
-    std::string getFragment(HalFormat halFormat, size_t maxLevel, const char* versionedInterface) {
-        auto format = R"(<hal format="%s" max-level="%s">
+    std::string getFragment(HalFormat halFormat, Level minLevel, Level maxLevel,
+                            const char* versionedInterface) {
+        auto format = R"(<hal format="%s"%s>
                              <name>android.frameworks.foo</name>
                              %s
                              <fqname>%s/default</fqname>
                          </hal>)";
-        std::string level = to_string(static_cast<Level>(maxLevel));
+        std::string halAttrs;
+        if (minLevel != Level::UNSPECIFIED) {
+            halAttrs +=
+                android::base::StringPrintf(R"( min-level="%s")", to_string(minLevel).c_str());
+        }
+        if (maxLevel != Level::UNSPECIFIED) {
+            halAttrs +=
+                android::base::StringPrintf(R"( max-level="%s")", to_string(maxLevel).c_str());
+        }
         const char* transport = "";
         if (halFormat == HalFormat::HIDL) {
             transport = "<transport>hwbinder</transport>";
         }
-        return android::base::StringPrintf(format, to_string(halFormat).c_str(), level.c_str(),
+        return android::base::StringPrintf(format, to_string(halFormat).c_str(), halAttrs.c_str(),
                                            transport, versionedInterface);
     }
 };
@@ -2136,10 +2149,27 @@ TEST_F(FrameworkManifestLevelTest, NoTargetFcmVersion) {
         android::base::StringPrintf(R"(<manifest %s type="device"/> )", kMetaVersionStr.c_str());
     expectFetch(kVendorManifest, xml);
 
+    // If no target FCM version, it is treated as an infinitely old device
+    expectContainsHidl({3, 0}, "ISystemEtc");
+    expectContainsHidl({4, 0}, "ISystemEtcFragment");
+    expectContainsAidl("ISystemEtcFragment3", false);
+    expectContainsAidl("ISystemEtc4", false);
+}
+
+TEST_F(FrameworkManifestLevelTest, TargetFcmVersion11) {
+    expectTargetFcmVersion(11);
+    expectContainsHidl({3, 0}, "ISystemEtc");
+    expectContainsHidl({4, 0}, "ISystemEtcFragment");
+    expectContainsAidl("ISystemEtcFragment3", false);
+    expectContainsAidl("ISystemEtc4", false);
+}
+
+TEST_F(FrameworkManifestLevelTest, TargetFcmVersion12) {
+    expectTargetFcmVersion(12);
     expectContainsHidl({3, 0}, "ISystemEtc");
     expectContainsHidl({4, 0}, "ISystemEtcFragment");
     expectContainsAidl("ISystemEtcFragment3");
-    expectContainsAidl("ISystemEtc4");
+    expectContainsAidl("ISystemEtc4", false);
 }
 
 TEST_F(FrameworkManifestLevelTest, TargetFcmVersion13) {
