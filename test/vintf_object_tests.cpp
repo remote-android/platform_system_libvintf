@@ -26,7 +26,6 @@
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <gtest/gtest.h>
-#include <hidl-util/FQName.h>
 
 #include <vintf/VintfObject.h>
 #include <vintf/parse_string.h>
@@ -39,10 +38,10 @@
 using namespace ::testing;
 using namespace std::literals;
 
-using android::FqInstance;
 using android::base::testing::HasError;
 using android::base::testing::Ok;
 using android::base::testing::WithMessage;
+using android::vintf::FqInstance;
 
 #define EXPECT_IN(sub, str) EXPECT_THAT(str, HasSubstr(sub))
 #define EXPECT_NOT_IN(sub, str) EXPECT_THAT(str, Not(HasSubstr(sub)))

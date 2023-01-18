@@ -20,11 +20,10 @@
 #include <optional>
 #include <string>
 
-#include <hidl-util/FqInstance.h>
-
-#include "HalFormat.h"
-#include "TransportArch.h"
-#include "Version.h"
+#include <vintf/FqInstance.h>
+#include <vintf/HalFormat.h>
+#include <vintf/TransportArch.h>
+#include <vintf/Version.h>
 
 namespace android {
 namespace vintf {

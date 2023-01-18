@@ -46,7 +46,6 @@ cc_defaults {
 
 libvintf_private_deps = [
     "libbase",
-    "libhidl-gen-utils",
     "liblog",
     "libselinux",
     "libtinyxml2",
@@ -69,6 +68,8 @@ cc_library {
         "Apex.cpp",
         "CompatibilityMatrix.cpp",
         "FileSystem.cpp",
+        "FQName.cpp",
+        "FqInstance.cpp",
         "HalManifest.cpp",
         "HalInterface.cpp",
         "KernelConfigTypedValue.cpp",
@@ -105,7 +106,6 @@ cc_library {
 
     export_shared_lib_headers: [
         "libbase",
-        "libhidl-gen-utils",
     ],
     export_header_lib_headers: [
         "libaidlmetadata_headers",
@@ -145,7 +145,6 @@ cc_binary {
     defaults: ["libvintf-defaults"],
     shared_libs: [
         "libbase",
-        "libhidl-gen-utils",
         "libvintf",
     ],
     srcs: [
@@ -159,7 +158,6 @@ cc_binary_host {
     static_libs: [
         "libaidlmetadata",
         "libbase",
-        "libhidl-gen-utils",
         "libhidlmetadata",
         "liblog",
         "libvintf",
@@ -224,7 +222,6 @@ cc_defaults {
     },
     static_libs: [
         "libbase",
-        "libhidl-gen-utils",
         "liblog",
         "libtinyxml2",
         "libutils",

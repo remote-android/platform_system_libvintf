@@ -371,7 +371,7 @@ std::set<std::string> HalManifest::checkUnusedHals(
             auto range =
                 childrenMap.equal_range(manifestInstance.getFqInstance().getFqName().string());
             for (auto it = range.first; it != range.second; ++it) {
-                FQName fqName;
+                details::FQName fqName;
                 CHECK(fqName.setTo(it->second));
                 if (mat.matchInstance(manifestInstance.format(), fqName.package(),
                                       fqName.getVersion(), fqName.name(),
