@@ -42,6 +42,7 @@ using ::testing::Combine;
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::HasSubstr;
+using ::testing::IsEmpty;
 using ::testing::Optional;
 using ::testing::Property;
 using ::testing::Range;
@@ -423,7 +424,7 @@ TEST_F(LibVintfTest, HalManifestOptional) {
             "</manifest>"));
 }
 
-TEST_F(LibVintfTest, HalManifestNative) {
+TEST_F(LibVintfTest, HalManifestNativeNoInstance) {
     std::string error;
     HalManifest vm;
     EXPECT_TRUE(fromXml(&vm,
@@ -433,6 +434,11 @@ TEST_F(LibVintfTest, HalManifestNative) {
                                       "        <version>1.0</version>"
                                       "    </hal>"
                                       "</manifest>", &error)) << error;
+}
+
+TEST_F(LibVintfTest, HalManifestNativeWithTransport) {
+    std::string error;
+    HalManifest vm;
     EXPECT_FALSE(fromXml(&vm,
                                        "<manifest " + kMetaVersionStr + " type=\"device\">"
                                        "    <hal format=\"native\">"
@@ -443,6 +449,105 @@ TEST_F(LibVintfTest, HalManifestNative) {
                                        "</manifest>", &error));
     EXPECT_THAT(error, HasSubstr("Native HAL 'foo' should not have <transport> defined"));
 }
+
+// clang-format on
+
+TEST_F(LibVintfTest, HalManifestNativeInstancesWithInterface) {
+    std::string error;
+    HalManifest manifest;
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="device">
+            <hal format="native">
+                <name>foo</name>
+                <version>1.0</version>
+                <interface>
+                    <name>IFoo</name>
+                    <instance>inst</instance>
+                </interface>
+           </hal>
+        </manifest>
+    )";
+
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+
+    manifest.forEachInstance([](const auto& manifestInstance) {
+        EXPECT_EQ(manifestInstance.package(), "foo");
+        EXPECT_EQ(manifestInstance.version(), Version(1, 0));
+        EXPECT_EQ(manifestInstance.interface(), "IFoo");
+        EXPECT_EQ(manifestInstance.instance(), "inst");
+        return true;  // continue
+    });
+}
+
+TEST_F(LibVintfTest, HalManifestNativeFqInstancesWithInterface) {
+    std::string error;
+    HalManifest manifest;
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="device">
+            <hal format="native">
+                <name>foo</name>
+                <fqname>@1.0::IFoo/inst</fqname>
+           </hal>
+        </manifest>
+    )";
+
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+
+    manifest.forEachInstance([](const auto& manifestInstance) {
+        EXPECT_EQ(manifestInstance.package(), "foo");
+        EXPECT_EQ(manifestInstance.version(), Version(1, 0));
+        EXPECT_EQ(manifestInstance.interface(), "IFoo");
+        EXPECT_EQ(manifestInstance.instance(), "inst");
+        return true;  // continue
+    });
+}
+
+TEST_F(LibVintfTest, HalManifestNativeInstancesNoInterface) {
+    std::string error;
+    HalManifest manifest;
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="device">
+            <hal format="native">
+                <name>foo</name>
+                <version>1.0</version>
+                <interface>
+                    <instance>inst</instance>
+                </interface>
+           </hal>
+        </manifest>
+    )";
+
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+
+    manifest.forEachInstance([](const auto& manifestInstance) {
+        EXPECT_EQ(manifestInstance.package(), "foo");
+        EXPECT_EQ(manifestInstance.version(), Version(1, 0));
+        EXPECT_EQ(manifestInstance.interface(), "");
+        EXPECT_EQ(manifestInstance.instance(), "inst");
+        return true;  // continue
+    });
+}
+
+TEST_F(LibVintfTest, HalManifestNativeFqInstancesNoInterface) {
+    std::string error;
+    HalManifest manifest;
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="device">
+            <hal format="native">
+                <name>foo</name>
+                <fqname>@1.0/inst</fqname>
+           </hal>
+        </manifest>
+    )";
+
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+
+    manifest.forEachInstance([](const auto& manifestInstance) {
+        EXPECT_EQ(manifestInstance.package(), "foo");
+        EXPECT_EQ(manifestInstance.version(), Version(1, 0));
+        EXPECT_EQ(manifestInstance.interface(), "");
+        EXPECT_EQ(manifestInstance.instance(), "inst");
+        return true;  // continue
+    });
+}
+
+// clang-format off
 
 TEST_F(LibVintfTest, HalManifestDuplicate) {
     HalManifest vm;
@@ -1241,7 +1346,7 @@ TEST_F(LibVintfTest, HalCompat) {
     }
 }
 
-TEST_F(LibVintfTest, Compat) {
+TEST_F(LibVintfTest, FullCompat) {
     std::string manifestXml =
         "<manifest " + kMetaVersionStr + " type=\"device\">\n"
         "    <hal format=\"hidl\">\n"
@@ -1361,6 +1466,144 @@ TEST_F(LibVintfTest, Compat) {
     set(matrix, Sepolicy{30, {{25, 4}}});
     EXPECT_TRUE(manifest.checkCompatibility(matrix, &error)) << error;
 }
+
+// clang-format on
+
+struct NativeHalCompatTestParam {
+    std::string matrixXml;
+    std::string manifestXml;
+    bool compatible;
+    std::string expectedError;
+};
+
+class NativeHalCompatTest : public LibVintfTest,
+                            public ::testing::WithParamInterface<NativeHalCompatTestParam> {
+   public:
+    static std::vector<NativeHalCompatTestParam> createParams() {
+        std::string matrixIntf = "<compatibility-matrix " + kMetaVersionStr + R"( type="device">
+                <hal format="native" optional="false">
+                    <name>foo</name>
+                    <version>1.0</version>
+                    <interface>
+                        <name>IFoo</name>
+                        <instance>default</instance>
+                    </interface>
+               </hal>
+            </compatibility-matrix>
+        )";
+        std::string matrixNoIntf = "<compatibility-matrix " + kMetaVersionStr + R"( type="device">
+                <hal format="native" optional="false">
+                    <name>foo</name>
+                    <version>1.0</version>
+                    <interface>
+                        <instance>default</instance>
+                    </interface>
+               </hal>
+            </compatibility-matrix>
+        )";
+        std::string matrixNoInst = "<compatibility-matrix " + kMetaVersionStr + R"( type="device">
+                <hal format="native" optional="false">
+                    <name>foo</name>
+                    <version>1.0</version>
+               </hal>
+            </compatibility-matrix>
+        )";
+        std::string manifestFqnameIntf = "<manifest " + kMetaVersionStr + R"( type="framework">
+                <hal format="native">
+                    <name>foo</name>
+                    <fqname>@1.0::IFoo/default</fqname>
+               </hal>
+            </manifest>
+        )";
+        std::string manifestLegacyIntf = "<manifest " + kMetaVersionStr + R"( type="framework">
+                <hal format="native">
+                    <name>foo</name>
+                    <version>1.0</version>
+                    <interface>
+                        <name>IFoo</name>
+                        <instance>default</instance>
+                    </interface>
+               </hal>
+            </manifest>
+        )";
+        std::string manifestFqnameNoIntf = "<manifest " + kMetaVersionStr + R"( type="framework">
+                <hal format="native">
+                    <name>foo</name>
+                    <fqname>@1.0/default</fqname>
+               </hal>
+            </manifest>
+        )";
+        std::string manifestLegacyNoIntf = "<manifest " + kMetaVersionStr + R"( type="framework">
+                <hal format="native">
+                    <name>foo</name>
+                    <version>1.0</version>
+                    <interface>
+                        <instance>default</instance>
+                    </interface>
+               </hal>
+            </manifest>
+        )";
+        std::string manifestNoInst = "<manifest " + kMetaVersionStr + R"( type="framework">
+                <hal format="native">
+                    <name>foo</name>
+                    <version>1.0</version>
+               </hal>
+            </manifest>
+        )";
+
+        std::vector<NativeHalCompatTestParam> ret;
+
+        // If the matrix specifies interface name, the manifest must also do.
+        ret.emplace_back(NativeHalCompatTestParam{matrixIntf, manifestFqnameIntf, true, ""});
+        ret.emplace_back(NativeHalCompatTestParam{matrixIntf, manifestLegacyIntf, true, ""});
+        ret.emplace_back(NativeHalCompatTestParam{matrixIntf, manifestFqnameNoIntf, false,
+                                                  "required: @1.0::IFoo/default"});
+        ret.emplace_back(NativeHalCompatTestParam{matrixIntf, manifestLegacyNoIntf, false,
+                                                  "required: @1.0::IFoo/default"});
+        ret.emplace_back(NativeHalCompatTestParam{matrixIntf, manifestNoInst, false,
+                                                  "required: @1.0::IFoo/default"});
+
+        // If the matrix does not specify an interface name, the manifest must not do that either.
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoIntf, manifestFqnameIntf, false,
+                                                  "required: @1.0/default"});
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoIntf, manifestLegacyIntf, false,
+                                                  "required: @1.0/default"});
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoIntf, manifestFqnameNoIntf, true, ""});
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoIntf, manifestLegacyNoIntf, true, ""});
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoIntf, manifestNoInst, false,
+                                                  "required: @1.0/default"});
+
+        // If the matrix does not specify interface name nor instances, the manifest may either
+        // provide instances of that version, or just a version number with no instances.
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoInst, manifestFqnameIntf, true, ""});
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoInst, manifestLegacyIntf, true, ""});
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoInst, manifestFqnameNoIntf, true, ""});
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoInst, manifestLegacyNoIntf, true, ""});
+        ret.emplace_back(NativeHalCompatTestParam{matrixNoInst, manifestNoInst, true, ""});
+
+        return ret;
+    }
+};
+
+TEST_P(NativeHalCompatTest, Compat) {
+    auto params = GetParam();
+    std::string error;
+    HalManifest manifest;
+    ASSERT_TRUE(fromXml(&manifest, params.manifestXml, &error)) << error;
+    CompatibilityMatrix matrix;
+    ASSERT_TRUE(fromXml(&matrix, params.matrixXml, &error)) << error;
+    EXPECT_EQ(params.compatible, manifest.checkCompatibility(matrix, &error)) << error;
+    if (!params.expectedError.empty()) {
+        EXPECT_THAT(error, HasSubstr(params.expectedError));
+    } else {
+        EXPECT_THAT(error, IsEmpty());
+    }
+}
+
+INSTANTIATE_TEST_CASE_P(LibVintfTest, NativeHalCompatTest,
+                        ::testing::ValuesIn(NativeHalCompatTest::createParams()));
+
+// clang-format off
 
 /////////////////// xmlfile tests
 
@@ -4902,6 +5145,45 @@ TEST_F(LibVintfTest, ManifestAddAidl) {
     ASSERT_TRUE(manifest1.addAll(&manifest2, &error)) << error;
 }
 
+// clang-format on
+
+TEST_F(LibVintfTest, NativeGetHalNamesAndVersions) {
+    HalManifest manifest;
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="device">
+            <hal format="native">
+                <name>foo</name>
+                <version>1.0</version>
+                <interface>
+                    <instance>inst</instance>
+                </interface>
+           </hal>
+        </manifest>
+    )";
+    std::string error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+    auto names = manifest.getHalNamesAndVersions();
+    ASSERT_EQ(1u, names.size());
+    EXPECT_EQ("foo@1.0", *names.begin());
+}
+
+TEST_F(LibVintfTest, NativeGetHalNamesAndVersionsFqName) {
+    HalManifest manifest;
+    std::string xml = "<manifest " + kMetaVersionStr + R"( type="device">
+            <hal format="native">
+                <name>foo</name>
+                <fqname>@1.0/inst</fqname>
+           </hal>
+        </manifest>
+    )";
+    std::string error;
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+    auto names = manifest.getHalNamesAndVersions();
+    ASSERT_EQ(1u, names.size());
+    EXPECT_EQ("foo@1.0", *names.begin());
+}
+
+// clang-format off
+
 TEST_F(LibVintfTest, KernelInfoLevel) {
     std::string error;
     std::string xml = "<kernel version=\"3.18.31\" target-level=\"1\"/>\n";
@@ -5076,24 +5358,137 @@ TEST_F(LibVintfTest, RuntimeInfoParseGkiKernelReleaseLevelInconsistent) {
                                     "5.4.42-android12-0-something", nullptr, &level));
 }
 
-TEST_F(LibVintfTest, HalManifestMissingI) {
-    // If package name, interface or instance contains characters invalid to FqInstance,
-    // it must be rejected because forEachInstance requires them to fit into FqInstance.
-    std::string xml = "<manifest " + kMetaVersionStr + R"( type="framework">
-                           <hal format="aidl">
-                               <name>android.frameworks.foo</name>
-                               <version>1</version>
-                               <interface>
-                                   <name>MyFoo</name>
-                                   <instance>default</instance>
-                               </interface>
-                           </hal>
-                       </manifest>)";
+class ManifestMissingITest : public LibVintfTest,
+                             public ::testing::WithParamInterface<std::string> {
+   public:
+    static std::vector<std::string> createParams() {
+        std::vector<std::string> ret;
+
+        ret.push_back("<manifest " + kMetaVersionStr + R"( type="device">
+            <hal format="aidl">
+                <name>android.hardware.foo</name>
+                <version>1</version>
+                <interface>
+                    <name>MyFoo</name>
+                    <instance>default</instance>
+                </interface>
+            </hal>
+        </manifest>)");
+
+        ret.push_back("<manifest " + kMetaVersionStr + R"( type="device">
+            <hal format="hidl">
+                <name>android.hardware.foo</name>
+                <transport>hwbinder</transport>
+                <version>1.0</version>
+                <interface>
+                    <name>MyFoo</name>
+                    <instance>default</instance>
+                </interface>
+            </hal>
+        </manifest>)");
+
+        ret.push_back("<manifest " + kMetaVersionStr + R"( type="device">
+            <hal format="native">
+                <name>android.hardware.foo</name>
+                <version>1.0</version>
+                <interface>
+                    <name>MyFoo</name>
+                    <instance>default</instance>
+                </interface>
+            </hal>
+        </manifest>)");
+
+        return ret;
+    }
+};
+
+TEST_P(ManifestMissingITest, CheckErrorMsg) {
+    std::string xml = GetParam();
     HalManifest manifest;
     std::string error;
     ASSERT_FALSE(fromXml(&manifest, xml, &error)) << "Should not be valid:\n" << xml;
-    EXPECT_THAT(error, HasSubstr("Interface 'MyFoo' should have the format I[a-zA-Z0-9_]*"));
+    EXPECT_THAT(error, HasSubstr("Interface 'MyFoo' should have the format I[a-zA-Z0-9_]*")) << "\n"
+                                                                                             << xml;
 }
+
+INSTANTIATE_TEST_SUITE_P(LibVintfTest, ManifestMissingITest,
+                         ::testing::ValuesIn(ManifestMissingITest::createParams()));
+
+struct ManifestMissingInterfaceTestParam {
+    std::string xml;
+    std::string expectedError;
+};
+
+class ManifestMissingInterfaceTest
+    : public LibVintfTest,
+      public ::testing::WithParamInterface<ManifestMissingInterfaceTestParam> {
+   public:
+    static std::vector<ManifestMissingInterfaceTestParam> createParams() {
+        std::vector<ManifestMissingInterfaceTestParam> ret;
+
+        ret.emplace_back(ManifestMissingInterfaceTestParam{
+            "<manifest " + kMetaVersionStr + R"( type="device">
+                <hal format="aidl">
+                    <name>android.hardware.foo</name>
+                    <version>1</version>
+                    <interface>
+                        <instance>default</instance>
+                    </interface>
+                </hal>
+            </manifest>)",
+            "Interface '' should have the format I[a-zA-Z0-9_]*",
+        });
+
+        ret.emplace_back(ManifestMissingInterfaceTestParam{
+            "<manifest " + kMetaVersionStr + R"( type="device">
+                <hal format="aidl">
+                    <name>android.hardware.foo</name>
+                    <version>1</version>
+                    <fqname>/default</fqname>
+                </hal>
+            </manifest>)",
+            "Could not parse text \"/default\" in element <fqname>",
+        });
+
+        ret.emplace_back(ManifestMissingInterfaceTestParam{
+            "<manifest " + kMetaVersionStr + R"( type="device">
+                <hal format="hidl">
+                    <name>android.hardware.foo</name>
+                    <transport>hwbinder</transport>
+                    <version>1.0</version>
+                    <interface>
+                        <instance>default</instance>
+                    </interface>
+                </hal>
+            </manifest>)",
+            "Interface '' should have the format I[a-zA-Z0-9_]*",
+        });
+
+        ret.emplace_back(ManifestMissingInterfaceTestParam{
+            "<manifest " + kMetaVersionStr + R"( type="device">
+                <hal format="hidl">
+                    <name>android.hardware.foo</name>
+                    <transport>hwbinder</transport>
+                    <fqname>@1.0/default</fqname>
+                </hal>
+            </manifest>)",
+            "Should specify interface: \"@1.0/default\"",
+        });
+
+        return ret;
+    }
+};
+
+TEST_P(ManifestMissingInterfaceTest, CheckErrorMsg) {
+    auto&& [xml, expectedError] = GetParam();
+    HalManifest manifest;
+    std::string error;
+    ASSERT_FALSE(fromXml(&manifest, xml, &error)) << "Should not be valid:\n" << xml;
+    EXPECT_THAT(error, HasSubstr(expectedError)) << "\n" << xml;
+}
+
+INSTANTIATE_TEST_SUITE_P(LibVintfTest, ManifestMissingInterfaceTest,
+                         ::testing::ValuesIn(ManifestMissingInterfaceTest::createParams()));
 
 TEST_F(LibVintfTest, HalManifestInvalidPackage) {
     // If package name, interface or instance contains characters invalid to FqInstance,
@@ -5114,24 +5509,111 @@ TEST_F(LibVintfTest, HalManifestInvalidPackage) {
     EXPECT_THAT(error, HasSubstr("not_a_valid_package!"));
 }
 
-TEST_F(LibVintfTest, CompatibilityMatrixMissingI) {
-    // If package name, interface or instance contains characters invalid to FqInstance,
-    // it must be rejected because forEachInstance requires them to fit into FqInstance.
-    std::string xml = "<compatibility-matrix " + kMetaVersionStr + R"( type="framework">
-                           <hal format="aidl">
-                               <name>android.frameworks.foo</name>
-                               <version>1-2</version>
-                               <interface>
-                                   <name>MyFoo</name>
-                                   <instance>default</instance>
-                               </interface>
-                           </hal>
-                       </compatibility-matrix>)";
+class MatrixMissingITest : public LibVintfTest, public ::testing::WithParamInterface<std::string> {
+   public:
+    static std::vector<std::string> createParams() {
+        std::vector<std::string> ret;
+
+        ret.push_back("<compatibility-matrix " + kMetaVersionStr + R"( type="device">
+            <hal format="aidl">
+                <name>android.hardware.foo</name>
+                <version>1</version>
+                <interface>
+                    <name>MyFoo</name>
+                    <instance>default</instance>
+                </interface>
+            </hal>
+        </compatibility-matrix>)");
+
+        ret.push_back("<compatibility-matrix " + kMetaVersionStr + R"( type="device">
+            <hal format="hidl">
+                <name>android.hardware.foo</name>
+                <version>1.0</version>
+                <interface>
+                    <name>MyFoo</name>
+                    <instance>default</instance>
+                </interface>
+            </hal>
+        </compatibility-matrix>)");
+
+        ret.push_back("<compatibility-matrix " + kMetaVersionStr + R"( type="device">
+            <hal format="native">
+                <name>android.hardware.foo</name>
+                <version>1.0</version>
+                <interface>
+                    <name>MyFoo</name>
+                    <instance>default</instance>
+                </interface>
+            </hal>
+        </compatibility-matrix>)");
+
+        return ret;
+    }
+};
+
+TEST_P(MatrixMissingITest, CheckErrorMsg) {
+    std::string xml = GetParam();
     CompatibilityMatrix matrix;
     std::string error;
     ASSERT_FALSE(fromXml(&matrix, xml, &error)) << "Should not be valid:\n" << xml;
     EXPECT_THAT(error, HasSubstr("Interface 'MyFoo' should have the format I[a-zA-Z0-9_]*"));
 }
+
+INSTANTIATE_TEST_SUITE_P(LibVintfTest, MatrixMissingITest,
+                         ::testing::ValuesIn(MatrixMissingITest::createParams()));
+
+struct MatrixMissingInterfaceTestParam {
+    std::string xml;
+    std::string expectedError;
+};
+
+class MatrixMissingInterfaceTest
+    : public LibVintfTest,
+      public ::testing::WithParamInterface<MatrixMissingInterfaceTestParam> {
+   public:
+    static std::vector<MatrixMissingInterfaceTestParam> createParams() {
+        std::vector<MatrixMissingInterfaceTestParam> ret;
+
+        ret.emplace_back(MatrixMissingInterfaceTestParam{
+            "<compatibility-matrix " + kMetaVersionStr + R"( type="device">
+                <hal format="aidl">
+                    <name>android.hardware.foo</name>
+                    <version>1</version>
+                    <interface>
+                        <instance>default</instance>
+                    </interface>
+                </hal>
+            </compatibility-matrix>)",
+            "Interface '' should have the format I[a-zA-Z0-9_]*",
+        });
+
+        ret.emplace_back(MatrixMissingInterfaceTestParam{
+            "<compatibility-matrix " + kMetaVersionStr + R"( type="device">
+                <hal format="hidl">
+                    <name>android.hardware.foo</name>
+                    <version>1.0</version>
+                    <interface>
+                        <instance>default</instance>
+                    </interface>
+                </hal>
+            </compatibility-matrix>)",
+            "Interface '' should have the format I[a-zA-Z0-9_]*",
+        });
+
+        return ret;
+    }
+};
+
+TEST_P(MatrixMissingInterfaceTest, CheckErrorMsg) {
+    auto&& [xml, expectedError] = GetParam();
+    CompatibilityMatrix matrix;
+    std::string error;
+    ASSERT_FALSE(fromXml(&matrix, xml, &error)) << "Should not be valid:\n" << xml;
+    EXPECT_THAT(error, HasSubstr(expectedError)) << "\n" << xml;
+}
+
+INSTANTIATE_TEST_SUITE_P(LibVintfTest, MatrixMissingInterfaceTest,
+                         ::testing::ValuesIn(MatrixMissingInterfaceTest::createParams()));
 
 TEST_F(LibVintfTest, CompatibilityMatrixInvalidPackage) {
     // If package name, interface or instance contains characters invalid to FqInstance,

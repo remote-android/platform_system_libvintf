@@ -579,7 +579,9 @@ struct HalInterfaceConverter : public XmlNodeConverter<HalInterface> {
     std::string elementName() const override { return "interface"; }
     void mutateNode(const HalInterface& object, NodeType* root,
                     const MutateNodeParam& param) const override {
-        appendTextElement(root, "name", object.name(), param.d);
+        if (!object.name().empty()) {
+            appendTextElement(root, "name", object.name(), param.d);
+        }
         appendTextElements(root, "instance", object.mInstances, param.d);
         appendTextElements(root, "regex-instance", object.mRegexes, param.d);
     }
@@ -587,7 +589,7 @@ struct HalInterfaceConverter : public XmlNodeConverter<HalInterface> {
                      const BuildObjectParam& param) const override {
         std::vector<std::string> instances;
         std::vector<std::string> regexes;
-        if (!parseTextElement(root, "name", &object->mName, param.error) ||
+        if (!parseOptionalTextElement(root, "name", {}, &object->mName, param.error) ||
             !parseTextElements(root, "instance", &instances, param.error) ||
             !parseTextElements(root, "regex-instance", &regexes, param.error)) {
             return false;
@@ -950,25 +952,10 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                 bool cont = intf.forEachInstance(
                     [&v, &fqInstances, &convertedInstancesIntoFqnames, &object, &param](
                         const auto& interface, const auto& instance, bool /* isRegex */) {
-                        // AIDL HAL <fqname> never contains version
-                        auto fqInstance =
-                            object->format == HalFormat::AIDL
-                                ? FqInstance::from(interface, instance)
-                                : FqInstance::from(v.majorVer, v.minorVer, interface, instance);
-                        std::string debugString =
-                            object->format == HalFormat::AIDL
-                                ? toAidlFqnameString(object->name, interface, instance)
-                                : toFQNameString(object->name, v, interface, instance);
+                        auto fqInstance = details::convertLegacyInstanceIntoFqInstance(
+                            object->name, v, interface, instance, object->format, param.error);
 
                         if (!fqInstance.has_value()) {
-                            // Bad FqInstance. Infer an error message.
-                            if (details::canConvertToFqInstance(object->name, v, interface,
-                                                                instance, object->format,
-                                                                param.error)) {
-                                // Unable to determine a better error. Return a generic error.
-                                *param.error = "Invalid FqInstance: " + debugString;
-                            }
-                            // else param.error is set appropriately.
                             return false;
                         }
 
@@ -979,6 +966,10 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
                         // <interface> and <fqname> is not allowed.
                         auto&& [it, inserted] = fqInstances.emplace(std::move(fqInstance.value()));
                         if (param.metaVersion >= kMetaVersionNoHalInterfaceInstance && !inserted) {
+                            std::string debugString =
+                                object->format == HalFormat::AIDL
+                                    ? toAidlFqnameString(object->name, interface, instance)
+                                    : toFQNameString(object->name, v, interface, instance);
                             *param.error = "Duplicated " + debugString +
                                            " in <interface><instance> and <fqname>. ";
                             if constexpr (kDevice) {
