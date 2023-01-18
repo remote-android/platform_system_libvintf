@@ -64,8 +64,8 @@ bool FqInstance::hasInstance() const {
     return !mInstance.empty();
 }
 
-const FQName& FqInstance::getFqName() const {
-    return mFqName;
+std::string FqInstance::getFqNameString() const {
+    return mFqName.string();
 }
 
 bool FqInstance::isValid() const {
