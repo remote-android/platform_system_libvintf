@@ -852,7 +852,9 @@ android::base::Result<std::vector<FqInstance>> VintfObject::GetListedInstanceInh
             return android::base::Error() << "Cannot parse " << childFqNameString << " as FQName";
         }
         FqInstance childFqInstance;
-        if (!childFqInstance.setTo(childFqName, fqInstance.getInstance())) {
+        if (!childFqInstance.setTo(childFqName.package(), childFqName.getPackageMajorVersion(),
+                                   childFqName.getPackageMinorVersion(),
+                                   childFqName.getInterfaceName(), fqInstance.getInstance())) {
             return android::base::Error() << "Cannot merge " << childFqName.string() << "/"
                                           << fqInstance.getInstance() << " as FqInstance";
             continue;
