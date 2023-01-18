@@ -26,8 +26,6 @@
 namespace android {
 namespace vintf {
 
-using details::canConvertToFqInstance;
-
 bool ManifestHal::isValid(std::string* error) const {
     if (error) {
         error->clear();
@@ -121,7 +119,7 @@ bool ManifestHal::verifyInstance(const FqInstance& fqInstance, std::string* erro
         if (error) *error = "Should specify version: \"" + fqInstance.string() + "\"";
         return false;
     }
-    if (!fqInstance.hasInterface()) {
+    if (!fqInstance.hasInterface() && format != HalFormat::NATIVE) {
         if (error) *error = "Should specify interface: \"" + fqInstance.string() + "\"";
         return false;
     }

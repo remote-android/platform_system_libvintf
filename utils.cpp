@@ -21,17 +21,9 @@
 
 namespace android::vintf::details {
 
-bool canConvertToFqInstance(const std::string& package, const Version& version,
-                            const std::string& interface, const std::string& instance,
-                            HalFormat format, std::string* appendedError) {
-    if (FqInstance::from(package, version.majorVer, version.minorVer, interface, instance)
-            .has_value()) {
-        return true;
-    }
-    if (appendedError == nullptr) {
-        return false;
-    }
-
+std::optional<FqInstance> convertLegacyInstanceIntoFqInstance(
+    const std::string& package, const Version& version, const std::string& interface,
+    const std::string& instance, HalFormat format, std::string* appendedError) {
     // Attempt to construct a good error message.
     std::stringstream ss;
     ss << "Invalid instance: '";
@@ -51,18 +43,52 @@ bool canConvertToFqInstance(const std::string& package, const Version& version,
         foundError = true;
     }
 
-    if (!fqName.setTo(interface) || !fqName.isInterfaceName()) {
-        ss << "Interface '" << interface << "' should have the format I[a-zA-Z0-9_]*";
-        foundError = true;
+    switch (format) {
+        case HalFormat::HIDL:
+        case HalFormat::AIDL: {
+            if (!fqName.setTo(interface) || !fqName.isInterfaceName()) {
+                ss << "Interface '" << interface << "' should have the format I[a-zA-Z0-9_]*";
+                foundError = true;
+            }
+        } break;
+        case HalFormat::NATIVE: {
+            if (!interface.empty() && (!fqName.setTo(interface) || !fqName.isInterfaceName())) {
+                ss << "Interface '" << interface << "' should have the format I[a-zA-Z0-9_]*";
+                foundError = true;
+            }
+        } break;
     }
 
-    if (!foundError) {
-        ss << "Unknown error.";
+    if (foundError) {
+        if (appendedError != nullptr) {
+            *appendedError += ss.str() + "\n";
+        }
+        return std::nullopt;
     }
-    ss << "\n";
 
-    *appendedError += ss.str();
-    return false;
+    // AIDL HAL <fqname> never contains version
+    std::optional<FqInstance> parsed;
+    switch (format) {
+        case HalFormat::HIDL:
+        case HalFormat::NATIVE:
+            parsed = FqInstance::from(version.majorVer, version.minorVer, interface, instance);
+            break;
+        case HalFormat::AIDL:
+            // AIDL HAL <fqname> never contains version
+            parsed = FqInstance::from(interface, instance);
+            break;
+    }
+    if (!parsed.has_value()) {
+        if (appendedError != nullptr) {
+            std::string debugString = format == HalFormat::AIDL
+                                          ? toAidlFqnameString(package, interface, instance)
+                                          : toFQNameString(package, version, interface, instance);
+
+            *appendedError += "Invalid FqInstance: " + debugString + "\n";
+        }
+    }
+
+    return parsed;
 }
 
 }  // namespace android::vintf::details

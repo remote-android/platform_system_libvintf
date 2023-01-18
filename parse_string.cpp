@@ -439,9 +439,9 @@ std::string toFQNameString(const std::string& package, const std::string& versio
     ss << package << "@" << version;
     if (!interface.empty()) {
         ss << "::" << interface;
-        if (!instance.empty()) {
-            ss << "/" << instance;
-        }
+    }
+    if (!instance.empty()) {
+        ss << "/" << instance;
     }
     return ss.str();
 }

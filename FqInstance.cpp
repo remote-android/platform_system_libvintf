@@ -48,8 +48,8 @@ bool FqInstance::hasVersion() const {
     return mFqName.hasVersion();
 }
 
-const std::string& FqInstance::getInterface() const {
-    return mFqName.getInterfaceName();
+std::string FqInstance::getInterface() const {
+    return hasInterface() ? mFqName.getInterfaceName() : "";
 }
 
 bool FqInstance::hasInterface() const {
@@ -75,12 +75,14 @@ bool FqInstance::isValid() const {
     bool hasInst = hasInstance();
 
     // android.hardware.foo@1.0::IFoo/default
-    if (hasPkg && hasVer && hasIntf && hasInst) {
+    // android.hardware.foo@1.0/default
+    if (hasPkg && hasVer && hasInst) {
         return true;
     }
 
     // @1.0::IFoo/default
-    if (!hasPkg && hasVer && hasIntf && hasInst) {
+    // @1.0/default
+    if (!hasPkg && hasVer && hasInst) {
         return true;
     }
 

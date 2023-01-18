@@ -38,7 +38,7 @@ class FqInstance {
     size_t getMajorVersion() const;
     size_t getMinorVersion() const;
     std::pair<size_t, size_t> getVersion() const;
-    const std::string& getInterface() const;
+    std::string getInterface() const;
     const std::string& getInstance() const;
     std::string getFqNameString() const;
 
@@ -54,8 +54,10 @@ class FqInstance {
     bool inPackage(const std::string& package) const;
 
     // Return true if valid:
+    // android.hardware.foo@1.0/instance
     // android.hardware.foo@1.0::IFoo/instance
     // @1.0::IFoo/instance
+    // @1.0/instance
     // IFoo/instance
     __attribute__((warn_unused_result)) bool setTo(const std::string& s);
 
