@@ -26,14 +26,12 @@ struct FQName {
 
     explicit FQName();
 
-    FQName(const std::string& package, const std::string& version, const std::string& name = "",
-           const std::string& valueName = "");
+    FQName(const std::string& package, const std::string& version, const std::string& name = "");
 
     // Returns false if string isn't a valid FQName object.
     __attribute__((warn_unused_result)) bool setTo(const std::string& s);
     __attribute__((warn_unused_result)) bool setTo(const std::string& package, size_t majorVer,
-                                                   size_t minorVer, const std::string& name = "",
-                                                   const std::string& valueName = "");
+                                                   size_t minorVer, const std::string& name = "");
 
     const std::string& package() const;
     // Return version in the form "1.0" if it is present, otherwise empty string.
@@ -103,7 +101,6 @@ struct FQName {
     size_t mMajor = 0;
     size_t mMinor = 0;
     std::string mName;
-    std::string mValueName;
 
     void clear();
 
