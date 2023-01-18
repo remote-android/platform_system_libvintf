@@ -57,29 +57,18 @@ class FqInstance {
     // android.hardware.foo@1.0::IFoo/instance
     // @1.0::IFoo/instance
     // IFoo/instance
-    // android.hardware.foo@1.0::IFoo.Type
-    // @1.0::IFoo.Type
-    // android.hardware.foo@1.0
-    // IFoo.Type
-    // Type
-    //
-    // If no "/instance", hasInstance() will return false afterwards.
     __attribute__((warn_unused_result)) bool setTo(const std::string& s);
 
     // Convenience method for the following formats:
-    // android.hardware.foo@1.0
-    // android.hardware.foo@1.0::IFoo
     // android.hardware.foo@1.0::IFoo/default
     __attribute__((warn_unused_result)) bool setTo(const std::string& package, size_t majorVer,
-                                                   size_t minorVer,
-                                                   const std::string& interface = "",
-                                                   const std::string& instance = "");
+                                                   size_t minorVer, const std::string& interface,
+                                                   const std::string& instance);
     // Convenience method for the following formats:
-    // @1.0::IFoo
     // @1.0::IFoo/default
     __attribute__((warn_unused_result)) bool setTo(size_t majorVer, size_t minorVer,
                                                    const std::string& interface,
-                                                   const std::string& instance = "");
+                                                   const std::string& instance);
 
     // Convenience method for the following formats:
     // IFoo/default
