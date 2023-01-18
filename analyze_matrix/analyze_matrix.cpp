@@ -19,7 +19,6 @@
 
 #include <android-base/logging.h>
 #include <gflags/gflags.h>
-#include <hidl-util/FqInstance.h>
 #include <vintf/FileSystem.h>
 #include <vintf/parse_string.h>
 #include <vintf/parse_xml.h>
