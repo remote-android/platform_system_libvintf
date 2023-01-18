@@ -43,7 +43,7 @@ class ManifestInstance {
                      const std::optional<std::string>& updatableViaApex);
     const std::string& package() const;
     Version version() const;
-    const std::string& interface() const;
+    std::string interface() const;
     const std::string& instance() const;
     Transport transport() const;
     Arch arch() const;
