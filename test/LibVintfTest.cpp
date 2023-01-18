@@ -3787,7 +3787,7 @@ TEST_F(LibVintfTest, FqNameInvalid) {
         "    <fqname>@1.0::IFoo</fqname>\n"
         "</hal>\n";
     ASSERT_FALSE(fromXml(&hal, xml, &error));
-    EXPECT_IN("Should specify instance", error);
+    EXPECT_IN("Could not parse text \"@1.0::IFoo\" in element <fqname>", error);
     xml =
         "<hal format=\"hidl\">\n"
         "    <name>n07 4 v4l1d 1n73rf4c3</name>\n"
