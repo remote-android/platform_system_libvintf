@@ -89,8 +89,7 @@ bool FqInstance::isValid() const {
         return true;
     }
 
-    // Other cases are covered by FQName::setTo, but instance name should be empty.
-    return !hasInst;
+    return false;
 }
 
 bool FqInstance::setTo(const std::string& s) {
