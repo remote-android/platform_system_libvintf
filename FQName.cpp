@@ -30,20 +30,18 @@ bool FQName::parse(const std::string& s, FQName* into) {
     return into->setTo(s);
 }
 
-FQName::FQName(const std::string& package, const std::string& version, const std::string& name,
-               const std::string& valueName) {
+FQName::FQName(const std::string& package, const std::string& version, const std::string& name) {
     size_t majorVer, minorVer;
     CHECK(parseVersion(version, &majorVer, &minorVer));
-    CHECK(setTo(package, majorVer, minorVer, name, valueName)) << string();
+    CHECK(setTo(package, majorVer, minorVer, name)) << string();
 }
 
 bool FQName::setTo(const std::string& package, size_t majorVer, size_t minorVer,
-                   const std::string& name, const std::string& valueName) {
+                   const std::string& name) {
     mPackage = package;
     mMajor = majorVer;
     mMinor = minorVer;
     mName = name;
-    mValueName = valueName;
 
     FQName other;
     if (!parse(string(), &other)) return false;
@@ -107,8 +105,8 @@ bool FQName::setTo(const std::string& s) {
 
     const char* l = s.c_str();
     const char* end = l + s.size();
-    // android.hardware.foo@10.12::IFoo.Type:MY_ENUM_VALUE
-    // S                   ES ES E S        ES            E
+    // android.hardware.foo@10.12::IFoo.Type
+    // S                   ES ES E S        E
     //
     // S - start pointer
     // E - end pointer
@@ -122,7 +120,7 @@ bool FQName::setTo(const std::string& s) {
             return std::string(start, end - start);
         }
     };
-    StartEnd package, major, minor, name, type;
+    StartEnd package, major, minor, name;
 
     if (l < end && isIdentStart(*l)) {
         package.start = l;
@@ -145,13 +143,8 @@ bool FQName::setTo(const std::string& s) {
             l++;
             name.start = l;
             if ((name.end = l = eatPackage(l, end)) == nullptr) return false;
-            if (l < end && *l++ == ':') {
-                type.start = l;
-                if ((type.end = l = eatIdent(l, end)) == nullptr) return false;
-            }
         } else {
-            type.start = l;
-            if ((type.end = l = eatIdent(l, end)) == nullptr) return false;
+            return false;
         }
     }
 
@@ -169,17 +162,14 @@ bool FQName::setTo(const std::string& s) {
     // failures after this goto fail to clear
     mName = name.string();
     mPackage = package.string();
-    mValueName = type.string();
 
     if (major.start != nullptr) {
         if (!parseVersion(major.string(), minor.string(), &mMajor, &mMinor)) goto fail;
-    } else if (mPackage.empty() && mValueName.empty() &&
-               name.end == eatIdent(name.start, name.end)) {
+    } else if (mPackage.empty() && name.end == eatIdent(name.start, name.end)) {
         // major.start == nullptr
         mIsIdentifier = true;
     }
 
-    if (!mValueName.empty() && mName.empty()) goto fail;
     if (!mPackage.empty() && version().empty()) goto fail;
 
     return true;
@@ -209,7 +199,6 @@ void FQName::clear() {
     mPackage.clear();
     clearVersion();
     mName.clear();
-    mValueName.clear();
 }
 
 void FQName::clearVersion(size_t* majorVer, size_t* minorVer) {
@@ -262,11 +251,6 @@ std::string FQName::string() const {
             out.append("::");
         }
         out.append(mName);
-
-        if (!mValueName.empty()) {
-            out.append(":");
-            out.append(mValueName);
-        }
     }
 
     return out;
