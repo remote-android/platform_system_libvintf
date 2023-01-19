@@ -24,15 +24,14 @@
 #include <string>
 #include <vector>
 
-#include <hidl-util/FqInstance.h>
-
-#include "HalFormat.h"
-#include "HalInterface.h"
-#include "Level.h"
-#include "ManifestInstance.h"
-#include "TransportArch.h"
-#include "Version.h"
-#include "WithFileName.h"
+#include <vintf/FqInstance.h>
+#include <vintf/HalFormat.h>
+#include <vintf/HalInterface.h>
+#include <vintf/Level.h>
+#include <vintf/ManifestInstance.h>
+#include <vintf/TransportArch.h>
+#include <vintf/Version.h>
+#include <vintf/WithFileName.h>
 
 namespace android {
 namespace vintf {

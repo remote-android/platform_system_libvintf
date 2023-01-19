@@ -369,9 +369,9 @@ std::set<std::string> HalManifest::checkUnusedHals(
         // If there is at least one match, do not consider it unused.
         if (manifestInstance.format() == HalFormat::HIDL) {
             auto range =
-                childrenMap.equal_range(manifestInstance.getFqInstance().getFqName().string());
+                childrenMap.equal_range(manifestInstance.getFqInstance().getFqNameString());
             for (auto it = range.first; it != range.second; ++it) {
-                FQName fqName;
+                details::FQName fqName;
                 CHECK(fqName.setTo(it->second));
                 if (mat.matchInstance(manifestInstance.format(), fqName.package(),
                                       fqName.getVersion(), fqName.name(),
