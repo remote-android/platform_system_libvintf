@@ -43,7 +43,6 @@
 #include "constants-private.h"
 #include "utils.h"
 
-using android::apex::info::kApexInfoFile;
 using android::kver::KernelRelease;
 
 namespace android {
@@ -189,14 +188,6 @@ int checkCompatibilityForFiles(const std::string& manifestPath, const std::strin
 
     std::cout << "true" << std::endl;
     return 0;
-}
-
-// Create VINTF APEX module.
-//  The input apex_info_file provides the location of the apex-info-file to parse
-// the APEX information.  The android::apex::kApexRoot is used to form the path of
-// the APEXs to allow usual use of FileSystem dirmaps.
-static std::unique_ptr<ApexInterface> createApex(const std::string& apex_info_file) {
-    return std::make_unique<Apex>(apex_info_file);
 }
 
 Args parseArgs(int argc, char** argv) {
@@ -457,14 +448,11 @@ android::base::Result<void> checkAllFiles(const Dirmap& dirmap, const Properties
     CheckFlags::Type flags = CheckFlags::DEFAULT;
     if (!runtimeInfo) flags = flags.disableRuntimeInfo();
 
-    auto hostApex = createApex(hostFileSystem->resolve(kApexInfoFile, nullptr));
-
     auto vintfObject =
         VintfObject::Builder()
             .setFileSystem(std::move(hostFileSystem))
             .setPropertyFetcher(std::move(hostPropertyFetcher))
             .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(runtimeInfo))
-            .setApex(std::move(hostApex))
             .build();
 
     std::optional<android::base::Error<>> retError = std::nullopt;
@@ -524,14 +512,12 @@ int checkOne(const Dirmap& dirmap, const Properties& props) {
     auto hostFileSystem = std::make_unique<HostFileSystem>(dirmap, NAME_NOT_FOUND);
     auto hostPropertyFetcher = std::make_unique<PresetPropertyFetcher>();
     hostPropertyFetcher->setProperties(props);
-    auto hostApex = createApex(hostFileSystem->resolve(kApexInfoFile, nullptr));
 
     auto vintfObject =
         VintfObject::Builder()
             .setFileSystem(std::move(hostFileSystem))
             .setPropertyFetcher(std::move(hostPropertyFetcher))
             .setRuntimeInfoFactory(std::make_unique<StaticRuntimeInfoFactory>(nullptr))
-            .setApex(std::move(hostApex))
             .build();
 
     if (dirmap.count("/system")) {

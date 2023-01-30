@@ -532,8 +532,11 @@ class VintfObjectTestBase : public ::testing::Test {
         // Map the apex with manifest to the files below
         const std::string& active_apex = apex_dirs.at(0);
 
-        EXPECT_CALL(apex(), DeviceVintfDirs())
-            .WillOnce(Return(apex_dirs))
+        EXPECT_CALL(apex(), DeviceVintfDirs(_, _, _))
+            .WillOnce(Invoke([apex_dirs](auto*, auto* out, auto*){
+                *out = apex_dirs;
+                return ::android::OK;
+            }))
             ;
 
         EXPECT_CALL(fetcher(), listFiles(_, _, _))
@@ -550,6 +553,9 @@ class VintfObjectTestBase : public ::testing::Test {
 
         // Expect to fetch APEX directory manifest once.
         expectFetch(std::string(active_apex).append("manifest.xml"), manifest);
+
+        ON_CALL(propertyFetcher(), getBoolProperty("apex.all.ready", _))
+            .WillByDefault(Return(true));
     }
 
     std::unique_ptr<VintfObject> vintfObject;
@@ -949,15 +955,24 @@ class DeviceManifestTest : public VintfObjectTestBase {
       // Map the apex with manifest to the files below
       const std::string& active_apex = apex_dirs.at(0);
 
-      EXPECT_CALL(apex(), DeviceVintfDirs())
-          .WillOnce({}) // Initialization
-          .WillOnce(Return(apex_dirs)) // after apex loaded
+      EXPECT_CALL(apex(), DeviceVintfDirs(_, _, _))
+          .WillOnce(Invoke([](auto*, auto* out, auto*){
+            *out = {};
+            return ::android::OK;
+          })) // Initialization
+          .WillOnce(Invoke([apex_dirs](auto*, auto* out, auto*){
+            *out = apex_dirs;
+            return ::android::OK;
+          })) // after apex loaded
           ;
 
-      EXPECT_CALL(apex(),HasUpdate()) // Not called during init
+      EXPECT_CALL(apex(), HasUpdate(_)) // Not called during init
           .WillOnce(Return(true)) // Apex loaded
           .WillOnce(Return(false)) // no updated to apex data
           ;
+
+      ON_CALL(propertyFetcher(), getBoolProperty("apex.all.ready", _))
+          .WillByDefault(Return(true));
 
       EXPECT_CALL(fetcher(), listFiles(_, _, _))
           .WillRepeatedly(Invoke([](const auto&, auto* out, auto*) {

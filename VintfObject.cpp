@@ -70,9 +70,11 @@ static std::unique_ptr<PropertyFetcher> createDefaultPropertyFetcher() {
     }
     return propertyFetcher;
 }
+
 static std::unique_ptr<ApexInterface> createDefaultApex() {
     return std::make_unique<details::Apex>();
 }
+
 std::shared_ptr<VintfObject> VintfObject::GetInstance() {
     static details::LockedSharedPtr<VintfObject> sInstance{};
     std::unique_lock<std::mutex> lock(sInstance.mutex);
@@ -91,7 +93,7 @@ std::shared_ptr<const HalManifest> VintfObject::getDeviceHalManifest() {
     {
         std::lock_guard<std::mutex> lock(mDeviceManifest.mutex);
         if (mDeviceManifest.fetchedOnce) {
-            if (getApex()->HasUpdate()) {
+            if (isApexReady() && getApex()->HasUpdate(getFileSystem().get())) {
                 LOG(INFO) << __func__ << ": Reloading VINTF information.";
                 mDeviceManifest.object = nullptr;
                 mDeviceManifest.fetchedOnce = false;
@@ -255,15 +257,22 @@ status_t VintfObject::fetchDeviceHalManifest(HalManifest* out, std::string* erro
     return fetchDeviceHalManifestApex(out, error);
 }
 
-// Priority for loading APEX vendor manifests
-// Vendor + odm
+// Fetch fragments from apexes originated from /vendor.
+// For now, we don't have /odm apexes.
 status_t VintfObject::fetchDeviceHalManifestApex(HalManifest* out, std::string* error) {
     status_t status = OK;
-
+    if (!isApexReady()) {
+        return OK;
+    }
     // Create HalManifest for all APEX HALs so that the apex defined attribute can
     // be set.
     HalManifest apexManifest;
-    for (const auto& dir : getApex()->DeviceVintfDirs()) {
+    std::vector<std::string> dirs;
+    status = getApex()->DeviceVintfDirs(getFileSystem().get(), &dirs, error);
+    if (status != OK) {
+        return status;
+    }
+    for (const auto& dir : dirs) {
         status = addDirectoryManifests(dir, &apexManifest, false, error);
         if (status != OK) {
             return status;
@@ -1037,6 +1046,15 @@ const std::unique_ptr<ObjectFactory<RuntimeInfo>>& VintfObject::getRuntimeInfoFa
 const std::unique_ptr<ApexInterface>& VintfObject::getApex() {
     return mApex;
 }
+
+bool VintfObject::isApexReady() {
+    if constexpr (kIsTarget) {
+        return getPropertyFetcher()->getBoolProperty("apex.all.ready", false);
+    } else {
+        return true;
+    }
+}
+
 android::base::Result<bool> VintfObject::hasFrameworkCompatibilityMatrixExtensions() {
     std::vector<CompatibilityMatrix> matrixFragments;
     std::string error;
@@ -1336,6 +1354,7 @@ VintfObjectBuilder& VintfObjectBuilder::setApex(std::unique_ptr<ApexInterface>&&
     mObject->mApex = std::move(a);
     return *this;
 }
+
 std::unique_ptr<VintfObject> VintfObjectBuilder::buildInternal() {
     if (!mObject->mFileSystem) mObject->mFileSystem = createDefaultFileSystem();
     if (!mObject->mRuntimeInfoFactory)

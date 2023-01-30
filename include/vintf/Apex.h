@@ -16,10 +16,11 @@
 
 #pragma once
 
+#include "FileSystem.h"
+
+#include <optional>
 #include <string>
 #include <vector>
-
-#include "apex_info_cache.h"
 
 namespace android {
 namespace vintf {
@@ -29,22 +30,24 @@ class ApexInterface {
    public:
     virtual ~ApexInterface() = default;
     // Check if there is an update for the given type of APEX files in the system
-    virtual bool HasUpdate() const = 0;
+    virtual bool HasUpdate(FileSystem* fileSystem) const = 0;
     // Get device VINTF directories
-    virtual std::vector<std::string> DeviceVintfDirs() = 0;
+    virtual status_t DeviceVintfDirs(FileSystem* fileSystem, std::vector<std::string>* out,
+                                     std::string* error) = 0;
 };
 
 namespace details {
 
-// Provide ApexInterface using ApexInfoCache
+// Provide default implementation for ApexInterface
 class Apex : public ApexInterface {
    public:
-    Apex(const std::string& apex_info_file = android::apex::info::kApexInfoFile);
-    virtual bool HasUpdate() const override;
-    virtual std::vector<std::string> DeviceVintfDirs() override;
+    Apex() = default;
+    bool HasUpdate(FileSystem* fileSystem) const override;
+    status_t DeviceVintfDirs(FileSystem* fileSystem, std::vector<std::string>* out,
+                             std::string* error) override;
 
    private:
-    std::unique_ptr<android::apex::info::ApexInfoCache> apex_;
+    std::optional<int64_t> mtime_;
 };
 
 }  // namespace details

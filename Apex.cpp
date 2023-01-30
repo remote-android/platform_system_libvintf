@@ -15,57 +15,83 @@
  */
 #include "Apex.h"
 
+#include <android-base/format.h>
 #include <android-base/logging.h>
+#include <android-base/strings.h>
 
+#include "com_android_apex.h"
 #include "constants-private.h"
+
+using android::base::StartsWith;
 
 namespace android {
 namespace vintf {
 namespace details {
 
-using android::apex::info::ApexInfoCache;
-using android::apex::info::ApexType;
-
-Apex::Apex(const std::string& apex_info_file)
-    : apex_(std::make_unique<ApexInfoCache>(apex_info_file)) {}
-
-std::vector<std::string> Apex::DeviceVintfDirs() {
+status_t Apex::DeviceVintfDirs(FileSystem* fileSystem, std::vector<std::string>* dirs,
+                               std::string* error) {
     std::vector<std::string> vendor;
     std::vector<std::string> odm;
-    // Update cache
-    auto ret = apex_->Update();
-    if (!ret.ok()) {
-        LOG(INFO) << "Could not update APEX info " << ret.error();
-        // Continue using existing data in cache
+
+    // Update cached mtime_
+    int64_t mtime;
+    auto status = fileSystem->modifiedTime(kApexInfoFile, &mtime, error);
+    if (status == NAME_NOT_FOUND) {
+        if (error) {
+            error->clear();
+        }
+        return OK;
     }
-    for (const auto& obj : apex_->Info()) {
-        switch (obj.Type()) {
-            case (ApexType::kVendor):
-                vendor.emplace_back(obj.Path() + "/" + details::kVintfSubDir);
-                break;
-            case (ApexType::kOdm):
-                odm.emplace_back(obj.Path() + "/" + details::kVintfSubDir);
-                break;
-            default:
-                break;
+    if (status != OK) return status;
+    mtime_ = mtime;
+
+    // Load apex-info-list
+    std::string xml;
+    status = fileSystem->fetch(kApexInfoFile, &xml, error);
+    if (status == NAME_NOT_FOUND) {
+        if (error) {
+            error->clear();
+        }
+        return OK;
+    }
+    if (status != OK) return status;
+
+    auto apexInfoList = com::android::apex::parseApexInfoList(xml.c_str());
+    if (!apexInfoList.has_value()) {
+        if (error) {
+            *error = std::string("Not a valid XML ") + kApexInfoFile;
+        }
+        return UNKNOWN_ERROR;
+    }
+
+    // Get vendor apex vintf dirs
+    for (const auto& apexInfo : apexInfoList->getApexInfo()) {
+        // Skip non-active apexes
+        if (!apexInfo.getIsActive()) continue;
+        // Skip if no preinstalled paths. This shouldn't happen but XML schema says it's optional.
+        if (!apexInfo.hasPreinstalledModulePath()) continue;
+
+        const std::string& path = apexInfo.getPreinstalledModulePath();
+        if (StartsWith(path, "/vendor/apex/") || StartsWith(path, "/system/vendor/apex/")) {
+            dirs->push_back(fmt::format("/apex/{}/" VINTF_SUB_DIR, apexInfo.getModuleName()));
         }
     }
-    if (vendor.empty()) {
-        return odm;
-    }
-
-    std::move(odm.begin(), odm.end(), std::back_inserter(vendor));
-    return vendor;
+    return OK;
 }
 
-bool Apex::HasUpdate() const {
-    // Currently only support updating vendor apex.
-    auto ret = apex_->HasNewData();
-    if (!ret.ok()) {
-        LOG(INFO) << "Could not determine new APEX data" << std::endl;
+// Returns true when /apex/apex-info-list.xml is updated
+bool Apex::HasUpdate(FileSystem* fileSystem) const {
+    int64_t mtime{};
+    std::string error;
+    status_t status = fileSystem->modifiedTime(kApexInfoFile, &mtime, &error);
+    if (status == NAME_NOT_FOUND) {
         return false;
     }
-    return *ret;
+    if (status != OK) {
+        LOG(ERROR) << error;
+        return false;
+    }
+    return mtime != mtime_;
 }
 
 }  // namespace details
