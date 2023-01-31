@@ -75,6 +75,7 @@ def ParseArgs() -> argparse.Namespace:
                            "E.g. wifi, usb, health. Recommend to use with --unchanged.")
   parser.add_argument("--verbose", "-v", action="store_true", help="Verbose mode")
   parser.add_argument("--json", "-j", action="store_true", help="Print JSON")
+  parser.add_argument("--package-only", action="store_true", help="Analyze on the package level.")
   args = parser.parse_args()
 
   if args.verbose:
@@ -255,6 +256,29 @@ def GetPackage(instance: str) -> str:
   return SplitInstance(instance)[0]
 
 
+def GetPackageAndHidlVersion(instance: str) -> str:
+  """
+  Guess the package and version of instance.
+  :param instance: two formats:
+    android.hardware.health.storage@1.0::IStorage/default
+    android.hardware.health.storage.IStorage/default (@1)
+  :return: The package and HIDL version. In the above example, return
+    android.hardware.health.storage@1.0 for HIDL, and android.hardware.health.storage for AIDL.
+
+  >>> GetPackageAndHidlVersion("android.hardware.health.storage@1.0::IStorage/default")
+  'android.hardware.health.storage@1.0'
+  >>> GetPackageAndHidlVersion("android.hardware.health.storage.IStorage/default (@1)")
+  'android.hardware.health.storage'
+  """
+  format = GetHalFormat(instance)
+  if format == HalFormat.HIDL:
+    colonPos = instance.find("::")
+    return instance[:colonPos]
+  elif format == HalFormat.AIDL:
+    dotPos = instance.rfind(".")
+    return instance[:dotPos]
+
+
 def KeyOnPackage(instances: Sequence[str]) -> dict[str, list[str]]:
   """
   :param instances: A list of instances.
@@ -297,6 +321,11 @@ class Report(object):
     for package in self.all_packages:
       package_instances1 = set(self.instances_by_package1.get(package, []))
       package_instances2 = set(self.instances_by_package2.get(package, []))
+
+      if self.args.package_only:
+        package_instances1 = set(GetPackageAndHidlVersion(inst) for inst in package_instances1)
+        package_instances2 = set(GetPackageAndHidlVersion(inst) for inst in package_instances2)
+
       deprecated = sorted(package_instances1 - package_instances2)
       unchanged = sorted(package_instances1 & package_instances2)
       introduced = sorted(package_instances2 - package_instances1)
@@ -379,6 +408,8 @@ class JsonReport(Report):
     for package_report in packages_report.values():
       for key, lst in package_report.items():
         final[key] += lst
+    for key in final:
+      final[key] = sorted(final[key])
     final["__meta__"] = {
         "old": {"level": self.matrixData1.level,
                 "level_name": self.matrixData1.level_name},
