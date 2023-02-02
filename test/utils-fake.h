@@ -37,6 +37,7 @@ class MockFileSystem : public FileSystem {
     MOCK_CONST_METHOD2(fetch, status_t(const std::string& path, std::string& fetched));
     MOCK_CONST_METHOD3(listFiles,
                        status_t(const std::string&, std::vector<std::string>*, std::string*));
+    MOCK_CONST_METHOD3(modifiedTime, status_t(const std::string&, int64_t*, std::string*));
 
     status_t fetch(const std::string& path, std::string* fetched, std::string*) const override {
         // Call the mocked function
@@ -51,6 +52,8 @@ class MockFileSystemWithError : public FileSystem {
     MOCK_METHOD(status_t, fetch, (const std::string&, std::string*, std::string*),
                 (const override));
     MOCK_METHOD(status_t, listFiles, (const std::string&, std::vector<std::string>*, std::string*),
+                (const override));
+    MOCK_METHOD(status_t, modifiedTime, (const std::string&, int64_t*, std::string*),
                 (const override));
 };
 
