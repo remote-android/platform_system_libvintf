@@ -94,8 +94,8 @@ class MockPropertyFetcher : public PropertyFetcher {
 class MockApex : public ApexInterface {
    public:
     MockApex() = default;
-    MOCK_METHOD(bool, HasUpdate, (), (const, override));
-    MOCK_METHOD(std::vector<std::string>, DeviceVintfDirs, (), (override));
+    MOCK_CONST_METHOD1(HasUpdate, bool(FileSystem*));
+    MOCK_METHOD3(DeviceVintfDirs, status_t(FileSystem*, std::vector<std::string>*, std::string*));
 };
 
 }  // namespace details
