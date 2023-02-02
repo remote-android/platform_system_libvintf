@@ -41,9 +41,10 @@ class HostFileSystem : public FileSystemImpl {
                        std::string* error) const override;
     status_t modifiedTime(const std::string& path, int64_t* mtime,
                           std::string* error) const override;
-    std::string resolve(const std::string& path, std::string* error) const;
 
    private:
+    std::string resolve(const std::string& path, std::string* error) const;
+
     Dirmap mDirMap;
     status_t mMissingError;
 

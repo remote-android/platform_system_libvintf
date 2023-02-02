@@ -1469,6 +1469,14 @@ TEST_F(LibVintfTest, FullCompat) {
 
 // clang-format on
 
+TEST_F(LibVintfTest, ApexInterfaceShouldBeOkayWithoutApexInfoList) {
+    details::FileSystemNoOp fs;
+    details::Apex apex;
+    ASSERT_FALSE(apex.HasUpdate(&fs));
+    std::vector<std::string> dirs;
+    ASSERT_EQ(OK, apex.DeviceVintfDirs(&fs, &dirs, nullptr));
+}
+
 struct NativeHalCompatTestParam {
     std::string matrixXml;
     std::string manifestXml;
