@@ -89,6 +89,7 @@ cc_library {
         "XmlFile.cpp",
         "utils.cpp",
     ],
+    generated_sources: ["apex-info-list-tinyxml"],
     shared_libs: libvintf_private_deps,
     header_libs: [
         "libaidlmetadata_headers",
@@ -96,7 +97,6 @@ cc_library {
     ],
     whole_static_libs: [
         "libkver",
-        "libapexinfo",
     ],
     export_include_dirs: [
         "include",
