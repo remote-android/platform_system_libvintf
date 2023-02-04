@@ -307,7 +307,7 @@ class AssembleVintfImpl : public AssembleVintf {
         out() << "    Input:" << std::endl;
         for (const auto& e : inputs) {
             if (!e.fileName().empty()) {
-                out() << "        " << base::Basename(e.fileName()) << std::endl;
+                out() << "        " << e.fileName() << std::endl;
             }
         }
         out() << "-->" << std::endl;
