@@ -152,6 +152,10 @@ struct CompatibilityMatrix : public HalGroup<MatrixHal>,
     // Prerequisite: matrixKernel is in mKernels.
     Level getSourceMatrixLevel(const MatrixKernel* matrixKernel) const;
 
+    // Return the minlts of the latest <kernel>, or empty value if any error (e.g. this is not an
+    // FCM, or there are no <kernel> tags).
+    [[nodiscard]] KernelVersion getLatestKernelMinLts() const;
+
     friend struct HalManifest;
     friend struct RuntimeInfo;
     friend struct CompatibilityMatrixConverter;

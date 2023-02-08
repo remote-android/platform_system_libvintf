@@ -480,5 +480,18 @@ Level CompatibilityMatrix::getSourceMatrixLevel(const MatrixKernel* matrixKernel
     return level();
 }
 
+KernelVersion CompatibilityMatrix::getLatestKernelMinLts() const {
+    if (type() != SchemaType::FRAMEWORK) {
+        return {};
+    }
+    auto maxIt = std::max_element(
+        framework.mKernels.begin(), framework.mKernels.end(),
+        [](const MatrixKernel& a, const MatrixKernel& b) { return a.minLts() < b.minLts(); });
+    if (maxIt == framework.mKernels.end()) {
+        return {};
+    }
+    return maxIt->minLts();
+}
+
 } // namespace vintf
 } // namespace android
