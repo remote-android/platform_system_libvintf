@@ -1326,6 +1326,28 @@ android::base::Result<void> VintfObject::checkMatrixHalsHasDefinition(
     return {};
 }
 
+android::base::Result<KernelVersion> VintfObject::getLatestMinLtsAtFcmVersion(Level fcmVersion) {
+    auto allFcms = getAllFrameworkMatrixLevels();
+    if (!allFcms.ok()) return allFcms.error();
+
+    // Get the max of latestKernelMinLts for all FCM fragments at |fcmVersion|.
+    // Usually there's only one such fragment.
+    KernelVersion foundLatestMinLts;
+    for (const auto& fcm : *allFcms) {
+        if (fcm.level() != fcmVersion) {
+            continue;
+        }
+        // Note: this says "minLts", but "Latest" indicates that it is a max value.
+        auto thisLatestMinLts = fcm.getLatestKernelMinLts();
+        if (foundLatestMinLts < thisLatestMinLts) foundLatestMinLts = thisLatestMinLts;
+    }
+    if (foundLatestMinLts != KernelVersion{}) {
+        return foundLatestMinLts;
+    }
+    return android::base::Error(-NAME_NOT_FOUND)
+           << "Can't find compatibility matrix fragment for level " << fcmVersion;
+}
+
 // make_unique does not work because VintfObject constructor is private.
 VintfObject::Builder::Builder()
     : VintfObjectBuilder(std::unique_ptr<VintfObject>(new VintfObject())) {}

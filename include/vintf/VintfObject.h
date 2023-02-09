@@ -269,6 +269,9 @@ class VintfObject {
         const std::vector<HidlInterfaceMetadata>& hidlMetadata,
         const std::vector<AidlInterfaceMetadata>& aidlMetadata);
 
+    // Get the latest <kernel> minlts for compatibility matrix level |fcmVersion|.
+    android::base::Result<KernelVersion> getLatestMinLtsAtFcmVersion(Level fcmVersion);
+
    private:
     std::unique_ptr<FileSystem> mFileSystem;
     std::unique_ptr<ObjectFactory<RuntimeInfo>> mRuntimeInfoFactory;
