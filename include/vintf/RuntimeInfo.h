@@ -91,12 +91,11 @@ struct RuntimeInfo {
         POLICYVERS = 1 << 3,
         AVB = 1 << 4,
         KERNEL_FCM = 1 << 5,
-        LAST_PLUS_ONE,
+        FETCH_FLAG_LAST_PLUS_ONE,
 
         NONE = 0,
-        ALL = ((LAST_PLUS_ONE - 1) << 1) - 1,
+        ALL = ((FETCH_FLAG_LAST_PLUS_ONE - 1) << 1) - 1,
     };
-
 
     // GKI kernel release string specifies the kernel level using a string like
     // "android12". This function converts the trailing number of this string to
