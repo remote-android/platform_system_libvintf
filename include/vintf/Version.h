@@ -94,6 +94,9 @@ struct KernelVersion {
         if (majorRev > other.majorRev) return false;
         return minorRev < other.minorRev;
     }
+    inline bool operator>(const KernelVersion& other) const { return other < (*this); }
+    inline bool operator<=(const KernelVersion& other) const { return !((*this) > other); }
+    inline bool operator>=(const KernelVersion& other) const { return !((*this) < other); }
 
     inline constexpr Version dropMinor() const { return Version{version, majorRev}; }
 };
