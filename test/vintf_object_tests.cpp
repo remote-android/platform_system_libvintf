@@ -39,7 +39,9 @@ using namespace ::testing;
 using namespace std::literals;
 
 using android::base::testing::HasError;
+using android::base::testing::HasValue;
 using android::base::testing::Ok;
+using android::base::testing::WithCode;
 using android::base::testing::WithMessage;
 using android::vintf::FqInstance;
 
@@ -2742,6 +2744,56 @@ TEST_P(VintfObjectComposerHalTest, Test) {
 INSTANTIATE_TEST_SUITE_P(VintfObjectComposerHalTest, VintfObjectComposerHalTest,
                          ::testing::ValuesIn(VintfObjectComposerHalTest::GetParams()),
                          [](const auto& info) { return to_string(info.param); });
+
+constexpr const char* systemMatrixLatestMinLtsFormat = R"(
+<compatibility-matrix %s type="framework" level="%s">
+    <kernel version="%s" />
+    <kernel version="%s" />
+    <kernel version="%s" />
+</compatibility-matrix>
+)";
+
+class VintfObjectLatestMinLtsTest : public MultiMatrixTest {};
+
+TEST_F(VintfObjectLatestMinLtsTest, TestEmpty) {
+    SetUpMockSystemMatrices({});
+    EXPECT_THAT(vintfObject->getLatestMinLtsAtFcmVersion(Level::S),
+                HasError(WithCode(-NAME_NOT_FOUND)));
+}
+
+TEST_F(VintfObjectLatestMinLtsTest, TestMissing) {
+    SetUpMockSystemMatrices({
+        android::base::StringPrintf(systemMatrixLatestMinLtsFormat, kMetaVersionStr.c_str(),
+                                    to_string(Level::S).c_str(), "4.19.191", "5.4.86", "5.10.43"),
+    });
+    EXPECT_THAT(
+        vintfObject->getLatestMinLtsAtFcmVersion(Level::T),
+        HasError(WithMessage(HasSubstr("Can't find compatibility matrix fragment for level 7"))));
+}
+
+TEST_F(VintfObjectLatestMinLtsTest, TestSimple) {
+    SetUpMockSystemMatrices({
+        android::base::StringPrintf(systemMatrixLatestMinLtsFormat, kMetaVersionStr.c_str(),
+                                    to_string(Level::S).c_str(), "4.19.191", "5.4.86", "5.10.43"),
+        android::base::StringPrintf(systemMatrixLatestMinLtsFormat, kMetaVersionStr.c_str(),
+                                    to_string(Level::T).c_str(), "5.4.86", "5.10.107", "5.15.41"),
+    });
+    EXPECT_THAT(vintfObject->getLatestMinLtsAtFcmVersion(Level::S),
+                HasValue(KernelVersion{5, 10, 43}));
+    EXPECT_THAT(vintfObject->getLatestMinLtsAtFcmVersion(Level::T),
+                HasValue(KernelVersion{5, 15, 41}));
+}
+
+TEST_F(VintfObjectLatestMinLtsTest, TestMultipleFragment) {
+    SetUpMockSystemMatrices({
+        android::base::StringPrintf(systemMatrixLatestMinLtsFormat, kMetaVersionStr.c_str(),
+                                    to_string(Level::S).c_str(), "4.19.191", "5.4.86", "5.10.43"),
+        android::base::StringPrintf(systemMatrixLatestMinLtsFormat, kMetaVersionStr.c_str(),
+                                    to_string(Level::S).c_str(), "5.4.86", "5.10.107", "5.15.41"),
+    });
+    EXPECT_THAT(vintfObject->getLatestMinLtsAtFcmVersion(Level::S),
+                HasValue(KernelVersion{5, 15, 41}));
+}
 
 }  // namespace testing
 }  // namespace vintf
