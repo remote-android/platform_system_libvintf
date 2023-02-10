@@ -38,8 +38,8 @@ bool CompatibilityMatrix::add(MatrixHal&& halToAdd, std::string*) {
 
 bool CompatibilityMatrix::addAllHals(CompatibilityMatrix* other, std::string*) {
     std::string internalError;
-    for (auto& pair : other->mHals) {
-        CHECK(add(std::move(pair.second), &internalError)) << internalError;
+    for (auto& entry : other->mHals) {
+        CHECK(add(std::move(entry.second), &internalError)) << internalError;
     }
     other->mHals.clear();
     return true;
@@ -195,9 +195,9 @@ bool CompatibilityMatrix::addAllHalsAsOptional(CompatibilityMatrix* other, std::
         return true;
     }
 
-    for (auto& pair : other->mHals) {
-        const std::string& name = pair.first;
-        MatrixHal& halToAdd = pair.second;
+    for (auto& halEntry : other->mHals) {
+        const std::string& name = halEntry.first;
+        MatrixHal& halToAdd = halEntry.second;
 
         std::set<std::pair<std::string, std::string>> insertedInstances;
         std::set<std::pair<std::string, std::string>> insertedRegex;
@@ -228,11 +228,11 @@ bool CompatibilityMatrix::addAllHalsAsOptional(CompatibilityMatrix* other, std::
         });
 
         // Add the remaining instances.
-        for (const auto& pair : insertedInstances) {
-            halToAdd.removeInstance(pair.first, pair.second, false /* isRegex */);
+        for (const auto& entry : insertedInstances) {
+            halToAdd.removeInstance(entry.first, entry.second, false /* isRegex */);
         }
-        for (const auto& pair : insertedRegex) {
-            halToAdd.removeInstance(pair.first, pair.second, true /* isRegex */);
+        for (const auto& entry : insertedRegex) {
+            halToAdd.removeInstance(entry.first, entry.second, true /* isRegex */);
         }
 
         if (halToAdd.instancesCount() > 0) {
@@ -478,6 +478,19 @@ Level CompatibilityMatrix::getSourceMatrixLevel(const MatrixKernel* matrixKernel
     Level ret = matrixKernel->getSourceMatrixLevel();
     if (ret != Level::UNSPECIFIED) return ret;
     return level();
+}
+
+KernelVersion CompatibilityMatrix::getLatestKernelMinLts() const {
+    if (type() != SchemaType::FRAMEWORK) {
+        return {};
+    }
+    auto maxIt = std::max_element(
+        framework.mKernels.begin(), framework.mKernels.end(),
+        [](const MatrixKernel& a, const MatrixKernel& b) { return a.minLts() < b.minLts(); });
+    if (maxIt == framework.mKernels.end()) {
+        return {};
+    }
+    return maxIt->minLts();
 }
 
 } // namespace vintf

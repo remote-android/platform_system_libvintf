@@ -35,6 +35,7 @@ cc_defaults {
         "-Wall",
         "-Werror",
         "-Wextra-semi",
+        "-Wshadow",
     ],
 
     target: {
