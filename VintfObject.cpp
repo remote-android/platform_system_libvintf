@@ -1146,13 +1146,16 @@ std::set<std::string> HidlMetadataToPackagesAndVersions(
 }
 
 // android.hardware.foo
-std::set<std::string> AidlMetadataToPackages(
+// All non-vintf stable interfaces are filtered out.
+std::set<std::string> AidlMetadataToVintfPackages(
     const std::vector<AidlInterfaceMetadata>& aidlMetadata,
     const std::function<bool(const std::string&)>& shouldCheck) {
     std::set<std::string> ret;
     for (const auto& item : aidlMetadata) {
-        for (const auto& type : item.types) {
-            InsertIf(StripAidlType(type), shouldCheck, &ret);
+        if (item.stability == "vintf") {
+            for (const auto& type : item.types) {
+                InsertIf(StripAidlType(type), shouldCheck, &ret);
+            }
         }
     }
     return ret;
@@ -1170,11 +1173,15 @@ std::set<std::string> HidlMetadataToNames(const std::vector<HidlInterfaceMetadat
 
 // android.hardware.foo.IFoo
 // Note that UDTs are not filtered out, so there might be non-interface types.
-std::set<std::string> AidlMetadataToNames(const std::vector<AidlInterfaceMetadata>& aidlMetadata) {
+// All non-vintf stable interfaces are filtered out.
+std::set<std::string> AidlMetadataToVintfNames(
+    const std::vector<AidlInterfaceMetadata>& aidlMetadata) {
     std::set<std::string> ret;
     for (const auto& item : aidlMetadata) {
-        for (const auto& type : item.types) {
-            ret.insert(type);
+        if (item.stability == "vintf") {
+            for (const auto& type : item.types) {
+                ret.insert(type);
+            }
         }
     }
     return ret;
@@ -1214,16 +1221,17 @@ android::base::Result<void> VintfObject::checkMissingHalsInMatrices(
     if (!matrixFragments.ok()) return matrixFragments.error();
 
     // Filter aidlMetadata and hidlMetadata with shouldCheck.
-    auto allAidlPackages = AidlMetadataToPackages(aidlMetadata, shouldCheck);
+    auto allAidlVintfPackages = AidlMetadataToVintfPackages(aidlMetadata, shouldCheck);
     auto allHidlPackagesAndVersions = HidlMetadataToPackagesAndVersions(hidlMetadata, shouldCheck);
 
-    // Filter out instances in allAidlMetadata and allHidlMetadata that are in the matrices.
+    // Filter out instances in allAidlVintfPackages and allHidlPackagesAndVersions that are
+    // in the matrices.
     std::vector<std::string> errors;
     for (const auto& matrix : matrixFragments.value()) {
         matrix.forEachInstance([&](const MatrixInstance& matrixInstance) {
             switch (matrixInstance.format()) {
                 case HalFormat::AIDL: {
-                    allAidlPackages.erase(matrixInstance.package());
+                    allAidlVintfPackages.erase(matrixInstance.package());
                     return true;  // continue to next instance
                 }
                 case HalFormat::HIDL: {
@@ -1251,10 +1259,10 @@ android::base::Result<void> VintfObject::checkMissingHalsInMatrices(
             "The following HIDL packages are not found in any compatibility matrix fragments:\t\n" +
             android::base::Join(allHidlPackagesAndVersions, "\t\n"));
     }
-    if (!allAidlPackages.empty()) {
+    if (!allAidlVintfPackages.empty()) {
         errors.push_back(
             "The following AIDL packages are not found in any compatibility matrix fragments:\t\n" +
-            android::base::Join(allAidlPackages, "\t\n"));
+            android::base::Join(allAidlVintfPackages, "\t\n"));
     }
 
     if (!errors.empty()) {
@@ -1270,7 +1278,7 @@ android::base::Result<void> VintfObject::checkMatrixHalsHasDefinition(
     auto matrixFragments = getAllFrameworkMatrixLevels();
     if (!matrixFragments.ok()) return matrixFragments.error();
 
-    auto allAidlNames = AidlMetadataToNames(aidlMetadata);
+    auto allAidlVintfNames = AidlMetadataToVintfNames(aidlMetadata);
     auto allHidlNames = HidlMetadataToNames(hidlMetadata);
     std::set<std::string> badAidlInterfaces;
     std::set<std::string> badHidlInterfaces;
@@ -1288,7 +1296,7 @@ android::base::Result<void> VintfObject::checkMatrixHalsHasDefinition(
                 case HalFormat::AIDL: {
                     auto matrixInterface =
                         toAidlFqnameString(matrixInstance.package(), matrixInstance.interface());
-                    if (allAidlNames.find(matrixInterface) == allAidlNames.end()) {
+                    if (allAidlVintfNames.find(matrixInterface) == allAidlVintfNames.end()) {
                         errors.push_back(
                             "AIDL interface " + matrixInterface + " is referenced in " +
                             matrix.fileName() +
