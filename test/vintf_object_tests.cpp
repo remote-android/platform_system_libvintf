@@ -1734,6 +1734,31 @@ const static std::vector<std::string> systemMatrixKernelXmls = {
     "</compatibility-matrix>\n",
 };
 
+const static std::vector<std::string> systemMatrixKernelXmlsGki = {
+    // 5.xml
+    "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"5\">\n"
+    FAKE_KERNEL("4.14.0", "R_4_14", 5)
+    FAKE_KERNEL("4.19.0", "R_4_19", 5)
+    FAKE_KERNEL("5.4.0", "R_5_4", 5)
+    "</compatibility-matrix>\n",
+    // 6.xml
+    "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"6\">\n"
+    FAKE_KERNEL("4.19.0", "S_4_19", 6)
+    FAKE_KERNEL("5.4.0", "S_5_4", 6)
+    FAKE_KERNEL("5.10.0", "S_5_10", 6)
+    "</compatibility-matrix>\n",
+    // 7.xml
+    "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"7\">\n"
+    FAKE_KERNEL("5.10.0", "T_5_10", 7)
+    FAKE_KERNEL("5.15.0", "T_5_15", 7)
+    "</compatibility-matrix>\n",
+    // 8.xml
+    "<compatibility-matrix " + kMetaVersionStr + " type=\"framework\" level=\"8\">\n"
+    FAKE_KERNEL("5.15.0", "U_5_15", 8)
+    FAKE_KERNEL("6.1.0", "U_6_1", 8)
+    "</compatibility-matrix>\n",
+};
+
 class KernelTest : public MultiMatrixTest {
    public:
     void expectKernelFcmVersion(size_t targetFcm, Level kernelFcm) {
@@ -1968,6 +1993,45 @@ INSTANTIATE_TEST_SUITE_P(KernelTest, KernelTestP, ValuesIn(KernelTestParamValues
                          &PrintKernelTestParam);
 INSTANTIATE_TEST_SUITE_P(NoRKernelWithoutFcm, KernelTestP, ValuesIn(RKernelTestParamValues()),
                          &PrintKernelTestParam);
+
+// clang-format on
+
+std::vector<KernelTestP::ParamType> GkiKernelTestParamValues() {
+    std::vector<KernelTestP::ParamType> ret;
+    std::vector<std::string> matrices = systemMatrixKernelXmlsGki;
+
+    // Kernel FCM version R: may use 4.19-stable and android12-5.4
+    ret.emplace_back(matrices, MakeKernelInfo("4.19.0", "R_4_19"), Level::R, Level::R, true);
+    ret.emplace_back(matrices, MakeKernelInfo("4.19.0", "S_4_19"), Level::R, Level::R, true);
+    ret.emplace_back(matrices, MakeKernelInfo("5.4.0", "R_5_4"), Level::R, Level::R, true);
+    ret.emplace_back(matrices, MakeKernelInfo("5.4.0", "S_5_4"), Level::R, Level::R, true);
+
+    // Kernel FCM version S: may not use android13-5.10.
+    ret.emplace_back(matrices, MakeKernelInfo("5.4.0", "S_5_4"), Level::S, Level::S, true);
+    ret.emplace_back(matrices, MakeKernelInfo("5.10.0", "S_5_10"), Level::S, Level::S, true);
+    ret.emplace_back(matrices, MakeKernelInfo("5.10.0", "T_5_10"), Level::S, Level::S, false);
+
+    // Kernel FCM version T: may not use android14-5.15.
+    ret.emplace_back(matrices, MakeKernelInfo("5.10.0", "T_5_10"), Level::T, Level::T, true);
+    ret.emplace_back(matrices, MakeKernelInfo("5.15.0", "T_5_15"), Level::T, Level::T, true);
+    ret.emplace_back(matrices, MakeKernelInfo("5.15.0", "U_5_15"), Level::T, Level::T, false);
+
+    return ret;
+}
+
+std::string GkiPrintKernelTestParam(const TestParamInfo<KernelTestP::ParamType>& info) {
+    const auto& [matrices, kernelInfo, targetFcm, kernelFcm, pass] = info.param;
+    std::string ret = kernelInfo.configs().begin()->first;
+    ret += "_TargetFcm" + (targetFcm == Level::UNSPECIFIED ? "Unspecified" : to_string(targetFcm));
+    ret += "_KernelFcm" + (kernelFcm == Level::UNSPECIFIED ? "Unspecified" : to_string(kernelFcm));
+    ret += "_Should"s + (pass ? "Pass" : "Fail");
+    return ret;
+}
+
+INSTANTIATE_TEST_SUITE_P(GkiNoCheckFutureKmi, KernelTestP, ValuesIn(GkiKernelTestParamValues()),
+                         &GkiPrintKernelTestParam);
+
+// clang-format off
 
 class VintfObjectPartialUpdateTest : public MultiMatrixTest {
    protected:
