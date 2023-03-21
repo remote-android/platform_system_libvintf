@@ -36,13 +36,29 @@ status_t Apex::DeviceVintfDirs(FileSystem* fileSystem, std::vector<std::string>*
     // Update cached mtime_
     int64_t mtime;
     auto status = fileSystem->modifiedTime(kApexInfoFile, &mtime, error);
-    if (status == NAME_NOT_FOUND) {
-        if (error) {
+
+    if (status != OK) {
+        switch (status) {
+            case NAME_NOT_FOUND:
+                status = OK;
+                break;
+            case -EACCES:
+                // Don't error out on access errors, but log it
+                LOG(WARNING) << "APEX Device VINTF Dirs: EACCES: "
+                             << (error ? *error : "(unknown error message)");
+                status = OK;
+                break;
+            default:
+                break;
+        }
+
+        if ((status == OK) && (error)) {
             error->clear();
         }
-        return OK;
+
+        return status;
     }
-    if (status != OK) return status;
+
     mtime_ = mtime;
 
     // Load apex-info-list
