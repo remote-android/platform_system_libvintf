@@ -196,6 +196,7 @@ def ReadMatrices(args: argparse.Namespace) -> dict[int, MatrixData]:
 
 class HalFormat(enum.Enum):
   HIDL = 0
+  NATIVE = 1
   AIDL = 2
 
 
@@ -205,14 +206,23 @@ def GetHalFormat(instance: str) -> HalFormat:
   :param instance: two formats:
     android.hardware.health.storage@1.0::IStorage/default optional
     android.hardware.health.storage.IStorage/default (@1) optional
-  :return: HalFormat.HIDL for the first one, HalFormat.AIDL for the second.
+    storage@5.0 optional
+  :return: HalFormat.HIDL for the first one, HalFormat.AIDL for the second,
+    HalFormat.NATIVE for the third.
 
   >>> str(GetHalFormat("android.hardware.health.storage@1.0::IStorage/default optional"))
   'HalFormat.HIDL'
   >>> str(GetHalFormat("android.hardware.health.storage.IStorage/default (@1) optional"))
   'HalFormat.AIDL'
+  >>> str(GetHalFormat("storage@5.0 optional"))
+  'HalFormat.NATIVE'
   """
-  return HalFormat.HIDL if "::" in instance else HalFormat.AIDL
+  if "::" in instance:
+    return HalFormat.HIDL
+  elif "(@" in instance:
+    return HalFormat.AIDL
+  else:
+    return HalFormat.NATIVE
 
 
 def SplitInstance(instance: str) -> tuple[str, str, str]:
@@ -222,12 +232,15 @@ def SplitInstance(instance: str) -> tuple[str, str, str]:
   :param instance: two formats:
     android.hardware.health.storage@1.0::IStorage/default optional
     android.hardware.health.storage.IStorage/default (@1) optional
+    storage@5.0 optional
   :return: (package, version+interface+instance, requirement)
 
   >>> SplitInstance("android.hardware.health.storage@1.0::IStorage/default optional")
   ('android.hardware.health.storage', '@1.0::IStorage/default', 'optional')
   >>> SplitInstance("android.hardware.health.storage.IStorage/default (@1) optional")
   ('android.hardware.health.storage', 'IStorage/default (@1)', 'optional')
+  >>> SplitInstance("storage@5.0 optional")
+  ('storage', 'storage@5.0', 'optional')
   """
   format = GetHalFormat(instance)
   if format == HalFormat.HIDL:
@@ -238,6 +251,10 @@ def SplitInstance(instance: str) -> tuple[str, str, str]:
     dotPos = instance.rfind(".")
     spacePos = instance.rfind(" ")
     return instance[:dotPos], instance[dotPos + 1:spacePos], instance[spacePos + 1:]
+  elif format == HalFormat.NATIVE:
+    atPos = instance.find("@")
+    spacePos = instance.rfind(" ")
+    return instance[:atPos], instance[:spacePos], instance[spacePos + 1:]
 
 
 def GetPackage(instance: str) -> str:
@@ -262,13 +279,17 @@ def GetPackageAndHidlVersion(instance: str) -> str:
   :param instance: two formats:
     android.hardware.health.storage@1.0::IStorage/default
     android.hardware.health.storage.IStorage/default (@1)
+    storage@5.0
   :return: The package and HIDL version. In the above example, return
-    android.hardware.health.storage@1.0 for HIDL, and android.hardware.health.storage for AIDL.
+    android.hardware.health.storage@1.0 for HIDL, storage@5.0 for NATIVE,
+    and android.hardware.health.storage for AIDL.
 
   >>> GetPackageAndHidlVersion("android.hardware.health.storage@1.0::IStorage/default")
   'android.hardware.health.storage@1.0'
   >>> GetPackageAndHidlVersion("android.hardware.health.storage.IStorage/default (@1)")
   'android.hardware.health.storage'
+  >>> GetPackageAndHidlVersion("storage@5.0")
+  'storage@5.0'
   """
   format = GetHalFormat(instance)
   if format == HalFormat.HIDL:
@@ -277,6 +298,9 @@ def GetPackageAndHidlVersion(instance: str) -> str:
   elif format == HalFormat.AIDL:
     dotPos = instance.rfind(".")
     return instance[:dotPos]
+  elif format == HalFormat.NATIVE:
+    return instance
+
 
 
 def KeyOnPackage(instances: Sequence[str]) -> dict[str, list[str]]:
