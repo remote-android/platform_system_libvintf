@@ -369,10 +369,10 @@ class HumanReadableReport(Report):
       package_report += [desc("- {0} {2} can no longer be used", instance)
                          for instance in deprecated]
     if self.args.unchanged:
-      package_report += [desc("  {0} {2} is {3}", instance) for instance in
+      package_report += [desc("  {0} {2}", instance) for instance in
                          unchanged]
     if self.args.introduced:
-      package_report += [desc("+ {0} {2} is {3}", instance) for instance in
+      package_report += [desc("+ {0} {2}", instance) for instance in
                          introduced]
 
     return package_report
