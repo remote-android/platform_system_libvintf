@@ -1034,7 +1034,7 @@ struct ManifestHalConverter : public XmlNodeConverter<ManifestHal> {
 
         if (param.metaVersion >= kMetaVersionNoHalInterfaceInstance &&
             (object->format == HalFormat::HIDL || object->format == HalFormat::AIDL) &&
-            fqInstancesToInsert.empty()) {
+            fqInstancesToInsert.empty() && !object->isOverride()) {
             *param.error = "<hal> " + object->name + " has no instance. Fix by adding <fqname>.";
             return false;
         }
