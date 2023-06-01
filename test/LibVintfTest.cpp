@@ -3046,6 +3046,23 @@ TEST_F(LibVintfTest, ManifestHalOverride) {
     EXPECT_FALSE(bar.front()->isOverride());
 }
 
+TEST_F(LibVintfTest, ManifestHalOverrideLatest) {
+    std::string error;
+    HalManifest manifest;
+    std::string xml =
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
+        "    <hal format=\"hidl\" override=\"true\">\n"
+        "        <name>android.hardware.foo</name>\n"
+        "        <transport>hwbinder</transport>\n"
+        "        <version>1.0</version>\n"
+        "    </hal>\n"
+        "</manifest>\n";
+    EXPECT_TRUE(fromXml(&manifest, xml, &error)) << error;
+    const auto& foo = getHals(manifest, "android.hardware.foo");
+    ASSERT_FALSE(foo.empty());
+    EXPECT_TRUE(foo.front()->isOverride());
+}
+
 // Test functionality of override="true" tag
 TEST_F(LibVintfTest, ManifestAddOverrideHalSimple) {
     std::string error;
@@ -3352,7 +3369,7 @@ TEST_F(LibVintfTest, ManifestAddOverrideHalRemoveAll) {
 
     HalManifest newManifest;
     xml =
-        "<manifest version=\"5.0\" type=\"device\">\n"
+        "<manifest " + kMetaVersionStr + " type=\"device\">\n"
         "    <hal format=\"hidl\" override=\"true\">\n"
         "        <name>android.hardware.foo</name>\n"
         "        <transport>hwbinder</transport>\n"
